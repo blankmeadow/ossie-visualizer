@@ -1,4 +1,4 @@
-import { ArrowRight, Braces, CircleDot, Database, GitBranch, KeyRound, Sigma, X } from 'lucide-react'
+import { ArrowRight, Braces, CircleDot, Database, GitBranch, Sigma, X } from 'lucide-react'
 import {
   collectExpressionStrings,
   conceptMembers,
@@ -141,10 +141,11 @@ function MemberTable({ headers, children }) {
 }
 
 /**
- * A row is one grid line of cells plus, when there is something to say, the
- * description underneath it. A description is a sentence and the inspector is
- * under 400px wide, so giving it a column of its own would clip it to a few
- * words; on its own line it gets the full width.
+ * A row is one grid line of cells plus, when the author wrote one, the
+ * description underneath it. A description is a sentence rather than a field,
+ * so a column of its own would clip it to a few words; on its own line it gets
+ * the panel's full width. Nothing else goes on that line -- `verbalizes` in
+ * particular belongs to the relationship's own panel, a click away on the name.
  */
 function MemberRow({ children, note }) {
   return (
@@ -248,15 +249,6 @@ function GroupedRows({ groups, renderRow }) {
   ))
 }
 
-/**
- * What a relationship row says about itself. `verbalizes` is required by the
- * spec while `description` is not, so an unannotated relationship still reads
- * as a sentence. Empty when there is neither, and then the row shows no note
- * at all rather than a line saying nothing.
- */
-function relationshipDescription(relationship) {
-  return relationship.description || relationship.verbalizes?.[0] || ''
-}
 
 /**
  * The relationships other concepts declare against this one. A concept cannot
@@ -271,7 +263,7 @@ function InboundTable({ entries, model, onNavigate }) {
       {entries.map((entry) => (
         <MemberRow
           key={`${entry.path}:${entry.role.name || ''}`}
-          note={relationshipDescription(entry.relationship)}
+          note={entry.relationship.description}
         >
           <Cell
             value={entry.owner}
@@ -317,7 +309,7 @@ function ConceptDetail({ item, model, onNavigate }) {
               renderRow={(member) => {
                 const types = attributeTypes(member, model, t)
                 return (
-                  <MemberRow key={member.path} note={relationshipDescription(member.relationship)}>
+                  <MemberRow key={member.path} note={member.relationship.description}>
                     <Cell value={member.name} onClick={() => onNavigate(relationshipTarget(member))} />
                     {types.length === 1 ? (
                       <Cell
@@ -355,7 +347,7 @@ function ConceptDetail({ item, model, onNavigate }) {
                 const targets = (member.relationship.roles || []).map((role) => role.concept)
                 const first = targets[0]
                 return (
-                  <MemberRow key={member.path} note={relationshipDescription(member.relationship)}>
+                  <MemberRow key={member.path} note={member.relationship.description}>
                     <Cell value={member.name} onClick={() => onNavigate(relationshipTarget(member))} />
                     <Cell
                       value={targets.length > 1 ? targets.join(', ') : first}
