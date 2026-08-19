@@ -1,4 +1,5 @@
-import { ArrowRight, Braces, CircleDot, Database, GitBranch, Sigma, X } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { ArrowLeft, ArrowRight, Braces, CircleDot, Database, GitBranch, Sigma, X } from 'lucide-react'
 import {
   collectExpressionStrings,
   conceptMembers,
@@ -33,8 +34,114 @@ const RELATIONSHIP_KIND_KEYS = {
   unary: 'relationship.kindUnary',
 }
 
+/** A value type arrives as a concept; it reads as its own kind of thing. */
+function resolveKind(selection) {
+  return selection.kind === 'concept' && selection.target?.type === 'ValueType'
+    ? 'valueType'
+    : selection.kind
+}
+
+/**
+ * A relationship or a value type is a detail *of* the concept on screen, and
+ * neither has a node on the canvas or a row in the index to get back from.
+ * Those open over the panel, so closing returns the reader where they were.
+ * An entity type is a different subject: it replaces the panel and the graph
+ * follows the selection.
+ */
+const OVERLAY_KINDS = new Set(['relationship', 'valueType'])
+
+function DetailHeader({ kind, name, target, model, onClose, closeLabel, CloseIcon = X }) {
+  const t = useT()
+  const meta = KIND_META[kind] || KIND_META.concept
+  const { Icon } = meta
+  // A relationship is labelled by what it actually is -- an attribute, an
+  // entity relation, an objectified or a unary fact -- rather than by the
+  // one word every relationship would share.
+  const eyebrow = kind === 'relationship'
+    ? t(RELATIONSHIP_KIND_KEYS[relationshipKind(target, model)])
+    : t(meta.labelKey)
+  const multiplicity = kind === 'relationship' ? target?.multiplicity : ''
+  return (
+    <header className="inspector__header">
+      <div className="inspector__symbol"><Icon size={17} /></div>
+      <div>
+        <span className="eyebrow">{eyebrow}</span>
+        <h2 title={name}>
+          {name}
+          {!!multiplicity && <span className="chip chip--amber">{multiplicity}</span>}
+        </h2>
+      </div>
+      <button className="icon-button" onClick={onClose} aria-label={closeLabel} title={closeLabel}>
+        <CloseIcon size={17} />
+      </button>
+    </header>
+  )
+}
+
+function DetailBody({ kind, target, model, onNavigate }) {
+  return (
+    <>
+      {kind === 'concept' && <ConceptDetail item={target} model={model} onNavigate={onNavigate} />}
+      {kind === 'valueType' && <ValueTypeDetail item={target} model={model} onNavigate={onNavigate} />}
+      {kind === 'relationship' && <RelationshipDetail item={target} model={model} onNavigate={onNavigate} />}
+      {kind === 'relationshipGroup' && <RelationshipGroupDetail item={target} onNavigate={onNavigate} />}
+      {kind === 'inheritance' && <InheritanceDetail item={target} onNavigate={onNavigate} />}
+      {kind === 'dataset' && <DatasetDetail item={target} model={model} onNavigate={onNavigate} />}
+      {kind === 'field' && <FieldDetail item={target} />}
+      {kind === 'metric' && <MetricDetail item={target} model={model} onNavigate={onNavigate} />}
+      {kind === 'semanticRelationship' && <SemanticRelationshipDetail item={target} model={model} onNavigate={onNavigate} />}
+      {kind === 'metricDependency' && <MetricDependencyDetail item={target} onNavigate={onNavigate} />}
+      {kind === 'mapping' && <MappingDetail item={target} model={model} onNavigate={onNavigate} />}
+      {kind === 'mappingEvidence' && <MappingEvidenceDetail item={target} onNavigate={onNavigate} />}
+    </>
+  )
+}
+
+/** The stacked panel a relationship or value type opens in. */
+function DetailOverlay({ item, model, onClose, onOpen }) {
+  const t = useT()
+  useEffect(() => {
+    const close = (event) => { if (event.key === 'Escape') onClose() }
+    window.addEventListener('keydown', close)
+    return () => window.removeEventListener('keydown', close)
+  }, [onClose])
+
+  const kind = resolveKind(item)
+  return (
+    <div className="detail-overlay">
+      <div className="detail-overlay__scrim" onClick={onClose} role="presentation" />
+      <section className="detail-overlay__panel" role="dialog" aria-modal="true" aria-label={item.name}>
+        <DetailHeader
+          kind={kind}
+          name={item.name}
+          target={item.target}
+          model={model}
+          onClose={onClose}
+          closeLabel={t('inspector.closeDetail')}
+          CloseIcon={ArrowLeft}
+        />
+        <div className="inspector__body">
+          <DetailBody kind={kind} target={item.target} model={model} onNavigate={onOpen} />
+        </div>
+      </section>
+    </div>
+  )
+}
+
 export default function Inspector({ selection, model, onClose, onNavigate, onResize, onResetWidth }) {
   const t = useT()
+  const [overlay, setOverlay] = useState(null)
+  const selectionKey = selection ? `${selection.kind}:${selection.name}` : ''
+  // Choosing something else in the graph or the index replaces what the
+  // overlay was a detail of, so it closes with it.
+  useEffect(() => setOverlay(null), [selectionKey])
+
+  const open = (item) => {
+    if (!item) return
+    if (OVERLAY_KINDS.has(resolveKind(item))) setOverlay(item)
+    else onNavigate(item)
+  }
+
   // The handle sits on the panel's left edge, so dragging left widens it.
   const handle = <ResizeHandle label={t('layout.resizeInspector')} direction={-1} onResize={onResize} onReset={onResetWidth} />
   if (!selection) {
@@ -48,50 +155,22 @@ export default function Inspector({ selection, model, onClose, onNavigate, onRes
     )
   }
 
-  // A concept's kind is its own eyebrow, so the type no longer needs a row of
-  // its own inside the body.
-  const kind = selection.kind === 'concept' && selection.target?.type === 'ValueType'
-    ? 'valueType'
-    : selection.kind
-  const meta = KIND_META[kind] || KIND_META.concept
-  const { Icon } = meta
-  // A relationship is labelled by what it actually is -- an attribute, an
-  // entity relation, an objectified or a unary fact -- rather than by the
-  // one word every relationship would share.
-  const eyebrow = kind === 'relationship'
-    ? t(RELATIONSHIP_KIND_KEYS[relationshipKind(selection.target, model)])
-    : t(meta.labelKey)
-  const multiplicity = kind === 'relationship' ? selection.target?.multiplicity : ''
+  const kind = resolveKind(selection)
   return (
     <aside className="inspector">
       {handle}
-      <header className="inspector__header">
-        <div className="inspector__symbol"><Icon size={17} /></div>
-        <div>
-          <span className="eyebrow">{eyebrow}</span>
-          <h2 title={selection.name}>
-            {selection.name}
-            {/* The only fact of the removed summary grid that is not already
-                on screen; shown only when the relationship declares one. */}
-            {!!multiplicity && <span className="chip chip--amber">{multiplicity}</span>}
-          </h2>
-        </div>
-        <button className="icon-button" onClick={onClose} aria-label={t('inspector.close')}><X size={17} /></button>
-      </header>
+      <DetailHeader
+        kind={kind}
+        name={selection.name}
+        target={selection.target}
+        model={model}
+        onClose={onClose}
+        closeLabel={t('inspector.close')}
+      />
       <div className="inspector__body">
-        {kind === 'concept' && <ConceptDetail item={selection.target} model={model} onNavigate={onNavigate} />}
-        {kind === 'valueType' && <ValueTypeDetail item={selection.target} model={model} onNavigate={onNavigate} />}
-        {kind === 'relationship' && <RelationshipDetail item={selection.target} model={model} onNavigate={onNavigate} />}
-        {kind === 'relationshipGroup' && <RelationshipGroupDetail item={selection.target} onNavigate={onNavigate} />}
-        {kind === 'inheritance' && <InheritanceDetail item={selection.target} onNavigate={onNavigate} />}
-        {kind === 'dataset' && <DatasetDetail item={selection.target} model={model} onNavigate={onNavigate} />}
-        {kind === 'field' && <FieldDetail item={selection.target} />}
-        {kind === 'metric' && <MetricDetail item={selection.target} model={model} onNavigate={onNavigate} />}
-        {kind === 'semanticRelationship' && <SemanticRelationshipDetail item={selection.target} model={model} onNavigate={onNavigate} />}
-        {kind === 'metricDependency' && <MetricDependencyDetail item={selection.target} onNavigate={onNavigate} />}
-        {kind === 'mapping' && <MappingDetail item={selection.target} model={model} onNavigate={onNavigate} />}
-        {kind === 'mappingEvidence' && <MappingEvidenceDetail item={selection.target} onNavigate={onNavigate} />}
+        <DetailBody kind={kind} target={selection.target} model={model} onNavigate={open} />
       </div>
+      {overlay && <DetailOverlay item={overlay} model={model} onClose={() => setOverlay(null)} onOpen={open} />}
     </aside>
   )
 }

@@ -98,6 +98,7 @@ const MESSAGES = {
     'inspector.emptyTitle': '选择一个语义元素',
     'inspector.emptyBody': '从索引、搜索结果或关系图选择 Concept、Dataset、Metric 或 Mapping。',
     'inspector.close': '关闭详情',
+    'inspector.closeDetail': '返回概念详情',
     'inspector.noDescription': '暂无描述。',
 
     'kind.entityType': 'ENTITY TYPE',
@@ -341,6 +342,7 @@ const MESSAGES = {
     'inspector.emptyTitle': 'Select an element',
     'inspector.emptyBody': 'Pick a Concept, Dataset, Metric or Mapping from the index, the search results or the graph.',
     'inspector.close': 'Close details',
+    'inspector.closeDetail': 'Back to the concept',
     'inspector.noDescription': 'No description.',
 
     'kind.entityType': 'ENTITY TYPE',
