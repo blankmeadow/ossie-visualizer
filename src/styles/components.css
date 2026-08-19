@@ -128,22 +128,29 @@
 .rule-list { display: flex; flex-direction: column; gap: 6px; }.rule-list code, .expression-block { display: block; padding: 8px 9px; border: 1px solid #d7ddd6; border-radius: 7px; color: #42554d; background: #f3f5f0; font-size: 9px; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
 .link-list, .plain-list, .field-table { display: flex; flex-direction: column; gap: 4px; }
 .link-list button, .quick-list button { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 8px; border: 0; border-radius: 6px; background: #f3f5f1; font: 500 9px 'SFMono-Regular', Consolas, monospace; text-align: left; cursor: pointer; }.link-list button:hover, .quick-list button:hover { color: var(--green-dark); background: var(--green-soft); }
-/* Attribute, relationship and participant tables. Three columns, the last one
-   narrow, every cell clipped with its full text on the title attribute -- the
-   inspector is under 400px wide and a long expression must not widen it. */
+/* Attribute, relationship and participant tables. Cells sit on one grid line
+   and are clipped with their full text on the title attribute -- the inspector
+   is under 400px wide and a long name must not widen it. A description is a
+   sentence rather than a field, so it wraps on its own line below the cells. */
 .member-table { display: flex; flex-direction: column; gap: 2px; }
-.member-table__header, .member-table__row { display: grid; gap: 6px; align-items: center; }
-.member-table--cols3 .member-table__header, .member-table--cols3 .member-table__row { grid-template-columns: minmax(0,1fr) minmax(0,1.05fr) minmax(78px,auto); }
+.member-table__header, .member-table__line { display: grid; gap: 6px; align-items: center; }
+.member-table--cols2 .member-table__header, .member-table--cols2 .member-table__line { grid-template-columns: minmax(0,1fr) minmax(84px,auto); }
+/* The last column is right-aligned throughout: in the wider tables it holds the
+   constraint chips, so the narrow ones line their value up the same way. */
+.member-table--cols2 .member-table__line > :last-child { text-align: right; }
+.member-table--cols3 .member-table__header, .member-table--cols3 .member-table__line { grid-template-columns: minmax(0,1fr) minmax(0,1.05fr) minmax(78px,auto); }
 .member-table__header { padding: 0 8px 3px; color: #89948f; font: 500 7px 'SFMono-Regular', Consolas, monospace; text-transform: uppercase; letter-spacing: .08em; }
 .member-table__header span:last-child { text-align: right; }
 .member-table__group { display: flex; flex-direction: column; gap: 2px; }
 .member-table__group + .member-table__group { margin-top: 8px; }
 .member-table__caption { padding: 5px 8px 3px; color: var(--muted); font: 500 8px 'SFMono-Regular', Consolas, monospace; letter-spacing: .04em; }
-.member-table__row { padding: 6px 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); }
+.member-table__row { display: flex; flex-direction: column; gap: 3px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); }
 .member-table__row:hover { background: var(--surface-2); }
 .member-table__cell { min-width: 0; overflow: hidden; padding: 0; border: 0; background: none; color: inherit; font: 500 9px 'SFMono-Regular', Consolas, monospace; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
 .member-table__cell--link { cursor: pointer; }
-.member-table__cell .chip { margin-left: 5px; padding: 1px 4px; font-size: 8px; vertical-align: 1px; }
+/* Two lines is enough to tell one relationship from another; the whole text
+   stays on the title attribute and in the relationship's own panel. */
+.member-table__note { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; margin: 0; color: var(--muted); font: 400 8px/1.5 'SFMono-Regular', Consolas, monospace; }
 .member-table__cell--link:hover { color: var(--green-dark); text-decoration: underline; }
 .member-table__cell--muted { color: var(--muted); font-weight: 400; }
 .member-table__cell--type { color: var(--green-dark); }

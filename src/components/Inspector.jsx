@@ -135,17 +135,27 @@ function MemberTable({ headers, children }) {
   )
 }
 
-function MemberRow({ children }) {
-  return <div className="member-table__row">{children}</div>
+/**
+ * A row is one grid line of cells plus, when there is something to say, the
+ * description underneath it. A description is a sentence and the inspector is
+ * under 400px wide, so giving it a column of its own would clip it to a few
+ * words; on its own line it gets the full width.
+ */
+function MemberRow({ children, note }) {
+  return (
+    <div className="member-table__row">
+      <div className="member-table__line">{children}</div>
+      {!!note && <p className="member-table__note" title={note}>{note}</p>}
+    </div>
+  )
 }
 
-function Cell({ value, onClick, tone, badge }) {
+function Cell({ value, onClick, tone }) {
   const text = value || '—'
-  const body = <>{text}{!!badge && <span className="chip chip--amber">{badge}</span>}</>
-  if (!onClick) return <span className={`member-table__cell ${tone || ''}`} title={text}>{body}</span>
+  if (!onClick) return <span className={`member-table__cell ${tone || ''}`} title={text}>{text}</span>
   return (
     <button className={`member-table__cell member-table__cell--link ${tone || ''}`} onClick={onClick} title={text}>
-      {body}
+      {text}
     </button>
   )
 }
@@ -186,22 +196,15 @@ function attributeTypes(member, model, t) {
   return roles.map((role) => ({ name: role.concept, label: typeLabel(role.concept, model, t) }))
 }
 
-/**
- * How a member is marked as part of the concept's identifier. A compound
- * identifier is ordered, so the position is part of the marker.
- */
-function keyBadge(member, concept, t) {
-  if (member.keyIndex < 0) return ''
-  return (concept.identify_by || []).length > 1
-    ? t('concept.keyIndexed', { index: member.keyIndex + 1 })
-    : t('concept.key')
-}
-
 /** Everything constraining one member, condensed to chips the row can hold. */
 function constraintChips(member, concept, model, t) {
   const chips = []
-  const key = keyBadge(member, concept, t)
-  if (key) chips.push(key)
+  if (member.keyIndex >= 0) {
+    // A compound identifier is ordered, so the position is part of the marker.
+    chips.push((concept.identify_by || []).length > 1
+      ? t('concept.keyIndexed', { index: member.keyIndex + 1 })
+      : t('concept.key'))
+  }
   if (member.relationship.multiplicity) chips.push(member.relationship.multiplicity)
   const requires = member.relationship.requires?.length || 0
   if (requires) chips.push(t('concept.requiresCount', { count: requires }))
@@ -240,8 +243,46 @@ function GroupedRows({ groups, renderRow }) {
   ))
 }
 
-function relationshipDescription(relationship, t) {
-  return relationship.description || relationship.verbalizes?.[0] || t('inspector.noDescription')
+/**
+ * What a relationship row says about itself. `verbalizes` is required by the
+ * spec while `description` is not, so an unannotated relationship still reads
+ * as a sentence. Empty when there is neither, and then the row shows no note
+ * at all rather than a line saying nothing.
+ */
+function relationshipDescription(relationship) {
+  return relationship.description || relationship.verbalizes?.[0] || ''
+}
+
+/**
+ * The relationships other concepts declare against this one. A concept cannot
+ * find these by looking at itself, and both an entity type and a value type
+ * need the same answer, so both read it from `inboundByConcept`.
+ */
+function InboundTable({ entries, model, onNavigate }) {
+  const t = useT()
+  if (!entries.length) return <span className="muted">—</span>
+  return (
+    <MemberTable headers={[t('concept.colSource'), t('concept.colName')]}>
+      {entries.map((entry) => (
+        <MemberRow
+          key={`${entry.path}:${entry.role.name || ''}`}
+          note={relationshipDescription(entry.relationship)}
+        >
+          <Cell
+            value={entry.owner}
+            onClick={conceptTarget(entry.owner, model)
+              ? () => onNavigate(conceptTarget(entry.owner, model))
+              : undefined}
+          />
+          <Cell
+            value={entry.relationship.name}
+            tone="member-table__cell--type"
+            onClick={() => onNavigate({ kind: 'relationship', name: entry.path, target: entry.relationship })}
+          />
+        </MemberRow>
+      ))}
+    </MemberTable>
+  )
 }
 
 function ConceptDetail({ item, model, onNavigate }) {
@@ -271,7 +312,7 @@ function ConceptDetail({ item, model, onNavigate }) {
               renderRow={(member) => {
                 const types = attributeTypes(member, model, t)
                 return (
-                  <MemberRow key={member.path}>
+                  <MemberRow key={member.path} note={relationshipDescription(member.relationship)}>
                     <Cell value={member.name} onClick={() => onNavigate(relationshipTarget(member))} />
                     {types.length === 1 ? (
                       <Cell
@@ -302,20 +343,15 @@ function ConceptDetail({ item, model, onNavigate }) {
 
       <Section title={t('concept.relations')} count={associations.length}>
         {associations.length ? (
-          <MemberTable headers={[t('concept.colName'), t('concept.colDescription'), t('concept.colTarget')]}>
+          <MemberTable headers={[t('concept.colName'), t('concept.colTarget'), t('concept.colConstraint')]}>
             <GroupedRows
               groups={groupMembers(associations, t)}
               renderRow={(member) => {
                 const targets = (member.relationship.roles || []).map((role) => role.concept)
                 const first = targets[0]
                 return (
-                  <MemberRow key={member.path}>
-                    <Cell
-                      value={member.name}
-                      badge={keyBadge(member, item, t)}
-                      onClick={() => onNavigate(relationshipTarget(member))}
-                    />
-                    <Cell value={relationshipDescription(member.relationship, t)} tone="member-table__cell--muted" />
+                  <MemberRow key={member.path} note={relationshipDescription(member.relationship)}>
+                    <Cell value={member.name} onClick={() => onNavigate(relationshipTarget(member))} />
                     <Cell
                       value={targets.length > 1 ? targets.join(', ') : first}
                       tone="member-table__cell--type"
@@ -323,6 +359,11 @@ function ConceptDetail({ item, model, onNavigate }) {
                         ? () => onNavigate(conceptTarget(first, model))
                         : undefined}
                     />
+                    <span className="member-table__chips">
+                      {constraintChips(member, item, model, t).map((chip) => (
+                        <span className="chip chip--amber" key={chip}>{chip}</span>
+                      ))}
+                    </span>
                   </MemberRow>
                 )
               }}
@@ -332,25 +373,7 @@ function ConceptDetail({ item, model, onNavigate }) {
       </Section>
 
       <Section title={t('concept.inbound')} count={inbound.length}>
-        {inbound.length ? (
-          <MemberTable headers={[t('concept.colSource'), t('concept.colName'), t('concept.colDescription')]}>
-            {inbound.map((entry) => (
-              <MemberRow key={`${entry.path}:${entry.role.name || ''}`}>
-                <Cell
-                  value={entry.owner}
-                  onClick={conceptTarget(entry.owner, model)
-                    ? () => onNavigate(conceptTarget(entry.owner, model))
-                    : undefined}
-                />
-                <Cell
-                  value={entry.relationship.name}
-                  onClick={() => onNavigate({ kind: 'relationship', name: entry.path, target: entry.relationship })}
-                />
-                <Cell value={relationshipDescription(entry.relationship, t)} tone="member-table__cell--muted" />
-              </MemberRow>
-            ))}
-          </MemberTable>
-        ) : <span className="muted">—</span>}
+        <InboundTable entries={inbound} model={model} onNavigate={onNavigate} />
       </Section>
 
       {!!inheritedBy.length && (
@@ -384,25 +407,7 @@ function ValueTypeDetail({ item, model, onNavigate }) {
       {!!item.extends?.length && <Section title={t('valueType.extends')}><Chips values={item.extends} tone="violet" /></Section>}
       {!!item.requires?.length && <Section title={t('valueType.requires')}><RuleList values={item.requires} /></Section>}
       <Section title={t('valueType.usedBy')} count={usedBy.length}>
-        {usedBy.length ? (
-          <MemberTable headers={[t('concept.colSource'), t('concept.colName'), t('concept.colDescription')]}>
-            {usedBy.map((entry) => (
-              <MemberRow key={`${entry.path}:${entry.role.name || ''}`}>
-                <Cell
-                  value={entry.owner}
-                  onClick={conceptTarget(entry.owner, model)
-                    ? () => onNavigate(conceptTarget(entry.owner, model))
-                    : undefined}
-                />
-                <Cell
-                  value={entry.relationship.name}
-                  onClick={() => onNavigate({ kind: 'relationship', name: entry.path, target: entry.relationship })}
-                />
-                <Cell value={relationshipDescription(entry.relationship, t)} tone="member-table__cell--muted" />
-              </MemberRow>
-            ))}
-          </MemberTable>
-        ) : <span className="muted">—</span>}
+        <InboundTable entries={usedBy} model={model} onNavigate={onNavigate} />
       </Section>
       {!!item.relationships?.length && (
         <Section title={t('valueType.relationships')} count={item.relationships.length}>
@@ -445,16 +450,15 @@ function RelationshipDetail({ item, model, onNavigate }) {
     <>
       <p className="detail-description">{item.description || t('inspector.noDescription')}</p>
       <Section title={t('relationship.participants')} count={participants.length}>
-        <MemberTable headers={[t('relationship.colEntity'), t('relationship.colEntityDescription'), t('relationship.colRole')]}>
+        <MemberTable headers={[t('relationship.colEntity'), t('relationship.colRole')]}>
           {participants.map((participant, index) => (
-            <MemberRow key={`${participant.name}:${participant.role}:${index}`}>
+            <MemberRow key={`${participant.name}:${participant.role}:${index}`} note={participant.description}>
               <Cell
                 value={participant.name}
                 onClick={conceptTarget(participant.name, model)
                   ? () => onNavigate(conceptTarget(participant.name, model))
                   : undefined}
               />
-              <Cell value={participant.description} tone="member-table__cell--muted" />
               <Cell
                 value={participant.role}
                 tone={participant.implicit ? 'member-table__cell--muted' : 'member-table__cell--type'}
