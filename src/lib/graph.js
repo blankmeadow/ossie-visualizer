@@ -2,8 +2,8 @@ import dagre from '@dagrejs/dagre'
 import { MarkerType } from '@xyflow/react'
 import { BUILTIN_CONCEPTS, mappingEvidenceForDataset, referencedDatasets } from './ossie'
 
-const NODE_WIDTH = 248
-const NODE_HEIGHT = 108
+export const NODE_WIDTH = 248
+export const NODE_HEIGHT = 136
 
 function connectedComponents(nodes, edges) {
   const adjacency = new Map(nodes.map((item) => [item.id, new Set()]))
@@ -45,7 +45,14 @@ function layoutComponent(nodes, edges, direction, options) {
     ranker: 'network-simplex',
   })
   nodes.forEach((item) => graph.setNode(item.id, { width: NODE_WIDTH, height: NODE_HEIGHT }))
-  edges.forEach((item) => graph.setEdge(item.source, item.target))
+  edges.forEach((item) => {
+    // Rank direction is not always the direction the arrow points. An `extends`
+    // edge is drawn child -> parent (the UML generalization convention), but the
+    // parent has to sit on the earlier rank so inheritance reads top-down, so
+    // dagre is given the reversed pair. See `rankReversed` on the edge.
+    if (item.data?.rankReversed) graph.setEdge(item.target, item.source)
+    else graph.setEdge(item.source, item.target)
+  })
   dagre.layout(graph)
 
   let minX = Infinity
@@ -197,31 +204,72 @@ function node(id, kind, name, subtitle, item, extra = {}) {
   }
 }
 
+/**
+ * Decide which side of each node an edge leaves from and arrives at.
+ *
+ * The sides come from where the nodes actually ended up, not from the requested
+ * rank direction. That matters because rank order and arrow direction can
+ * disagree: an `extends` edge points child -> parent while the parent is laid
+ * out above, so the arrow has to leave the child's top edge and enter the
+ * parent's bottom edge. Reading the positions keeps every such case consistent
+ * and gives the property that, for any node, edges arriving from earlier ranks
+ * touch one side and edges leaving toward later ranks touch the opposite one.
+ */
+function edgeSides(sourceNode, targetNode, direction) {
+  if (!sourceNode || !targetNode) {
+    return direction === 'TB' ? ['bottom', 'top'] : ['right', 'left']
+  }
+  if (direction === 'TB') {
+    const forward = targetNode.position.y >= sourceNode.position.y
+    return forward ? ['bottom', 'top'] : ['top', 'bottom']
+  }
+  const forward = targetNode.position.x >= sourceNode.position.x
+  return forward ? ['right', 'left'] : ['left', 'right']
+}
+
 function attachHandles(nodes, edges, direction) {
-  const outgoing = new Map(nodes.map((item) => [item.id, []]))
-  const incoming = new Map(nodes.map((item) => [item.id, []]))
-  for (const item of [...edges].sort((left, right) => left.id.localeCompare(right.id))) {
-    outgoing.get(item.source)?.push(item)
-    incoming.get(item.target)?.push(item)
+  const nodeById = new Map(nodes.map((item) => [item.id, item]))
+  // Group by the side an edge actually uses, so the fan-out offsets spread
+  // across that side only. Mixing arriving and leaving edges into one counter
+  // used to bunch them together on a single edge of the node.
+  const bySide = new Map(nodes.map((item) => [item.id, new Map()]))
+  const sideKey = (nodeId, side) => {
+    const sides = bySide.get(nodeId)
+    if (!sides) return null
+    if (!sides.has(side)) sides.set(side, [])
+    return sides.get(side)
+  }
+
+  const sorted = [...edges].sort((left, right) => left.id.localeCompare(right.id))
+  const resolved = new Map()
+  for (const item of sorted) {
+    const selfLoop = item.source === item.target
+    const [sourceSide, targetSide] = selfLoop
+      ? ['right', 'right']
+      : edgeSides(nodeById.get(item.source), nodeById.get(item.target), direction)
+    resolved.set(item.id, { sourceSide, targetSide, selfLoop })
+    if (selfLoop) continue
+    sideKey(item.source, sourceSide)?.push(item.id)
+    sideKey(item.target, targetSide)?.push(item.id)
   }
 
   const nodeHandles = new Map(nodes.map((item) => [item.id, { sourceHandles: [], targetHandles: [] }]))
   const handledEdges = edges.map((item) => {
-    const selfLoop = item.source === item.target
-    const sourceItems = outgoing.get(item.source) || []
-    const targetItems = incoming.get(item.target) || []
-    const sourceIndex = sourceItems.findIndex((candidate) => candidate.id === item.id)
-    const targetIndex = targetItems.findIndex((candidate) => candidate.id === item.id)
+    const { sourceSide, targetSide, selfLoop } = resolved.get(item.id)
+    const sourceItems = selfLoop ? [] : bySide.get(item.source)?.get(sourceSide) || []
+    const targetItems = selfLoop ? [] : bySide.get(item.target)?.get(targetSide) || []
+    const sourceIndex = sourceItems.indexOf(item.id)
+    const targetIndex = targetItems.indexOf(item.id)
     const sourceHandle = `source:${item.id}`
     const targetHandle = `target:${item.id}`
     nodeHandles.get(item.source)?.sourceHandles.push({
       id: sourceHandle,
-      position: selfLoop ? 'right' : direction === 'TB' ? 'bottom' : 'right',
+      position: sourceSide,
       offset: selfLoop ? 34 : ((sourceIndex + 1) / (sourceItems.length + 1)) * 100,
     })
     nodeHandles.get(item.target)?.targetHandles.push({
       id: targetHandle,
-      position: selfLoop ? 'right' : direction === 'TB' ? 'top' : 'left',
+      position: targetSide,
       offset: selfLoop ? 72 : ((targetIndex + 1) / (targetItems.length + 1)) * 100,
     })
     return {
@@ -291,9 +339,11 @@ export function buildOntologyGraph(model, options = {}) {
         concept.concept,
         concept.type === 'ValueType' ? 'valueType' : 'concept',
         concept.concept,
-        concept.description || concept.type,
+        // No subtitle: the header already states EntityType / ValueType.
+        '',
         concept,
         {
+          description: concept.description,
           badges: [
             concept.extends?.length ? `${concept.extends.length} parent` : null,
             concept.identify_by?.length ? `${concept.identify_by.length} key` : null,
@@ -325,6 +375,9 @@ export function buildOntologyGraph(model, options = {}) {
             parentConcept: model.conceptByName.get(parent),
           },
         },
+        // Draw the arrow child -> parent, but rank the parent first so the
+        // inheritance hierarchy reads top-down.
+        { rankReversed: true },
       ))
     }
   }
@@ -375,7 +428,8 @@ export function buildSemanticGraph(model, options = {}) {
   const includeMetrics = showMetrics || selectedName.startsWith('metric:')
   const depth = options.depth ?? 0
   const nodes = model.datasets.map((dataset) =>
-    node(dataset.name, 'dataset', dataset.name, dataset.source || dataset.description, dataset, {
+    node(dataset.name, 'dataset', dataset.name, dataset.source, dataset, {
+      description: dataset.description,
       badges: [`${dataset.fields?.length || 0} fields`],
     }),
   )
@@ -396,7 +450,8 @@ export function buildSemanticGraph(model, options = {}) {
     const datasetNames = new Set(model.datasets.map((dataset) => dataset.name))
     for (const metric of model.metrics) {
       const metricId = `metric:${metric.name}`
-      nodes.push(node(metricId, 'metric', metric.name, metric.description || metric.datatype, metric, {
+      nodes.push(node(metricId, 'metric', metric.name, metric.datatype, metric, {
+        description: metric.description,
         selection: { kind: 'metric', name: metric.name, target: metric },
       }))
       for (const datasetName of referencedDatasets(metric, datasetNames)) {
@@ -416,7 +471,7 @@ export function buildSemanticGraph(model, options = {}) {
     }
   }
 
-  if (!selectedName || depth === 0) return graphResult(nodes, edges, 'LR')
+  if (!selectedName || depth === 0) return graphResult(nodes, edges, 'TB')
   const adjacency = new Map(nodes.map((item) => [item.id, new Set()]))
   edges.forEach((item) => {
     adjacency.get(item.source)?.add(item.target)
@@ -436,7 +491,7 @@ export function buildSemanticGraph(model, options = {}) {
   }
   const filteredNodes = nodes.filter((item) => visible.has(item.id))
   const filteredEdges = edges.filter((item) => visible.has(item.source) && visible.has(item.target))
-  return graphResult(filteredNodes, filteredEdges, 'LR')
+  return graphResult(filteredNodes, filteredEdges, 'TB')
 }
 
 function layoutMapping(nodes) {
@@ -468,7 +523,8 @@ export function buildMappingGraph(model, conceptMapping) {
   const referenced = referencedDatasets(conceptMapping, datasetNames)
   const concept = model.conceptByName.get(conceptMapping.concept)
   const nodes = [
-    node(`concept:${conceptMapping.concept}`, 'concept', conceptMapping.concept, concept?.description || 'Ontology Concept', concept, {
+    node(`concept:${conceptMapping.concept}`, 'concept', conceptMapping.concept, '', concept, {
+      description: concept?.description,
       selection: { kind: 'concept', name: conceptMapping.concept, target: concept },
     }),
     node(`mapping:${conceptMapping.concept}`, 'mapping', conceptMapping._mappingName, 'Concept Mapping', conceptMapping, {
@@ -493,6 +549,7 @@ export function buildMappingGraph(model, conceptMapping) {
     const dataset = model.datasetByName.get(datasetName)
     const evidence = mappingEvidenceForDataset(conceptMapping, datasetName)
     nodes.push(node(`dataset:${datasetName}`, 'dataset', datasetName, dataset?.source || '', dataset, {
+      description: dataset?.description,
       selection: { kind: 'dataset', name: datasetName, target: dataset },
     }))
     edges.push(

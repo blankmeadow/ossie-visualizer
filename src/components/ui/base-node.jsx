@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils'
 
 const baseNodeVariants = cva(
   cn(
-    'w-[248px] min-h-[108px] rounded-[11px] border px-[13px] py-[12px]',
+    'w-[248px] min-h-[136px] rounded-[11px] border px-[13px] py-[12px]',
     'bg-[rgba(252,253,250,.98)]',
     'transition-[opacity,filter,border-color,box-shadow,transform] duration-150',
   ),
@@ -87,9 +87,29 @@ function BaseNodeTitle({ className, ...props }) {
   )
 }
 
+/** One dense line: the concept's type, or a dataset's physical source. */
 function BaseNodeSubtitle({ className, ...props }) {
   return (
-    <div className={cn('mt-[4px] h-[14px] truncate text-tiny text-muted', className)} {...props} />
+    <div
+      className={cn('mt-[4px] h-[14px] truncate font-mono text-tiny text-muted', className)}
+      {...props}
+    />
+  )
+}
+
+/**
+ * Prose description. Wraps to two lines and clamps, so a long description stays
+ * readable without letting one node dictate the height of its whole rank.
+ */
+function BaseNodeDescription({ className, ...props }) {
+  return (
+    <div
+      className={cn(
+        'mt-[5px] line-clamp-2 min-h-[26px] text-tiny leading-[1.45] text-[#5b6a63]',
+        className,
+      )}
+      {...props}
+    />
   )
 }
 
@@ -118,6 +138,7 @@ export {
   BaseNodeContent,
   BaseNodeTitle,
   BaseNodeSubtitle,
+  BaseNodeDescription,
   BaseNodeFooter,
   BaseNodeBadge,
   baseNodeVariants,

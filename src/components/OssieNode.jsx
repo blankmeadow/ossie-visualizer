@@ -4,6 +4,7 @@ import {
   BaseNode,
   BaseNodeBadge,
   BaseNodeContent,
+  BaseNodeDescription,
   BaseNodeFooter,
   BaseNodeHeader,
   BaseNodeHeaderTitle,
@@ -51,7 +52,9 @@ export default function OssieNode({ data, selected }) {
       </BaseNodeHeader>
       <BaseNodeContent>
         <BaseNodeTitle title={data.name}>{data.name}</BaseNodeTitle>
-        <BaseNodeSubtitle title={data.subtitle}>{data.subtitle || '—'}</BaseNodeSubtitle>
+        {!!data.subtitle && <BaseNodeSubtitle title={data.subtitle}>{data.subtitle}</BaseNodeSubtitle>}
+        {/* Rendered even when empty so cards in a rank keep a common height. */}
+        <BaseNodeDescription title={data.description}>{data.description}</BaseNodeDescription>
       </BaseNodeContent>
       {!!data.badges?.length && (
         <BaseNodeFooter>

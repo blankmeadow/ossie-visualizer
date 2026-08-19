@@ -11,11 +11,13 @@ import {
 import OssieNode from './OssieNode'
 import RelationshipEdge from './RelationshipEdge'
 import { useCssTokens } from '../lib/useCssTokens'
+import { NODE_HEIGHT, NODE_WIDTH } from '../lib/graph'
 
 const nodeTypes = { ossieNode: OssieNode }
 const edgeTypes = { relationshipEdge: RelationshipEdge }
-const nodeWidth = 248
-const nodeHeight = 108
+// Framing maths has to agree with the dimensions dagre laid the graph out with.
+const nodeWidth = NODE_WIDTH
+const nodeHeight = NODE_HEIGHT
 
 // Fallbacks match the light-theme values in styles/tokens.css; the live values
 // are read from CSS so the canvas follows the active theme.
@@ -164,7 +166,8 @@ function InnerGraphCanvas({ graph, selection, onSelect, onFocus, canvasRef }) {
     const selected = graph.nodes.find((item) => item.id === selectedNodeId)
     if (!selected) return undefined
     const timeout = window.setTimeout(() => {
-      flow.setCenter(selected.position.x + 284, selected.position.y + 54, { zoom: 1.03, duration: 320 })
+      // Bias the centre to the right of the node so it settles clear of the inspector.
+      flow.setCenter(selected.position.x + 284, selected.position.y + nodeHeight / 2, { zoom: 1.03, duration: 320 })
     }, 40)
     return () => window.clearTimeout(timeout)
   }, [flow, graph.nodes, selectedNodeId])
