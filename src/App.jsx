@@ -222,7 +222,7 @@ export default function App() {
           <Languages size={16} />{t('locale.label')}
         </button>
         <button className="button button--primary topbar__open" onClick={() => setImportOpen(true)}>
-          <FolderOpen size={16} />{model ? t('app.import') : t('app.open')}
+          <FolderOpen size={16} />{t('app.import')}
         </button>
       </header>
 

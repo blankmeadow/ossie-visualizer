@@ -206,11 +206,19 @@
 
 .ossie-import-backdrop { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 20px; background: rgba(19,31,27,.54); backdrop-filter: blur(6px); }
 .import-dialog { width: min(680px, 100%); max-height: calc(100vh - 40px); overflow: auto; padding: 21px; border: 1px solid rgba(255,255,255,.55); border-radius: 16px; background: var(--surface); box-shadow: 0 30px 100px rgba(12,29,23,.28); }
-.import-dialog header { display: flex; align-items: flex-start; justify-content: space-between; gap: 15px; }.import-dialog h2 { margin: 4px 0; font-size: 21px; letter-spacing: -.03em; }.import-dialog header p { margin: 0; color: var(--muted); font-size: 10px; }
-.drop-zone { width: 100%; min-height: 112px; margin-top: 18px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px; border: 1px dashed #9eb6ab; border-radius: 11px; color: var(--green); background: var(--green-soft); cursor: pointer; }.drop-zone.is-dragging { border-style: solid; background: #dcece4; }.drop-zone strong { color: var(--ink); font-size: 12px; }.drop-zone span { color: var(--muted); font-size: 9px; }
-.visually-hidden-input { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
-.import-divider { display: flex; align-items: center; gap: 10px; margin: 13px 0; color: #9aa39f; font-size: 9px; }.import-divider::before,.import-divider::after { content: ''; flex: 1; border-top: 1px solid var(--line); }
-.import-dialog textarea { width: 100%; height: 210px; resize: vertical; padding: 13px; border: 1px solid var(--line); border-radius: 9px; outline: 0; color: #dce8e2; background: #21302a; font: 400 10px/1.6 'SFMono-Regular', Consolas, monospace; }.import-dialog textarea:focus { border-color: #719686; box-shadow: 0 0 0 3px rgba(67,119,99,.09); }
+.import-dialog header { display: flex; align-items: center; gap: 12px; }
+.import-dialog h2 { flex: none; margin: 0; font-size: 17px; letter-spacing: -.025em; }
+/* The chosen file's name, once there is one -- the only status the dialog has. */
+.import-dialog__file { min-width: 0; flex: 0 1 auto; overflow: hidden; padding: 3px 7px; border: 1px solid var(--line); border-radius: 6px; color: var(--muted); background: var(--surface-2); font: 500 9px 'SFMono-Regular', Consolas, monospace; text-overflow: ellipsis; white-space: nowrap; }
+.import-dialog header .icon-button { margin-left: auto; }
+/* Pasting and dropping land in the same place, so there is one surface for
+   both: the editor, which says so while a file is over it. */
+.import-dialog__source { position: relative; margin-top: 14px; }
+.import-dialog__drop { position: absolute; inset: 0; display: grid; place-items: center; border: 1px solid var(--green); border-radius: 9px; color: #dce8e2; background: rgba(33,48,42,.92); font: 500 11px 'SFMono-Regular', Consolas, monospace; pointer-events: none; }
+.import-dialog__pick { display: inline-block; margin-top: 9px; color: var(--green-dark); font-size: 10px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.import-dialog__pick:hover { color: var(--ink); }
+.import-dialog__pick input { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.import-dialog textarea { display: block; width: 100%; height: 232px; resize: vertical; padding: 13px; border: 1px solid var(--line); border-radius: 9px; outline: 0; color: #dce8e2; background: #21302a; font: 400 10px/1.6 'SFMono-Regular', Consolas, monospace; }.import-dialog textarea:focus { border-color: #719686; box-shadow: 0 0 0 3px rgba(67,119,99,.09); }
 .import-errors { margin-top: 10px; padding: 10px; border: 1px solid #e7bdb4; border-radius: 8px; color: #8e3f2e; background: #fbede9; font-size: 9px; }.import-errors > strong { display: block; margin-bottom: 6px; }.import-errors > div { display: grid; grid-template-columns: 165px 1fr; gap: 7px; padding: 3px 0; }.import-errors code { font-size: 8px; overflow: hidden; text-overflow: ellipsis; }.import-errors small { display: block; margin-top: 4px; }
 .import-dialog footer { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 14px; }.import-dialog footer > span { display: flex; align-items: center; gap: 5px; color: var(--muted); font-size: 9px; }.import-dialog footer > div { display: flex; gap: 7px; }
 
