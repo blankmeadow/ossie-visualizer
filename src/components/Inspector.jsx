@@ -13,7 +13,7 @@ import { useT } from '../lib/i18n'
 const KIND_META = {
   concept: { labelKey: 'kind.entityType', Icon: CircleDot },
   valueType: { labelKey: 'kind.valueType', Icon: Braces },
-  relationship: { labelKey: 'kind.relationship', Icon: GitBranch },
+  relationship: { Icon: GitBranch },
   relationshipGroup: { labelKey: 'kind.relationshipGroup', Icon: GitBranch },
   inheritance: { labelKey: 'kind.inheritance', Icon: GitBranch },
   dataset: { labelKey: 'kind.dataset', Icon: Database },
@@ -51,13 +51,25 @@ export default function Inspector({ selection, model, onClose, onNavigate }) {
     : selection.kind
   const meta = KIND_META[kind] || KIND_META.concept
   const { Icon } = meta
+  // A relationship is labelled by what it actually is -- an attribute, an
+  // entity relation, an objectified or a unary fact -- rather than by the
+  // one word every relationship would share.
+  const eyebrow = kind === 'relationship'
+    ? t(RELATIONSHIP_KIND_KEYS[relationshipKind(selection.target, model)])
+    : t(meta.labelKey)
+  const multiplicity = kind === 'relationship' ? selection.target?.multiplicity : ''
   return (
     <aside className="inspector">
       <header className="inspector__header">
         <div className="inspector__symbol"><Icon size={17} /></div>
         <div>
-          <span className="eyebrow">{t(meta.labelKey)}</span>
-          <h2>{selection.name}</h2>
+          <span className="eyebrow">{eyebrow}</span>
+          <h2 title={selection.name}>
+            {selection.name}
+            {/* The only fact of the removed summary grid that is not already
+                on screen; shown only when the relationship declares one. */}
+            {!!multiplicity && <span className="chip chip--amber">{multiplicity}</span>}
+          </h2>
         </div>
         <button className="icon-button" onClick={onClose} aria-label={t('inspector.close')}><X size={17} /></button>
       </header>
@@ -127,12 +139,13 @@ function MemberRow({ children }) {
   return <div className="member-table__row">{children}</div>
 }
 
-function Cell({ value, onClick, tone }) {
+function Cell({ value, onClick, tone, badge }) {
   const text = value || '—'
-  if (!onClick) return <span className={`member-table__cell ${tone || ''}`} title={text}>{text}</span>
+  const body = <>{text}{!!badge && <span className="chip chip--amber">{badge}</span>}</>
+  if (!onClick) return <span className={`member-table__cell ${tone || ''}`} title={text}>{body}</span>
   return (
     <button className={`member-table__cell member-table__cell--link ${tone || ''}`} onClick={onClick} title={text}>
-      {text}
+      {body}
     </button>
   )
 }
@@ -173,14 +186,22 @@ function attributeTypes(member, model, t) {
   return roles.map((role) => ({ name: role.concept, label: typeLabel(role.concept, model, t) }))
 }
 
+/**
+ * How a member is marked as part of the concept's identifier. A compound
+ * identifier is ordered, so the position is part of the marker.
+ */
+function keyBadge(member, concept, t) {
+  if (member.keyIndex < 0) return ''
+  return (concept.identify_by || []).length > 1
+    ? t('concept.keyIndexed', { index: member.keyIndex + 1 })
+    : t('concept.key')
+}
+
 /** Everything constraining one member, condensed to chips the row can hold. */
 function constraintChips(member, concept, model, t) {
   const chips = []
-  if (member.keyIndex >= 0) {
-    chips.push((concept.identify_by || []).length > 1
-      ? t('concept.keyIndexed', { index: member.keyIndex + 1 })
-      : t('concept.key'))
-  }
+  const key = keyBadge(member, concept, t)
+  if (key) chips.push(key)
   if (member.relationship.multiplicity) chips.push(member.relationship.multiplicity)
   const requires = member.relationship.requires?.length || 0
   if (requires) chips.push(t('concept.requiresCount', { count: requires }))
@@ -289,7 +310,11 @@ function ConceptDetail({ item, model, onNavigate }) {
                 const first = targets[0]
                 return (
                   <MemberRow key={member.path}>
-                    <Cell value={member.name} onClick={() => onNavigate(relationshipTarget(member))} />
+                    <Cell
+                      value={member.name}
+                      badge={keyBadge(member, item, t)}
+                      onClick={() => onNavigate(relationshipTarget(member))}
+                    />
                     <Cell value={relationshipDescription(member.relationship, t)} tone="member-table__cell--muted" />
                     <Cell
                       value={targets.length > 1 ? targets.join(', ') : first}
@@ -400,7 +425,6 @@ function RelationshipDetail({ item, model, onNavigate }) {
   const mappings = model.conceptMappings.filter((mapping) => mapping.concept === item.owner)
   const datasetNames = new Set(model.datasets.map((dataset) => dataset.name))
   const datasets = [...new Set(mappings.flatMap((mapping) => referencedDatasets(mapping, datasetNames)))]
-  const kind = relationshipKind(item, model)
   const owner = model.conceptByName.get(item.owner)
   const participants = [
     {
@@ -420,12 +444,6 @@ function RelationshipDetail({ item, model, onNavigate }) {
   return (
     <>
       <p className="detail-description">{item.description || t('inspector.noDescription')}</p>
-      <div className="detail-kv">
-        <div><span>{t('relationship.id')}</span><strong>{item.path || `${item.owner}.${item.name}`}</strong></div>
-        <div><span>{t('relationship.kind')}</span><strong>{t(RELATIONSHIP_KIND_KEYS[kind])}</strong></div>
-        <div><span>{t('relationship.owner')}</span><strong>{item.owner}</strong></div>
-        <div><span>{t('relationship.multiplicity')}</span><strong>{item.multiplicity || '—'}</strong></div>
-      </div>
       <Section title={t('relationship.participants')} count={participants.length}>
         <MemberTable headers={[t('relationship.colEntity'), t('relationship.colEntityDescription'), t('relationship.colRole')]}>
           {participants.map((participant, index) => (

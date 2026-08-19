@@ -25,7 +25,7 @@ const MESSAGES = {
     'tab.overview': '概览',
     'tab.ontology': '本体',
     'tab.semantic': '语义模型',
-    'tab.mapping': '映射追踪',
+    'tab.mapping': '映射',
     'tab.json': 'JSON',
 
     'welcome.title': '看清本体，也看清语义如何连接',
@@ -59,7 +59,6 @@ const MESSAGES = {
     'overview.quickEyebrow': '快速开始',
     'overview.quickTitle': '快速进入',
 
-    'sidebar.eyebrow': '浏览',
     'sidebar.titleOntology': '实体目录',
     'sidebar.titleSemantic': '语义目录',
     'sidebar.titleMapping': '映射目录',
@@ -100,7 +99,6 @@ const MESSAGES = {
 
     'kind.entityType': 'ENTITY TYPE',
     'kind.valueType': 'VALUE TYPE',
-    'kind.relationship': 'ONTOLOGY RELATIONSHIP',
     'kind.relationshipGroup': 'RELATIONSHIP BUNDLE',
     'kind.inheritance': 'ONTOLOGY INHERITANCE',
     'kind.dataset': 'SEMANTIC DATASET',
@@ -134,10 +132,6 @@ const MESSAGES = {
     'concept.requiresCount': 'requires ×{count}',
     'concept.facetCount': 'facet ×{count}',
 
-    'relationship.id': '关系 ID',
-    'relationship.owner': '所属 Concept',
-    'relationship.multiplicity': 'Multiplicity',
-    'relationship.kind': '关系类型',
     'relationship.kindAttribute': '属性',
     'relationship.kindAssociation': '实体关系',
     'relationship.kindObjectified': '对象化关系',
@@ -307,7 +301,6 @@ const MESSAGES = {
     'overview.quickEyebrow': 'QUICK START',
     'overview.quickTitle': 'Jump in',
 
-    'sidebar.eyebrow': 'BROWSE',
     'sidebar.titleOntology': 'Ontology Index',
     'sidebar.titleSemantic': 'Semantic Index',
     'sidebar.titleMapping': 'Mapping Directory',
@@ -348,7 +341,6 @@ const MESSAGES = {
 
     'kind.entityType': 'ENTITY TYPE',
     'kind.valueType': 'VALUE TYPE',
-    'kind.relationship': 'ONTOLOGY RELATIONSHIP',
     'kind.relationshipGroup': 'RELATIONSHIP BUNDLE',
     'kind.inheritance': 'ONTOLOGY INHERITANCE',
     'kind.dataset': 'SEMANTIC DATASET',
@@ -382,10 +374,6 @@ const MESSAGES = {
     'concept.requiresCount': 'requires ×{count}',
     'concept.facetCount': 'facet ×{count}',
 
-    'relationship.id': 'Relationship ID',
-    'relationship.owner': 'Declared under',
-    'relationship.multiplicity': 'Multiplicity',
-    'relationship.kind': 'Kind',
     'relationship.kindAttribute': 'Attribute',
     'relationship.kindAssociation': 'Entity relation',
     'relationship.kindObjectified': 'Objectified fact',

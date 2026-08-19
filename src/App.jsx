@@ -31,13 +31,21 @@ import { buildMappingGraph, buildOntologyGraph, buildSemanticGraph } from './lib
 import { issueText, useI18n, useT } from './lib/i18n'
 import { buildSearchIndex, normalizeOssie, parseOssie, relationshipKind, searchIndex } from './lib/ossie'
 
+// `count` reports how much the tab actually holds; the tabs that are not a
+// list of anything leave it off. `hideWhenEmpty` drops the semantic layers a
+// pure ontology document simply does not have -- the ontology tab stays put
+// even at zero, since it is what the document is.
 const TABS = [
   { id: 'overview', labelKey: 'tab.overview', icon: Layers3 },
-  { id: 'ontology', labelKey: 'tab.ontology', icon: Network },
-  { id: 'semantic', labelKey: 'tab.semantic', icon: Database },
-  { id: 'mapping', labelKey: 'tab.mapping', icon: GitBranch },
+  { id: 'ontology', labelKey: 'tab.ontology', icon: Network, count: (model) => model.stats.entityTypes },
+  { id: 'semantic', labelKey: 'tab.semantic', icon: Database, count: (model) => model.stats.datasets, hideWhenEmpty: true },
+  { id: 'mapping', labelKey: 'tab.mapping', icon: GitBranch, count: (model) => model.stats.conceptMappings, hideWhenEmpty: true },
   { id: 'json', labelKey: 'tab.json', icon: Braces },
 ]
+
+function visibleTabs(model) {
+  return TABS.filter((tab) => !tab.hideWhenEmpty || tab.count(model) > 0)
+}
 
 const JsonView = lazy(() => import('./components/JsonView'))
 
@@ -213,9 +221,10 @@ export default function App() {
 
       {model && (
         <nav className="tabbar">
-          {TABS.map(({ id, labelKey, icon: Icon }) => (
+          {visibleTabs(model).map(({ id, labelKey, icon: Icon, count }) => (
             <button key={id} className={activeTab === id ? 'is-active' : ''} onClick={() => selectTab(id)}>
               <Icon size={15} />{t(labelKey)}
+              {!!count && <em className="tabbar__count">{count(model)}</em>}
             </button>
           ))}
           <div className="tabbar__status"><CheckCircle2 size={14} />{t('app.statusOk')}</div>
@@ -379,7 +388,7 @@ function Sidebar({ activeTab, items, query, onQuery, selectedKind, onKind, selec
 
   return (
     <aside className="sidebar">
-      <div className="sidebar__title"><span className="eyebrow">{t('sidebar.eyebrow')}</span><h2>{title}</h2></div>
+      <div className="sidebar__title"><h2>{title}</h2></div>
       <label className="search-box">
         <Search size={15} />
         <input value={query} onChange={(event) => onQuery(event.target.value)} placeholder={t('sidebar.search')} />

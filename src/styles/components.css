@@ -16,6 +16,8 @@
 
 .tabbar { height: 45px; flex: none; display: flex; align-items: stretch; padding: 0 24px; border-bottom: 1px solid var(--line); background: var(--surface); }
 .tabbar button { position: relative; display: flex; align-items: center; gap: 7px; padding: 0 17px; border: 0; background: transparent; font-size: 12px; color: var(--muted); cursor: pointer; }
+.tabbar__count { padding: 1px 5px; border-radius: 999px; color: var(--muted); background: #edf0eb; font: 500 9px 'SFMono-Regular', Consolas, monospace; font-style: normal; }
+.tabbar button.is-active .tabbar__count { color: var(--green-dark); background: var(--green-soft); }
 .tabbar button::after { content: ''; position: absolute; height: 2px; left: 14px; right: 14px; bottom: -1px; background: transparent; }
 .tabbar button.is-active { color: var(--green-dark); font-weight: 700; }
 .tabbar button.is-active::after { background: var(--green); }
@@ -107,7 +109,9 @@
 .inspector--empty h3 { margin: 14px 0 5px; color: var(--ink); font-size: 14px; }.inspector--empty p { max-width: 240px; margin: 0; font-size: 10px; line-height: 1.7; }
 .inspector__header { min-height: 73px; display: grid; grid-template-columns: 34px minmax(0,1fr) 32px; gap: 10px; align-items: center; padding: 13px 14px; border-bottom: 1px solid var(--line); }
 .inspector__symbol { width: 33px; height: 33px; display: grid; place-items: center; border-radius: 9px; color: var(--green); background: var(--green-soft); }
-.inspector__header h2 { margin: 3px 0 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 500 13px 'SFMono-Regular', Consolas, monospace; }
+.inspector__header h2 { min-width: 0; display: flex; align-items: center; gap: 7px; margin: 3px 0 0; font: 500 13px 'SFMono-Regular', Consolas, monospace; }
+.inspector__header h2 > span:first-child, .inspector__header h2 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inspector__header h2 .chip { flex: none; padding: 2px 5px; font-size: 8px; }
 .inspector__body { min-height: 0; overflow: auto; padding: 16px; }
 .detail-description { margin: 0 0 15px; color: #52615b; font-size: 11px; line-height: 1.7; }
 .detail-kv { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px; }
@@ -139,6 +143,7 @@
 .member-table__row:hover { background: var(--surface-2); }
 .member-table__cell { min-width: 0; overflow: hidden; padding: 0; border: 0; background: none; color: inherit; font: 500 9px 'SFMono-Regular', Consolas, monospace; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
 .member-table__cell--link { cursor: pointer; }
+.member-table__cell .chip { margin-left: 5px; padding: 1px 4px; font-size: 8px; vertical-align: 1px; }
 .member-table__cell--link:hover { color: var(--green-dark); text-decoration: underline; }
 .member-table__cell--muted { color: var(--muted); font-weight: 400; }
 .member-table__cell--type { color: var(--green-dark); }
