@@ -17,6 +17,9 @@ const MESSAGES = {
     'locale.label': '中文',
     'locale.switch': '切换语言',
 
+    'layout.resizeSidebar': '拖动调整目录宽度',
+    'layout.resizeInspector': '拖动调整详情面板宽度',
+
     'app.open': '打开 JSON',
     'app.import': '导入 JSON',
     'app.statusOk': '结构检查通过',
@@ -256,6 +259,9 @@ const MESSAGES = {
   en: {
     'locale.label': 'EN',
     'locale.switch': 'Switch language',
+
+    'layout.resizeSidebar': 'Drag to resize the index',
+    'layout.resizeInspector': 'Drag to resize the details panel',
 
     'app.open': 'Open JSON',
     'app.import': 'Import JSON',

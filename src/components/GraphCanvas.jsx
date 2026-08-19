@@ -40,7 +40,7 @@ function edgeMatchesSelection(edge, selection) {
   return selection.kind === 'relationship' && edge.data?.relationPaths?.includes(selection.name)
 }
 
-function frameNodes(flow, canvasRef, items, duration = 340) {
+function frameNodes(flow, canvasRef, items, inspectorWidth, duration = 340) {
   const canvas = canvasRef.current?.getBoundingClientRect()
   if (!canvas || !items.length) return false
 
@@ -50,7 +50,10 @@ function frameNodes(flow, canvasRef, items, duration = 340) {
   const maxY = Math.max(...items.map((item) => item.position.y + nodeHeight))
   const boundsWidth = Math.max(nodeWidth, maxX - minX)
   const boundsHeight = Math.max(nodeHeight, maxY - minY)
-  const inspectorReserve = Math.min(390, canvas.width * 0.38)
+  // Keep the framed graph clear of the inspector floating over the canvas.
+  // The panel is resizable, so the reserve follows its real width, still
+  // capped so a wide panel cannot squeeze the graph out of view entirely.
+  const inspectorReserve = Math.min(inspectorWidth + 20, canvas.width * 0.5)
   const availableWidth = Math.max(260, canvas.width - inspectorReserve - 72)
   const availableHeight = Math.max(220, canvas.height - 96)
   const zoom = Math.max(0.1, Math.min(1.06, availableWidth / boundsWidth, availableHeight / boundsHeight))
@@ -65,7 +68,7 @@ function frameNodes(flow, canvasRef, items, duration = 340) {
   return true
 }
 
-function InnerGraphCanvas({ graph, selection, onSelect, onFocus, canvasRef }) {
+function InnerGraphCanvas({ graph, selection, onSelect, onFocus, canvasRef, inspectorWidth }) {
   const t = useT()
   const flow = useReactFlow()
   const tokens = useCssTokens(CANVAS_TOKENS)
@@ -160,12 +163,12 @@ function InnerGraphCanvas({ graph, selection, onSelect, onFocus, canvasRef }) {
     if (previousGraphKey.current === graphKey) return undefined
     previousGraphKey.current = graphKey
     const timeout = window.setTimeout(() => {
-      if (!selection || !frameNodes(flow, canvasRef, graph.nodes, 320)) {
+      if (!selection || !frameNodes(flow, canvasRef, graph.nodes, inspectorWidth, 320)) {
         flow.fitView({ padding: 0.16, duration: 320, maxZoom: 1.12 })
       }
     }, 70)
     return () => window.clearTimeout(timeout)
-  }, [canvasRef, flow, graph.nodes, graphKey, selection])
+  }, [canvasRef, flow, graph.nodes, graphKey, inspectorWidth, selection])
 
   useEffect(() => {
     if (!selectedNodeId || previousCenteredNode.current === selectedNodeId) return undefined
@@ -189,10 +192,10 @@ function InnerGraphCanvas({ graph, selection, onSelect, onFocus, canvasRef }) {
     if (!selectedNodes.length) return undefined
     const timeout = window.setTimeout(() => {
       // Frame both endpoints inside the area that remains visible beside the inspector.
-      frameNodes(flow, canvasRef, selectedNodes)
+      frameNodes(flow, canvasRef, selectedNodes, inspectorWidth)
     }, 120)
     return () => window.clearTimeout(timeout)
-  }, [canvasRef, flow, graph.edges, graph.nodes, selectedEdgeIds, selectedEdgeKey])
+  }, [canvasRef, flow, graph.edges, graph.nodes, inspectorWidth, selectedEdgeIds, selectedEdgeKey])
 
   if (!nodes.length) {
     return (

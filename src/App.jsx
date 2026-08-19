@@ -19,6 +19,7 @@ import {
 import GraphCanvas from './components/GraphCanvas'
 import ImportDialog from './components/ImportDialog'
 import Inspector from './components/Inspector'
+import ResizeHandle from './components/ResizeHandle'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,6 +31,7 @@ import {
 import { buildMappingGraph, buildOntologyGraph, buildSemanticGraph } from './lib/graph'
 import { issueText, useI18n, useT } from './lib/i18n'
 import { buildSearchIndex, normalizeOssie, parseOssie, relationshipKind, searchIndex } from './lib/ossie'
+import { usePanelWidth } from './lib/usePanelWidth'
 
 // `count` reports how much the tab actually holds; the tabs that are not a
 // list of anything leave it off. `hideWhenEmpty` drops the semantic layers a
@@ -62,6 +64,8 @@ const KIND_LABELS = {
 
 export default function App() {
   const { locale, setLocale, t } = useI18n()
+  const sidebar = usePanelWidth('sidebar')
+  const inspector = usePanelWidth('inspector')
   const [model, setModel] = useState(null)
   const [warnings, setWarnings] = useState([])
   const [importErrors, setImportErrors] = useState([])
@@ -240,7 +244,10 @@ export default function App() {
           <JsonView document={model.document} />
         </Suspense>
       ) : (
-        <main className="workspace">
+        <main
+          className="workspace"
+          style={{ '--sidebar-width': `${sidebar.width}px`, '--inspector-width': `${inspector.width}px` }}
+        >
           <Sidebar
             key={activeTab}
             activeTab={activeTab}
@@ -251,6 +258,8 @@ export default function App() {
             onKind={setSidebarKind}
             selection={selection}
             onSelect={navigate}
+            onResize={sidebar.resize}
+            onResetWidth={sidebar.reset}
           />
           <section className="canvas-panel">
             <GraphToolbar
@@ -264,10 +273,23 @@ export default function App() {
               setFocusDepth={setFocusDepth}
               selection={selection}
             />
-            <GraphCanvas graph={graph} selection={selection} onSelect={selectGraphElement} onFocus={setFocusDepth} />
+            <GraphCanvas
+              graph={graph}
+              selection={selection}
+              onSelect={selectGraphElement}
+              onFocus={setFocusDepth}
+              inspectorWidth={inspector.width}
+            />
             <GraphLegend activeTab={activeTab} />
           </section>
-          <Inspector selection={selection} model={model} onClose={() => setSelection(null)} onNavigate={navigate} />
+          <Inspector
+            selection={selection}
+            model={model}
+            onClose={() => setSelection(null)}
+            onNavigate={navigate}
+            onResize={inspector.resize}
+            onResetWidth={inspector.reset}
+          />
         </main>
       )}
 
@@ -376,7 +398,7 @@ function Overview({ model, warnings, onNavigate, onTab }) {
   )
 }
 
-function Sidebar({ activeTab, items, query, onQuery, selectedKind, onKind, selection, onSelect }) {
+function Sidebar({ activeTab, items, query, onQuery, selectedKind, onKind, selection, onSelect, onResize, onResetWidth }) {
   const t = useT()
   const title = activeTab === 'ontology'
     ? t('sidebar.titleOntology')
@@ -426,6 +448,7 @@ function Sidebar({ activeTab, items, query, onQuery, selectedKind, onKind, selec
         ))}
         {!items.length && <div className="sidebar__empty">{t('sidebar.empty')}</div>}
       </div>
+      <ResizeHandle label={t('layout.resizeSidebar')} onResize={onResize} onReset={onResetWidth} />
     </aside>
   )
 }

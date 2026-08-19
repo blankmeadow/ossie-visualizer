@@ -9,6 +9,7 @@ import {
   roleKind,
 } from '../lib/ossie'
 import { useT } from '../lib/i18n'
+import ResizeHandle from './ResizeHandle'
 
 const KIND_META = {
   concept: { labelKey: 'kind.entityType', Icon: CircleDot },
@@ -32,11 +33,14 @@ const RELATIONSHIP_KIND_KEYS = {
   unary: 'relationship.kindUnary',
 }
 
-export default function Inspector({ selection, model, onClose, onNavigate }) {
+export default function Inspector({ selection, model, onClose, onNavigate, onResize, onResetWidth }) {
   const t = useT()
+  // The handle sits on the panel's left edge, so dragging left widens it.
+  const handle = <ResizeHandle label={t('layout.resizeInspector')} direction={-1} onResize={onResize} onReset={onResetWidth} />
   if (!selection) {
     return (
       <aside className="inspector inspector--empty">
+        {handle}
         <div className="inspector-empty__glyph"><CircleDot size={25} /></div>
         <h3>{t('inspector.emptyTitle')}</h3>
         <p>{t('inspector.emptyBody')}</p>
@@ -60,6 +64,7 @@ export default function Inspector({ selection, model, onClose, onNavigate }) {
   const multiplicity = kind === 'relationship' ? selection.target?.multiplicity : ''
   return (
     <aside className="inspector">
+      {handle}
       <header className="inspector__header">
         <div className="inspector__symbol"><Icon size={17} /></div>
         <div>

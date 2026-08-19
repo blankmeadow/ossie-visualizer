@@ -41,9 +41,23 @@
 .welcome__features span { display: flex; align-items: center; gap: 5px; }
 .welcome__features svg { color: var(--green); }
 
-.workspace { flex: 1; position: relative; min-height: 0; display: grid; grid-template-columns: 278px minmax(0, 1fr); }
+/* Both panel widths are set from React and read back here, so the grid column,
+   the floating inspector, the minimap offset and the graph framing all agree
+   on one number. The fallbacks keep the layout sane before the first paint. */
+.workspace { flex: 1; position: relative; min-height: 0; display: grid; grid-template-columns: var(--sidebar-width, 278px) minmax(0, 1fr); }
 .sidebar, .inspector { min-height: 0; background: var(--surface); }
-.sidebar { display: flex; flex-direction: column; border-right: 1px solid var(--line); }
+.sidebar { position: relative; display: flex; flex-direction: column; border-right: 1px solid var(--line); }
+
+/* A thin grab strip straddling the panel edge, widened on hover so it is easy
+   to catch without stealing clicks from the content beside it. */
+.resize-handle { position: absolute; z-index: 5; top: 0; bottom: 0; width: 9px; cursor: col-resize; touch-action: none; }
+.resize-handle::after { content: ''; position: absolute; top: 0; bottom: 0; left: 4px; width: 1px; background: transparent; transition: background .15s ease; }
+.resize-handle:hover::after, .resize-handle:focus-visible::after { background: var(--green); }
+.resize-handle:focus-visible { outline: 0; }
+.sidebar .resize-handle { right: -4px; }
+/* The inspector clips its corners, so its handle stays inside -- over the
+   panel's own left padding, where there is nothing to click. */
+.inspector .resize-handle { left: 0; }
 .sidebar__title { padding: 19px 18px 13px; }
 .sidebar h2 { margin: 3px 0 0; font-size: 16px; letter-spacing: -.025em; }
 .search-box { display: flex; align-items: center; gap: 8px; margin: 0 14px 10px; padding: 9px 10px; border: 1px solid var(--line); background: var(--surface-2); border-radius: 8px; color: var(--muted); }
@@ -82,7 +96,7 @@
 .depth-switch button { padding: 4px 7px; border: 0; border-radius: 5px; background: transparent; color: var(--muted); font-size: 8px; cursor: pointer; }
 .depth-switch button.is-active { color: var(--green-dark); background: white; box-shadow: 0 1px 4px rgba(30,50,42,.09); }
 .depth-switch button:disabled { opacity: .35; cursor: default; }
-.graph-canvas { flex: 1; min-height: 0; }.graph-canvas .react-flow__minimap { transition: right .2s ease; }.graph-canvas.has-inspector .react-flow__minimap { right: 390px; }
+.graph-canvas { flex: 1; min-height: 0; }.graph-canvas .react-flow__minimap { transition: right .2s ease; }.graph-canvas.has-inspector .react-flow__minimap { right: calc(var(--inspector-width, 370px) + 24px); }
 .graph-canvas .react-flow__controls { border-radius: 8px; overflow: hidden; box-shadow: 0 4px 15px rgba(30,50,42,.09); }
 .graph-canvas .react-flow__controls-button { border-bottom-color: var(--line); background: var(--surface); }
 .graph-canvas .react-flow__minimap { overflow: hidden; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); }
@@ -103,7 +117,7 @@
 .empty-canvas h3 { margin: 12px 0 4px; font-size: 14px; color: var(--ink); }.empty-canvas p { margin: 0; font-size: 10px; }
 
 
-.inspector { position: absolute; z-index: 12; top: 74px; right: 14px; bottom: 14px; width: min(370px, calc(100% - 320px)); overflow: hidden; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 18px 48px rgba(22,42,34,.18); }
+.inspector { position: absolute; z-index: 12; top: 74px; right: 14px; bottom: 14px; width: min(var(--inspector-width, 370px), calc(100% - var(--sidebar-width, 278px) - 60px)); overflow: hidden; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 18px 48px rgba(22,42,34,.18); }
 .inspector--empty { display: none; }
 .inspector-empty__glyph { width: 52px; height: 52px; display: grid; place-items: center; border-radius: 16px; color: var(--green); background: var(--green-soft); }
 .inspector--empty h3 { margin: 14px 0 5px; color: var(--ink); font-size: 14px; }.inspector--empty p { max-width: 240px; margin: 0; font-size: 10px; line-height: 1.7; }
@@ -190,14 +204,15 @@
 .import-dialog footer { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 14px; }.import-dialog footer > span { display: flex; align-items: center; gap: 5px; color: var(--muted); font-size: 9px; }.import-dialog footer > div { display: flex; gap: 7px; }
 
 @media (max-width: 1120px) {
-  .workspace { grid-template-columns: 240px minmax(0,1fr); }.inspector { width: min(340px, calc(100% - 275px)); }.graph-canvas.has-inspector .react-flow__minimap { right: 360px; }
+  .workspace { grid-template-columns: min(var(--sidebar-width, 278px), 240px) minmax(0,1fr); }.inspector { width: min(var(--inspector-width, 370px), 340px, calc(100% - 275px)); }
   .stat-grid { grid-template-columns: repeat(3, 1fr); }
   .overview-grid { grid-template-columns: 1fr 1fr; }.overview-card--large { grid-column: 1 / -1; }
 }
 
 @media (max-width: 820px) {
   body { overflow: auto; }.app-shell { min-height: 100%; height: auto; }.topbar { position: sticky; top: 0; z-index: 20; }.brand { min-width: 0; }.topbar__locale span { display: none; }.tabbar { overflow-x: auto; padding: 0 8px; }.tabbar__status { display: none; }
-  .workspace { height: calc(100vh - 109px); grid-template-columns: 200px minmax(420px,1fr); overflow: auto; }.inspector { position: fixed; z-index: 30; top: 109px; right: 0; bottom: 0; width: min(360px, 92vw); border-radius: 0; box-shadow: -14px 0 36px rgba(20,38,31,.16); }.inspector--empty { display: none; }.graph-canvas.has-inspector .react-flow__minimap { right: 14px; }
+  /* Too little room to trade width between panels, so the handles come off. */
+  .workspace { height: calc(100vh - 109px); grid-template-columns: 200px minmax(420px,1fr); overflow: auto; }.inspector { position: fixed; z-index: 30; top: 109px; right: 0; bottom: 0; width: min(360px, 92vw); border-radius: 0; box-shadow: -14px 0 36px rgba(20,38,31,.16); }.inspector--empty { display: none; }.graph-canvas.has-inspector .react-flow__minimap { right: 14px; }.resize-handle { display: none; }
   .overview__hero { flex-direction: column; }.overview__health { width: 100%; }.stat-grid { grid-template-columns: repeat(2, 1fr); }.overview-grid { grid-template-columns: 1fr; }.overview-card--large { grid-column: auto; }.layer-flow { flex-direction: column; }.layer-flow > svg { transform: rotate(90deg); }.layer-flow button { width: 100%; }
   .json-view header { align-items: flex-start; flex-direction: column; }.json-view__actions { width: 100%; overflow-x: auto; }.json-view__actions button { flex: none; }.json-editor { min-height: 560px; }
   .import-dialog footer { align-items: flex-start; flex-direction: column; }.import-dialog footer > div { align-self: flex-end; }
