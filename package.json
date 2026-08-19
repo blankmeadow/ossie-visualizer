@@ -5,9 +5,9 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/MingkeVan/ossie-visualizer.git"
+    "url": "git+https://github.com/blankmeadow/ossie-visualizer.git"
   },
-  "homepage": "https://github.com/MingkeVan/ossie-visualizer#readme",
+  "homepage": "https://github.com/blankmeadow/ossie-visualizer#readme",
   "keywords": [
     "ossie",
     "semantic-model",

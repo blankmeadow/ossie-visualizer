@@ -41,7 +41,7 @@ nvm use 20
 
 ```bash
 # 1. 克隆项目
-git clone https://github.com/MingkeVan/ossie-visualizer.git
+git clone https://github.com/blankmeadow/ossie-visualizer.git
 cd ossie-visualizer
 
 # 2. 安装依赖
