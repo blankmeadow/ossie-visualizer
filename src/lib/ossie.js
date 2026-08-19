@@ -1,3 +1,5 @@
+import { parse as parseYaml } from 'yaml'
+
 // Ossie has no discriminator on a relationship: `EntityType -> EntityType` and
 // `EntityType -> ValueType` are the same JSON shape. The only reliable judgement
 // is the *type of the concept a role points at*, so the built-ins have to be
@@ -20,20 +22,43 @@ const BUILTIN_ENTITY_TYPES = new Set(['Any'])
 
 const BUILTIN_CONCEPTS = new Set([...BUILTIN_VALUE_TYPES, ...BUILTIN_ENTITY_TYPES])
 
+/**
+ * Read an Ossie document written as either JSON or YAML.
+ *
+ * The specification and Apache Ossie's own examples are written in YAML, so a
+ * reader should be able to open one without converting it first. YAML 1.2 is a
+ * superset of JSON, but JSON is tried first: it is the stricter grammar and it
+ * reports a syntax error the reader can act on, where the YAML parser would
+ * quietly accept some malformed JSON as a plain string.
+ */
 export function parseOssie(text) {
   let document
+  let format = 'json'
   try {
     document = JSON.parse(text)
-  } catch (error) {
-    return {
-      document: null,
-      errors: [{ path: '$', code: 'issue.jsonSyntax', params: { message: error.message } }],
-      warnings: [],
+  } catch (jsonError) {
+    try {
+      format = 'yaml'
+      document = parseYaml(text)
+    } catch (yamlError) {
+      // Whichever grammar the input was reaching for, report the failure that
+      // fits it: a leading brace or bracket means JSON was intended.
+      const looksLikeJson = /^[\s﻿]*[[{]/.test(text)
+      return {
+        document: null,
+        format,
+        errors: [{
+          path: '$',
+          code: looksLikeJson ? 'issue.jsonSyntax' : 'issue.yamlSyntax',
+          params: { message: (looksLikeJson ? jsonError : yamlError).message },
+        }],
+        warnings: [],
+      }
     }
   }
 
   const { errors, warnings } = validateOssie(document)
-  return { document, errors, warnings }
+  return { document, format, errors, warnings }
 }
 
 /**

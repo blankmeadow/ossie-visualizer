@@ -17,7 +17,7 @@ export default function ImportDialog({ open, onClose, onImport, errors = [] }) {
 
   const submit = () => {
     if (!text.trim()) return
-    onImport(text, fileName || 'pasted-ossie.json')
+    onImport(text)
   }
 
   return (
@@ -52,7 +52,7 @@ export default function ImportDialog({ open, onClose, onImport, errors = [] }) {
           name="ossie_json_file"
           className="visually-hidden-input"
           type="file"
-          accept="application/json,.json"
+          accept="application/json,application/yaml,text/yaml,.json,.yaml,.yml"
           onChange={(event) => readFile(event.target.files?.[0])}
         />
 

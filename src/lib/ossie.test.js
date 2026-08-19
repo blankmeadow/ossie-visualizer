@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
   buildSearchIndex,
@@ -240,5 +241,56 @@ describe('relationship classification', () => {
     const index = buildSearchIndex(model)
     expect(searchIndex(index, 'tax number', ['concept'])).toEqual([])
     expect(searchIndex(index, 'tax number', ['valueType'])[0].name).toBe('tax_number')
+  })
+})
+
+describe('reading YAML as well as JSON', () => {
+  it('reads a document written in YAML', () => {
+    const result = parseOssie([
+      'version: 0.2.0.dev0',
+      'name: party_ontology',
+      'ontology:',
+      '  - concept: party',
+      '    type: EntityType',
+      '    relationships:',
+      '      - name: party_name',
+      '        roles: [{ concept: String }]',
+      '        verbalizes: ["{party} has name {String}"]',
+    ].join('\n'))
+    expect(result.errors).toEqual([])
+    expect(result.format).toBe('yaml')
+    expect(normalizeOssie(result.document).stats.entityTypes).toBe(1)
+  })
+
+  it('still reads JSON, and says so', () => {
+    const result = parseOssie(JSON.stringify(pureOntology))
+    expect(result.errors).toEqual([])
+    expect(result.format).toBe('json')
+  })
+
+  it('blames the grammar the input was reaching for', () => {
+    // A leading brace means JSON was meant, however badly it parses as YAML.
+    expect(parseOssie('{"name":').errors[0].code).toBe('issue.jsonSyntax')
+    expect(parseOssie('name: ok\n\tbad: indent').errors[0].code).toBe('issue.yamlSyntax')
+  })
+
+  it('opens the bundled Apache Ossie example without complaint', () => {
+    const result = parseOssie(readFileSync('public/flights.yaml', 'utf8'))
+    expect(result.errors).toEqual([])
+    expect(result.warnings).toEqual([])
+    expect(result.format).toBe('yaml')
+    const model = normalizeOssie(result.document)
+    // The example is the coverage the visualizer is checked against: entity and
+    // value types, inherited members, compound identifiers, n-ary relationships.
+    expect(model.stats).toMatchObject({
+      entityTypes: 12,
+      valueTypes: 32,
+      ontologyRelationships: 58,
+      datasets: 6,
+      conceptMappings: 11,
+    })
+    expect(model.concepts.some((concept) => (concept.identify_by || []).length > 1)).toBe(true)
+    expect(model.ontologyRelationships.some((item) => (item.roles || []).length > 1)).toBe(true)
+    expect(model.ontologyRelationships.some((item) => item.derived_by)).toBe(true)
   })
 })

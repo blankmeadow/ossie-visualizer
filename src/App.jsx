@@ -67,6 +67,7 @@ export default function App() {
   const sidebar = usePanelWidth('sidebar')
   const inspector = usePanelWidth('inspector')
   const [model, setModel] = useState(null)
+  const [source, setSource] = useState(null)
   const [warnings, setWarnings] = useState([])
   const [importErrors, setImportErrors] = useState([])
   const [importOpen, setImportOpen] = useState(false)
@@ -149,6 +150,8 @@ export default function App() {
       return
     }
     setModel(normalizeOssie(result.document))
+    // The source tab shows what was opened, in the language it was written in.
+    setSource({ text, format: result.format })
     setWarnings(result.warnings)
     setImportErrors([])
     setImportOpen(false)
@@ -241,7 +244,7 @@ export default function App() {
         <Overview model={model} warnings={warnings} onNavigate={navigate} onTab={selectTab} />
       ) : activeTab === 'json' ? (
         <Suspense fallback={<main className="json-view"><div className="json-view__loading">{t('app.jsonLoading')}</div></main>}>
-          <JsonView document={model.document} />
+          <JsonView source={source} />
         </Suspense>
       ) : (
         <main

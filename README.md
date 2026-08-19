@@ -56,7 +56,28 @@ npm install
 npm run dev
 ```
 
-启动后在浏览器打开 `http://127.0.0.1:4178` 即可使用。项目根目录下提供示例文件 `public/sample-ossie-model.json` 可供直接导入测试。
+启动后在浏览器打开 `http://127.0.0.1:4178` 即可使用。
+
+### 示例文档
+
+`public/flights.yaml` 是 [Apache Ossie 官方示例](https://github.com/apache/ossie/blob/main/examples/flights.yaml) `examples/flights.yaml`，逐字节原样收录（含 ASF 许可头），可直接导入。它覆盖：
+
+| 要素 | 覆盖情况 |
+|---|---|
+| Concept | 12 个 EntityType、32 个 ValueType |
+| `extends` | 32 处（含 ValueType 到内建类型的继承链） |
+| `identify_by` | 12 处（含复合标识符） |
+| Relationship | 58 条（45 条属性、13 条实体关系，含 2 条多角色关系） |
+| `verbalizes` | 58 处 |
+| `multiplicity` | 56 处 |
+| `requires` | 文档级 2 条、Concept 级 5 处、Relationship 级 5 处 |
+| `derived_by` | 4 处 |
+| Semantic Model | 6 个 Dataset、51 个 Field |
+| Concept Mapping | 11 处 |
+
+该文档**未涉及**的要素：Relationship 的 `description`、Dataset 之间的关系、Metric、`ai_context`。官方另一个示例 `tpcds_semantic_model.yaml` 覆盖了后三者，但它是纯语义模型文档（顶层 `semantic_model`、没有 `ontology`），不符合本工具要求的文档形态，因此未纳入。
+
+> 规范和官方示例都以 YAML 编写，因此导入支持 `.json` / `.yaml` / `.yml`；YAML 文档在「JSON」页按原文展示，不会被转成 JSON——否则注释（包括许可头）会丢失。
 
 ---
 
