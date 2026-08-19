@@ -1,5 +1,10 @@
+@import 'tailwindcss';
+
 :root {
   font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  /* Tailwind preflight sets html{line-height:1.5}; this layout was authored against
+     the browser default, so pin it back until components migrate to explicit leading. */
+  line-height: normal;
   color: #1d2926;
   background: #f1f3ee;
   font-synthesis: none;
@@ -9,6 +14,7 @@
   --line-strong: #ccd4ca;
   --ink: #1d2926;
   --muted: #6b7772;
+  --placeholder: #757575;
   --green: #386f5c;
   --green-dark: #245343;
   --green-soft: #e6f0eb;
@@ -22,9 +28,14 @@
 }
 
 * { box-sizing: border-box; }
+/* Preflight resets h1-h6 to font-weight:inherit; restore the browser default this
+   layout was authored against. Rules using the `font` shorthand still override. */
+h1, h2, h3, h4, h5, h6 { font-weight: bold; }
 html, body, #root { width: 100%; min-width: 320px; height: 100%; margin: 0; }
 body { overflow: hidden; }
 button, input, textarea { font: inherit; }
+/* Preflight renders placeholders at 50% of currentColor; pin to the muted token. */
+input::placeholder, textarea::placeholder { color: var(--placeholder); opacity: 1; }
 button { color: inherit; }
 code, pre { font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace; }
 
