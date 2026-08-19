@@ -105,17 +105,6 @@
 .empty-canvas__mark { width: 48px; height: 48px; margin: auto; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 50%; font: 500 18px 'SFMono-Regular', Consolas, monospace; }
 .empty-canvas h3 { margin: 12px 0 4px; font-size: 14px; color: var(--ink); }.empty-canvas p { margin: 0; font-size: 10px; }
 
-.ossie-node { width: 248px; min-height: 108px; padding: 12px 13px; border: 1px solid #c9d5cf; border-radius: 11px; background: rgba(252,253,250,.98); box-shadow: 0 8px 22px rgba(30,50,42,.10); transition: opacity .16s, filter .16s, border-color .15s, box-shadow .15s, transform .15s; }
-.ossie-node:hover, .ossie-node.is-selected { border-color: #56816e; box-shadow: 0 12px 30px rgba(30,70,55,.18); transform: translateY(-1px); }.ossie-node.is-related { border-color: #9ab4a8; box-shadow: 0 8px 24px rgba(30,70,55,.12); }.ossie-node.is-dimmed { opacity: .16; filter: saturate(.35); }
-.ossie-node__header { display: flex; align-items: center; gap: 5px; color: #7d8984; }
-.ossie-node__icon { width: 21px; height: 21px; display: grid; place-items: center; border-radius: 6px; color: var(--green); background: var(--green-soft); }
-.ossie-node--dataset .ossie-node__icon { color: var(--orange); background: var(--orange-soft); }.ossie-node--metric .ossie-node__icon { color: var(--amber); background: var(--amber-soft); }.ossie-node--mapping .ossie-node__icon { color: var(--violet); background: var(--violet-soft); }
-.ossie-node__kind { font: 500 8px 'SFMono-Regular', Consolas, monospace; letter-spacing: .08em; }
-.ossie-node__name { margin-top: 7px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 500 12px 'SFMono-Regular', Consolas, monospace; color: #21312b; }
-.ossie-node__subtitle { margin-top: 4px; height: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 9px; }
-.ossie-node__badges { display: flex; gap: 4px; margin-top: 7px; }
-.ossie-node__badges span { padding: 2px 5px; border-radius: 4px; color: #5e6e67; background: #eef1ec; font: 500 7px 'SFMono-Regular', Consolas, monospace; }
-.ossie-node__handle { width: 6px; height: 6px; border: 1px solid #92aaa0; background: #fafffc; opacity: .75; }
 
 .inspector { position: absolute; z-index: 12; top: 74px; right: 14px; bottom: 14px; width: min(370px, calc(100% - 320px)); overflow: hidden; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 18px 48px rgba(22,42,34,.18); }
 .inspector--empty { display: none; }

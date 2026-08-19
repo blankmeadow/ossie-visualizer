@@ -1,5 +1,16 @@
 import { Handle, Position } from '@xyflow/react'
 import { Braces, CircleDot, Database, GitBranch, Sigma } from 'lucide-react'
+import {
+  BaseNode,
+  BaseNodeBadge,
+  BaseNodeContent,
+  BaseNodeFooter,
+  BaseNodeHeader,
+  BaseNodeHeaderTitle,
+  BaseNodeIcon,
+  BaseNodeSubtitle,
+  BaseNodeTitle,
+} from './ui/base-node'
 
 const ICONS = {
   concept: CircleDot,
@@ -9,24 +20,46 @@ const ICONS = {
   mapping: GitBranch,
 }
 
+const KIND_LABELS = {
+  concept: 'ENTITY TYPE',
+  valueType: 'VALUE TYPE',
+  dataset: 'DATASET',
+  metric: 'METRIC',
+  mapping: 'MAPPING',
+}
+
+/** Icon tint per node kind; anything unmapped falls back to the concept green. */
+const KIND_TINTS = {
+  dataset: 'text-orange bg-orange-soft',
+  metric: 'text-amber bg-amber-soft',
+  mapping: 'text-violet bg-violet-soft',
+}
+const DEFAULT_TINT = 'text-green bg-green-soft'
+
 export default function OssieNode({ data, selected }) {
   const Icon = ICONS[data.kind] || CircleDot
+  const emphasis = selected ? 'selected' : data.dimmed ? 'dimmed' : data.related ? 'related' : 'default'
+
   return (
-    <div className={`ossie-node ossie-node--${data.kind} ${selected ? 'is-selected' : ''} ${data.related ? 'is-related' : ''} ${data.dimmed ? 'is-dimmed' : ''}`}>
+    <BaseNode emphasis={emphasis}>
       {(data.targetHandles || []).map((handle) => <NodeHandle key={handle.id} type="target" handle={handle} />)}
-      <div className="ossie-node__header">
-        <span className="ossie-node__icon"><Icon size={15} strokeWidth={2} /></span>
-        <span className="ossie-node__kind">{labelForKind(data.kind)}</span>
-      </div>
-      <div className="ossie-node__name" title={data.name}>{data.name}</div>
-      <div className="ossie-node__subtitle" title={data.subtitle}>{data.subtitle || '—'}</div>
+      <BaseNodeHeader>
+        <BaseNodeIcon className={KIND_TINTS[data.kind] || DEFAULT_TINT}>
+          <Icon size={15} strokeWidth={2} />
+        </BaseNodeIcon>
+        <BaseNodeHeaderTitle>{KIND_LABELS[data.kind] || data.kind.toUpperCase()}</BaseNodeHeaderTitle>
+      </BaseNodeHeader>
+      <BaseNodeContent>
+        <BaseNodeTitle title={data.name}>{data.name}</BaseNodeTitle>
+        <BaseNodeSubtitle title={data.subtitle}>{data.subtitle || '—'}</BaseNodeSubtitle>
+      </BaseNodeContent>
       {!!data.badges?.length && (
-        <div className="ossie-node__badges">
-          {data.badges.map((badge) => <span key={badge}>{badge}</span>)}
-        </div>
+        <BaseNodeFooter>
+          {data.badges.map((badge) => <BaseNodeBadge key={badge}>{badge}</BaseNodeBadge>)}
+        </BaseNodeFooter>
       )}
       {(data.sourceHandles || []).map((handle) => <NodeHandle key={handle.id} type="source" handle={handle} />)}
-    </div>
+    </BaseNode>
   )
 }
 
@@ -40,15 +73,13 @@ function NodeHandle({ type, handle }) {
   const style = ['top', 'bottom'].includes(handle.position)
     ? { left: `${handle.offset}%` }
     : { top: `${handle.offset}%` }
-  return <Handle id={handle.id} type={type} position={position} style={style} className="ossie-node__handle" />
-}
-
-function labelForKind(kind) {
-  return {
-    concept: 'ENTITY TYPE',
-    valueType: 'VALUE TYPE',
-    dataset: 'DATASET',
-    metric: 'METRIC',
-    mapping: 'MAPPING',
-  }[kind] || kind.toUpperCase()
+  return (
+    <Handle
+      id={handle.id}
+      type={type}
+      position={position}
+      style={style}
+      className="size-[6px] border border-[#92aaa0] bg-[#fafffc] opacity-75"
+    />
+  )
 }
