@@ -1,8 +1,7 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useMemo, useState } from 'react'
 import {
   AlertTriangle,
   Braces,
-  Check,
   CheckCircle2,
   ChevronRight,
   CircleDot,
@@ -19,6 +18,14 @@ import {
 import GraphCanvas from './components/GraphCanvas'
 import ImportDialog from './components/ImportDialog'
 import Inspector from './components/Inspector'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from './components/ui/dropdown-menu'
 import { buildMappingGraph, buildOntologyGraph, buildSemanticGraph } from './lib/graph'
 import { buildSearchIndex, normalizeOssie, parseOssie, searchIndex } from './lib/ossie'
 
@@ -340,30 +347,12 @@ function Overview({ model, warnings, onNavigate, onTab }) {
 }
 
 function Sidebar({ activeTab, items, query, onQuery, selectedKind, onKind, selection, onSelect }) {
-  const [filtersOpen, setFiltersOpen] = useState(false)
-  const filterRef = useRef(null)
   const title = activeTab === 'ontology' ? 'Ontology Index' : activeTab === 'semantic' ? 'Semantic Index' : 'Mapping Directory'
   const filterOptions = activeTab === 'ontology'
     ? [['all', '全部'], ['concept', 'Concept'], ['relationship', 'Relationship']]
     : activeTab === 'semantic'
       ? [['all', '全部'], ['dataset', 'Dataset'], ['metric', 'Metric'], ['field', 'Field']]
       : []
-
-  useEffect(() => {
-    if (!filtersOpen) return undefined
-    const closeOnOutsideClick = (event) => {
-      if (!filterRef.current?.contains(event.target)) setFiltersOpen(false)
-    }
-    const closeOnEscape = (event) => {
-      if (event.key === 'Escape') setFiltersOpen(false)
-    }
-    document.addEventListener('pointerdown', closeOnOutsideClick)
-    document.addEventListener('keydown', closeOnEscape)
-    return () => {
-      document.removeEventListener('pointerdown', closeOnOutsideClick)
-      document.removeEventListener('keydown', closeOnEscape)
-    }
-  }, [filtersOpen])
 
   return (
     <aside className="sidebar">
@@ -372,37 +361,23 @@ function Sidebar({ activeTab, items, query, onQuery, selectedKind, onKind, selec
       <div className="sidebar__summary">
         <span>{items.length} items</span>
         {!!filterOptions.length && (
-          <div className="sidebar__filter" ref={filterRef}>
-            <button
-              type="button"
-              className={`sidebar__filter-trigger ${selectedKind !== 'all' ? 'is-active' : ''}`}
-              aria-label="筛选索引类型"
-              aria-haspopup="menu"
-              aria-expanded={filtersOpen}
-              onClick={() => setFiltersOpen((open) => !open)}
-            >
-              <SlidersHorizontal size={14} />
-            </button>
-            {filtersOpen && (
-              <div className="sidebar__filter-menu" role="menu" aria-label="索引类型">
-                <span>类型</span>
-                {filterOptions.map(([kind, label]) => (
-                  <button
-                    key={kind}
-                    type="button"
-                    role="menuitemradio"
-                    aria-checked={selectedKind === kind}
-                    className={selectedKind === kind ? 'is-active' : ''}
-                    onClick={() => {
-                      onKind(kind)
-                      setFiltersOpen(false)
-                    }}
-                  >
-                    {label}{selectedKind === kind && <Check size={13} />}
-                  </button>
-                ))}
-              </div>
-            )}
+          <div className="sidebar__filter">
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                className={`sidebar__filter-trigger ${selectedKind !== 'all' ? 'is-active' : ''}`}
+                aria-label="筛选索引类型"
+              >
+                <SlidersHorizontal size={14} />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" aria-label="索引类型">
+                <DropdownMenuLabel>类型</DropdownMenuLabel>
+                <DropdownMenuRadioGroup value={selectedKind} onValueChange={onKind}>
+                  {filterOptions.map(([kind, label]) => (
+                    <DropdownMenuRadioItem key={kind} value={kind}>{label}</DropdownMenuRadioItem>
+                  ))}
+                </DropdownMenuRadioGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         )}
       </div>
