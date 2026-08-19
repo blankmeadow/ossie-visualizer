@@ -1,0 +1,31 @@
+/* Document defaults, plus the handful of Tailwind preflight corrections this
+ * layout needs. Each correction is here because a screenshot diff caught it,
+ * not pre-emptively — see the commit that introduced Tailwind.
+ */
+
+:root {
+  font-family: var(--font-sans);
+  color: var(--ink);
+  background: var(--canvas);
+  font-synthesis: none;
+  /* Preflight sets html{line-height:1.5}; this layout was authored against the
+     browser default, so every text run shifted. Pin it back until components
+     migrate to explicit leading. */
+  line-height: normal;
+}
+
+* { box-sizing: border-box; }
+
+/* Preflight resets h1-h6 to font-weight:inherit. Restore the browser default.
+   Rules using the `font` shorthand still override this. */
+h1, h2, h3, h4, h5, h6 { font-weight: bold; }
+
+html, body, #root { width: 100%; min-width: 320px; height: 100%; margin: 0; }
+body { overflow: hidden; }
+button, input, textarea { font: inherit; }
+button { color: inherit; }
+code, pre { font-family: var(--font-mono); }
+
+/* Preflight renders placeholders at 50% of currentColor, which the UA default
+   did not do. Pin to a token so a future dark theme can follow it. */
+input::placeholder, textarea::placeholder { color: var(--placeholder); opacity: 1; }

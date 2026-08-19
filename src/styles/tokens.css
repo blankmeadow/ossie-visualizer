@@ -1,0 +1,84 @@
+/* Design tokens.
+ *
+ * Every value is declared once here and consumed two ways:
+ *   - as `var(--x)` by the hand-written CSS in components.css
+ *   - as a Tailwind utility (bg-surface, text-muted, ...) via the @theme block
+ *
+ * Keeping both readers on the same declarations is what makes the migration
+ * incremental: a component can move to utilities without its colours drifting
+ * from the ones still using var().
+ */
+
+:root {
+  /* Neutrals — a warm, slightly green-tinted grey ramp. */
+  --canvas: #f1f3ee;
+  --surface: #fbfcf9;
+  --surface-2: #f4f6f1;
+  --line: #dfe4dc;
+  --line-strong: #ccd4ca;
+  --ink: #1d2926;
+  --muted: #6b7772;
+  --placeholder: #757575;
+
+  /* Accents. Each pairs a saturated tone with a tinted background used for
+     icon chips, badges and selected rows. */
+  --green: #386f5c;
+  --green-dark: #245343;
+  --green-soft: #e6f0eb;
+  --orange: #cb6b3d;
+  --orange-soft: #f7ebe4;
+  --violet: #7659cd;
+  --violet-soft: #efebfb;
+  --amber: #ad7c17;
+  --amber-soft: #f8f0dc;
+
+  --shadow: 0 18px 60px rgba(28, 45, 38, 0.11);
+
+  /* Graph canvas. These were hardcoded inside GraphCanvas.jsx, which meant the
+     React Flow surface could not follow the rest of the theme. */
+  --canvas-dots: #ccd2cb;
+  --canvas-minimap-mask: rgba(241, 243, 238, 0.78);
+  --node-concept: #477d6b;
+  --node-dataset: #d16f3d;
+  --node-metric: #b98b22;
+}
+
+/* Expose the tokens to Tailwind so `bg-surface`, `text-muted`, `border-line`
+   and friends resolve to exactly the same values as var(). */
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+
+  --color-green: var(--green);
+  --color-green-dark: var(--green-dark);
+  --color-green-soft: var(--green-soft);
+  --color-orange: var(--orange);
+  --color-orange-soft: var(--orange-soft);
+  --color-violet: var(--violet);
+  --color-violet-soft: var(--violet-soft);
+  --color-amber: var(--amber);
+  --color-amber-soft: var(--amber-soft);
+
+  --font-sans: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+
+  /* A deliberate type scale. The hand-written CSS currently uses 13 ad-hoc
+     sizes between 7px and 32px; migrated components should pick from these
+     seven steps instead. `micro` and `tiny` cover the dense monospace labels
+     the graph UI leans on. */
+  --text-micro: 8px;
+  --text-tiny: 9px;
+  --text-xs: 10px;
+  --text-sm: 11px;
+  --text-base: 12px;
+  --text-md: 14px;
+  --text-lg: 16px;
+  --text-xl: 21px;
+  --text-2xl: 27px;
+}

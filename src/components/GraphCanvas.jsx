@@ -10,11 +10,22 @@ import {
 } from '@xyflow/react'
 import OssieNode from './OssieNode'
 import RelationshipEdge from './RelationshipEdge'
+import { useCssTokens } from '../lib/useCssTokens'
 
 const nodeTypes = { ossieNode: OssieNode }
 const edgeTypes = { relationshipEdge: RelationshipEdge }
 const nodeWidth = 248
 const nodeHeight = 108
+
+// Fallbacks match the light-theme values in styles/tokens.css; the live values
+// are read from CSS so the canvas follows the active theme.
+const CANVAS_TOKENS = {
+  'canvas-dots': '#ccd2cb',
+  'canvas-minimap-mask': 'rgba(241, 243, 238, 0.78)',
+  'node-concept': '#477d6b',
+  'node-dataset': '#d16f3d',
+  'node-metric': '#b98b22',
+}
 
 function selectionMatches(left, right) {
   return !!left && !!right && left.kind === right.kind && left.name === right.name
@@ -53,6 +64,7 @@ function frameNodes(flow, canvasRef, items, duration = 340) {
 
 function InnerGraphCanvas({ graph, selection, onSelect, onFocus, canvasRef }) {
   const flow = useReactFlow()
+  const tokens = useCssTokens(CANVAS_TOKENS)
   const previousGraphKey = useRef('')
   const previousCenteredNode = useRef('')
   const previousCenteredEdge = useRef('')
@@ -208,14 +220,18 @@ function InnerGraphCanvas({ graph, selection, onSelect, onFocus, canvasRef }) {
       onEdgeMouseLeave={() => setHoveredEdgeId('')}
       onPaneClick={() => onSelect(null)}
     >
-      <Background variant={BackgroundVariant.Dots} gap={22} size={1.2} color="#ccd2cb" />
+      <Background variant={BackgroundVariant.Dots} gap={22} size={1.2} color={tokens['canvas-dots']} />
       <Controls showInteractive={false} position="bottom-left" />
       <MiniMap
         pannable
         zoomable
         position="bottom-right"
-        nodeColor={(item) => item.data?.kind === 'dataset' ? '#d16f3d' : item.data?.kind === 'metric' ? '#b98b22' : '#477d6b'}
-        maskColor="rgba(241, 243, 238, 0.78)"
+        nodeColor={(item) => item.data?.kind === 'dataset'
+          ? tokens['node-dataset']
+          : item.data?.kind === 'metric'
+            ? tokens['node-metric']
+            : tokens['node-concept']}
+        maskColor={tokens['canvas-minimap-mask']}
       />
     </ReactFlow>
   )
