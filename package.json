@@ -1,0 +1,45 @@
+{
+  "name": "ossie-visualizer",
+  "version": "0.1.0",
+  "description": "An open-source, local-first visualizer and workbench for Apache Ossie semantic models and ontologies",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MingkeVan/ossie-visualizer.git"
+  },
+  "homepage": "https://github.com/MingkeVan/ossie-visualizer#readme",
+  "keywords": [
+    "ossie",
+    "semantic-model",
+    "ontology",
+    "visualization",
+    "reactflow",
+    "react"
+  ],
+  "private": false,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@codemirror/lang-json": "^6.0.2",
+    "@codemirror/language": "^6.12.4",
+    "@codemirror/search": "^6.7.1",
+    "@codemirror/state": "^6.7.1",
+    "@codemirror/view": "^6.43.9",
+    "@dagrejs/dagre": "^3.0.0",
+    "@uiw/react-codemirror": "^4.25.11",
+    "@xyflow/react": "^12.10.0",
+    "lucide-react": "^0.468.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.0.5",
+    "vite": "^8.2.1",
+    "vitest": "^4.1.10"
+  }
+}

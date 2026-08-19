@@ -1,0 +1,233 @@
+import { useEffect, useMemo, useRef, useState } from 'react'
+import {
+  Background,
+  BackgroundVariant,
+  Controls,
+  MiniMap,
+  ReactFlow,
+  ReactFlowProvider,
+  useReactFlow,
+} from '@xyflow/react'
+import OssieNode from './OssieNode'
+import RelationshipEdge from './RelationshipEdge'
+
+const nodeTypes = { ossieNode: OssieNode }
+const edgeTypes = { relationshipEdge: RelationshipEdge }
+const nodeWidth = 248
+const nodeHeight = 108
+
+function selectionMatches(left, right) {
+  return !!left && !!right && left.kind === right.kind && left.name === right.name
+}
+
+function edgeMatchesSelection(edge, selection) {
+  if (!selection) return false
+  if (selectionMatches(edge.data?.selection, selection)) return true
+  return selection.kind === 'relationship' && edge.data?.relationPaths?.includes(selection.name)
+}
+
+function frameNodes(flow, canvasRef, items, duration = 340) {
+  const canvas = canvasRef.current?.getBoundingClientRect()
+  if (!canvas || !items.length) return false
+
+  const minX = Math.min(...items.map((item) => item.position.x))
+  const minY = Math.min(...items.map((item) => item.position.y))
+  const maxX = Math.max(...items.map((item) => item.position.x + nodeWidth))
+  const maxY = Math.max(...items.map((item) => item.position.y + nodeHeight))
+  const boundsWidth = Math.max(nodeWidth, maxX - minX)
+  const boundsHeight = Math.max(nodeHeight, maxY - minY)
+  const inspectorReserve = Math.min(390, canvas.width * 0.38)
+  const availableWidth = Math.max(260, canvas.width - inspectorReserve - 72)
+  const availableHeight = Math.max(220, canvas.height - 96)
+  const zoom = Math.max(0.1, Math.min(1.06, availableWidth / boundsWidth, availableHeight / boundsHeight))
+  const contentCenterX = minX + boundsWidth / 2
+  const contentCenterY = minY + boundsHeight / 2
+
+  flow.setViewport({
+    x: (canvas.width - inspectorReserve) / 2 - contentCenterX * zoom,
+    y: canvas.height / 2 - contentCenterY * zoom,
+    zoom,
+  }, { duration })
+  return true
+}
+
+function InnerGraphCanvas({ graph, selection, onSelect, onFocus, canvasRef }) {
+  const flow = useReactFlow()
+  const previousGraphKey = useRef('')
+  const previousCenteredNode = useRef('')
+  const previousCenteredEdge = useRef('')
+  const [hoveredEdgeId, setHoveredEdgeId] = useState('')
+
+  const selectedNodeId = useMemo(
+    () => graph.nodes.find((item) => selectionMatches(item.data?.selection, selection))?.id || '',
+    [graph.nodes, selection],
+  )
+  const selectedEdgeIds = useMemo(
+    () => new Set(graph.edges.filter((item) => edgeMatchesSelection(item, selection)).map((item) => item.id)),
+    [graph.edges, selection],
+  )
+
+  const active = useMemo(() => {
+    const nodeIds = new Set()
+    const edgeIds = new Set()
+    if (selectedNodeId) {
+      nodeIds.add(selectedNodeId)
+      for (const item of graph.edges) {
+        if (item.source !== selectedNodeId && item.target !== selectedNodeId) continue
+        edgeIds.add(item.id)
+        nodeIds.add(item.source)
+        nodeIds.add(item.target)
+      }
+    } else if (selectedEdgeIds.size) {
+      for (const item of graph.edges) {
+        if (!selectedEdgeIds.has(item.id)) continue
+        edgeIds.add(item.id)
+        nodeIds.add(item.source)
+        nodeIds.add(item.target)
+      }
+    }
+    return { nodeIds, edgeIds, enabled: nodeIds.size > 0 || edgeIds.size > 0 }
+  }, [graph.edges, selectedEdgeIds, selectedNodeId])
+
+  const nodes = useMemo(
+    () => graph.nodes.map((item) => ({
+      ...item,
+      selected: item.id === selectedNodeId,
+      data: {
+        ...item.data,
+        dimmed: active.enabled && !active.nodeIds.has(item.id),
+        related: active.enabled && active.nodeIds.has(item.id) && item.id !== selectedNodeId,
+      },
+    })),
+    [active, graph.nodes, selectedNodeId],
+  )
+
+  const edges = useMemo(
+    () => graph.edges.map((item) => {
+      const selected = selectedEdgeIds.has(item.id)
+      const related = active.enabled && active.edgeIds.has(item.id)
+      const dimmed = active.enabled && !related
+      const hovered = hoveredEdgeId === item.id
+      return {
+        ...item,
+        selected,
+        label: selected || hovered ? item.data?.label : undefined,
+        data: {
+          ...item.data,
+          showAnchor: item.data?.kind === 'mapping'
+            || (item.data?.kind === 'relationship' && graph.nodes.length <= 24),
+          onSelect,
+        },
+        className: [selected ? 'is-selected' : '', related ? 'is-related' : '', dimmed ? 'is-dimmed' : ''].filter(Boolean).join(' '),
+        style: {
+          ...item.style,
+          opacity: dimmed ? 0.1 : 1,
+          strokeWidth: selected ? 3.4 : related ? 2.25 : item.style?.strokeWidth,
+        },
+        zIndex: selected || hovered ? 8 : related ? 4 : 1,
+      }
+    }),
+    [active, graph.edges, graph.nodes.length, hoveredEdgeId, onSelect, selectedEdgeIds],
+  )
+
+  const graphKey = useMemo(
+    () => `${graph.nodes.map((item) => item.id).join('|')}::${graph.edges.map((item) => item.id).join('|')}`,
+    [graph.edges, graph.nodes],
+  )
+
+  useEffect(() => {
+    if (previousGraphKey.current === graphKey) return undefined
+    previousGraphKey.current = graphKey
+    const timeout = window.setTimeout(() => {
+      if (!selection || !frameNodes(flow, canvasRef, graph.nodes, 320)) {
+        flow.fitView({ padding: 0.16, duration: 320, maxZoom: 1.12 })
+      }
+    }, 70)
+    return () => window.clearTimeout(timeout)
+  }, [canvasRef, flow, graph.nodes, graphKey, selection])
+
+  useEffect(() => {
+    if (!selectedNodeId || previousCenteredNode.current === selectedNodeId) return undefined
+    previousCenteredNode.current = selectedNodeId
+    const selected = graph.nodes.find((item) => item.id === selectedNodeId)
+    if (!selected) return undefined
+    const timeout = window.setTimeout(() => {
+      flow.setCenter(selected.position.x + 284, selected.position.y + 54, { zoom: 1.03, duration: 320 })
+    }, 40)
+    return () => window.clearTimeout(timeout)
+  }, [flow, graph.nodes, selectedNodeId])
+
+  const selectedEdgeKey = [...selectedEdgeIds].sort().join('|')
+  useEffect(() => {
+    if (!selectedEdgeKey || previousCenteredEdge.current === selectedEdgeKey) return undefined
+    previousCenteredEdge.current = selectedEdgeKey
+    const selectedEdges = graph.edges.filter((item) => selectedEdgeIds.has(item.id))
+    const selectedNodeIds = new Set(selectedEdges.flatMap((item) => [item.source, item.target]))
+    const selectedNodes = graph.nodes.filter((item) => selectedNodeIds.has(item.id))
+    if (!selectedNodes.length) return undefined
+    const timeout = window.setTimeout(() => {
+      // Frame both endpoints inside the area that remains visible beside the inspector.
+      frameNodes(flow, canvasRef, selectedNodes)
+    }, 120)
+    return () => window.clearTimeout(timeout)
+  }, [canvasRef, flow, graph.edges, graph.nodes, selectedEdgeIds, selectedEdgeKey])
+
+  if (!nodes.length) {
+    return (
+      <div className="empty-canvas">
+        <div className="empty-canvas__mark">∅</div>
+        <h3>没有可展示的图</h3>
+        <p>当前文档未包含这一层，或筛选结果为空。</p>
+      </div>
+    )
+  }
+
+  return (
+    <ReactFlow
+      nodes={nodes}
+      edges={edges}
+      nodeTypes={nodeTypes}
+      edgeTypes={edgeTypes}
+      nodesDraggable={false}
+      nodesConnectable={false}
+      elementsSelectable
+      edgesFocusable
+      minZoom={0.08}
+      maxZoom={2.2}
+      fitView
+      fitViewOptions={{ padding: 0.16, maxZoom: 1.12 }}
+      onlyRenderVisibleElements
+      proOptions={{ hideAttribution: true }}
+      onNodeClick={(_, item) => onSelect(item.data?.selection)}
+      onNodeDoubleClick={(_, item) => {
+        onSelect(item.data?.selection)
+        onFocus(1)
+      }}
+      onEdgeClick={(_, item) => onSelect(item.data?.selection)}
+      onEdgeMouseEnter={(_, item) => setHoveredEdgeId(item.id)}
+      onEdgeMouseLeave={() => setHoveredEdgeId('')}
+      onPaneClick={() => onSelect(null)}
+    >
+      <Background variant={BackgroundVariant.Dots} gap={22} size={1.2} color="#ccd2cb" />
+      <Controls showInteractive={false} position="bottom-left" />
+      <MiniMap
+        pannable
+        zoomable
+        position="bottom-right"
+        nodeColor={(item) => item.data?.kind === 'dataset' ? '#d16f3d' : item.data?.kind === 'metric' ? '#b98b22' : '#477d6b'}
+        maskColor="rgba(241, 243, 238, 0.78)"
+      />
+    </ReactFlow>
+  )
+}
+
+export default function GraphCanvas(props) {
+  const canvasRef = useRef(null)
+  return (
+    <div ref={canvasRef} className={`graph-canvas ${props.selection ? 'has-inspector' : ''}`}>
+      <ReactFlowProvider>
+        <InnerGraphCanvas {...props} canvasRef={canvasRef} />
+      </ReactFlowProvider>
+    </div>
+  )
+}
