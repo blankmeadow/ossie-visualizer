@@ -16,8 +16,13 @@
   - 支持包含 `ontology_mappings`、`semantic_model` 及 `concept_mappings` 的完整 Ossie JSON 模型。
 - ⚡ **智能语法与引用校验**：在加载前自动进行语法、Concept、`extends`、Role、`identify_by`、Dataset 和 Mapping 的交叉引用检查。
 - 🕸️ **交互式图谱可视化**：
-  - **Concept Graph**：展现 EntityType、ValueType、继承层级与 Role 对象关系图。
+  - **Concept Graph**：只展现 EntityType 与实体之间的关系（含继承层级）；指向 ValueType 或内建类型的关系属于该实体的属性，改在详情面板中以表格呈现。
   - **Dataset & Metric Graph**：展现 Dataset 关联、Semantic Model 关系边及 Metric 衍生节点。
+- 📋 **概念详情表格化**：
+  - 属性表：属性名、目标 ValueType（含其内建基础类型）与约束（主键、Multiplicity、`requires`、ValueType facet）。
+  - 关系表：本概念声明的实体关系，以及其他概念指向本概念的入向关系。
+  - 继承成员按来源父概念分组显示。
+- 🌏 **中英文界面**：默认跟随浏览器语言，可在顶栏手动切换并记住选择。
 - 🔎 **追踪与深度聚焦**：
   - 支持从 Concept 一键追踪至 Concept Mapping 及底层物理 Dataset。
   - 支持按名称、描述及 `ai_context.synonyms` 全局搜索。

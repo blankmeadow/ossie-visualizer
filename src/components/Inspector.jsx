@@ -1,55 +1,79 @@
 import { ArrowRight, Braces, CircleDot, Database, GitBranch, KeyRound, Sigma, X } from 'lucide-react'
-import { collectExpressionStrings, expressionText, referencedDatasets } from '../lib/ossie'
+import {
+  collectExpressionStrings,
+  conceptMembers,
+  expressionText,
+  referencedDatasets,
+  relationshipKind,
+  resolveValueBase,
+  roleKind,
+} from '../lib/ossie'
+import { useT } from '../lib/i18n'
 
 const KIND_META = {
-  concept: { label: 'ONTOLOGY CONCEPT', Icon: CircleDot },
-  relationship: { label: 'ONTOLOGY RELATIONSHIP', Icon: GitBranch },
-  relationshipGroup: { label: 'RELATIONSHIP BUNDLE', Icon: GitBranch },
-  inheritance: { label: 'ONTOLOGY INHERITANCE', Icon: GitBranch },
-  dataset: { label: 'SEMANTIC DATASET', Icon: Database },
-  field: { label: 'SEMANTIC FIELD', Icon: Braces },
-  metric: { label: 'SEMANTIC METRIC', Icon: Sigma },
-  semanticRelationship: { label: 'DATASET RELATIONSHIP', Icon: GitBranch },
-  metricDependency: { label: 'METRIC DEPENDENCY', Icon: Sigma },
-  mapping: { label: 'CONCEPT MAPPING', Icon: GitBranch },
-  mappingEvidence: { label: 'MAPPING EVIDENCE', Icon: GitBranch },
+  concept: { labelKey: 'kind.entityType', Icon: CircleDot },
+  valueType: { labelKey: 'kind.valueType', Icon: Braces },
+  relationship: { labelKey: 'kind.relationship', Icon: GitBranch },
+  relationshipGroup: { labelKey: 'kind.relationshipGroup', Icon: GitBranch },
+  inheritance: { labelKey: 'kind.inheritance', Icon: GitBranch },
+  dataset: { labelKey: 'kind.dataset', Icon: Database },
+  field: { labelKey: 'kind.field', Icon: Braces },
+  metric: { labelKey: 'kind.metric', Icon: Sigma },
+  semanticRelationship: { labelKey: 'kind.semanticRelationship', Icon: GitBranch },
+  metricDependency: { labelKey: 'kind.metricDependency', Icon: Sigma },
+  mapping: { labelKey: 'kind.mapping', Icon: GitBranch },
+  mappingEvidence: { labelKey: 'kind.mappingEvidence', Icon: GitBranch },
+}
+
+const RELATIONSHIP_KIND_KEYS = {
+  attribute: 'relationship.kindAttribute',
+  association: 'relationship.kindAssociation',
+  objectified: 'relationship.kindObjectified',
+  unary: 'relationship.kindUnary',
 }
 
 export default function Inspector({ selection, model, onClose, onNavigate }) {
+  const t = useT()
   if (!selection) {
     return (
       <aside className="inspector inspector--empty">
         <div className="inspector-empty__glyph"><CircleDot size={25} /></div>
-        <h3>选择一个语义元素</h3>
-        <p>从索引、搜索结果或关系图选择 Concept、Dataset、Metric 或 Mapping。</p>
+        <h3>{t('inspector.emptyTitle')}</h3>
+        <p>{t('inspector.emptyBody')}</p>
       </aside>
     )
   }
 
-  const meta = KIND_META[selection.kind] || KIND_META.concept
+  // A concept's kind is its own eyebrow, so the type no longer needs a row of
+  // its own inside the body.
+  const kind = selection.kind === 'concept' && selection.target?.type === 'ValueType'
+    ? 'valueType'
+    : selection.kind
+  const meta = KIND_META[kind] || KIND_META.concept
   const { Icon } = meta
   return (
     <aside className="inspector">
       <header className="inspector__header">
         <div className="inspector__symbol"><Icon size={17} /></div>
         <div>
-          <span className="eyebrow">{meta.label}</span>
+          <span className="eyebrow">{t(meta.labelKey)}</span>
           <h2>{selection.name}</h2>
         </div>
-        <button className="icon-button" onClick={onClose} aria-label="关闭详情"><X size={17} /></button>
+        <button className="icon-button" onClick={onClose} aria-label={t('inspector.close')}><X size={17} /></button>
       </header>
       <div className="inspector__body">
-        {selection.kind === 'concept' && <ConceptDetail item={selection.target} model={model} onNavigate={onNavigate} />}
-        {selection.kind === 'relationship' && <RelationshipDetail item={selection.target} model={model} onNavigate={onNavigate} />}
-        {selection.kind === 'relationshipGroup' && <RelationshipGroupDetail item={selection.target} onNavigate={onNavigate} />}
-        {selection.kind === 'inheritance' && <InheritanceDetail item={selection.target} onNavigate={onNavigate} />}
-        {selection.kind === 'dataset' && <DatasetDetail item={selection.target} model={model} onNavigate={onNavigate} />}
-        {selection.kind === 'field' && <FieldDetail item={selection.target} />}
-        {selection.kind === 'metric' && <MetricDetail item={selection.target} model={model} onNavigate={onNavigate} />}
-        {selection.kind === 'semanticRelationship' && <SemanticRelationshipDetail item={selection.target} model={model} onNavigate={onNavigate} />}
-        {selection.kind === 'metricDependency' && <MetricDependencyDetail item={selection.target} onNavigate={onNavigate} />}
-        {selection.kind === 'mapping' && <MappingDetail item={selection.target} model={model} onNavigate={onNavigate} />}
-        {selection.kind === 'mappingEvidence' && <MappingEvidenceDetail item={selection.target} onNavigate={onNavigate} />}
+        {kind === 'concept' && <ConceptDetail item={selection.target} model={model} onNavigate={onNavigate} />}
+        {kind === 'valueType' && <ValueTypeDetail item={selection.target} model={model} onNavigate={onNavigate} />}
+        {kind === 'relationship' && <RelationshipDetail item={selection.target} model={model} onNavigate={onNavigate} />}
+        {kind === 'relationshipGroup' && <RelationshipGroupDetail item={selection.target} onNavigate={onNavigate} />}
+        {kind === 'inheritance' && <InheritanceDetail item={selection.target} onNavigate={onNavigate} />}
+        {kind === 'dataset' && <DatasetDetail item={selection.target} model={model} onNavigate={onNavigate} />}
+        {kind === 'field' && <FieldDetail item={selection.target} />}
+        {kind === 'metric' && <MetricDetail item={selection.target} model={model} onNavigate={onNavigate} />}
+        {kind === 'semanticRelationship' && <SemanticRelationshipDetail item={selection.target} model={model} onNavigate={onNavigate} />}
+        {kind === 'metricDependency' && <MetricDependencyDetail item={selection.target} onNavigate={onNavigate} />}
+        {kind === 'mapping' && <MappingDetail item={selection.target} model={model} onNavigate={onNavigate} />}
+        {kind === 'mappingEvidence' && <MappingEvidenceDetail item={selection.target} onNavigate={onNavigate} />}
       </div>
     </aside>
   )
@@ -87,11 +111,121 @@ function LinkList({ items, onNavigate }) {
   )
 }
 
-function ConceptDetail({ item, model, onNavigate }) {
-  const properties = (item.relationships || []).filter((relationship) =>
-    relationship.roles?.length === 1 && ['String', 'Integer', 'Decimal', 'Float', 'Boolean', 'Date', 'DateTime'].includes(relationship.roles[0].concept),
+/** Shared shell for the attribute, relationship and participant tables. */
+function MemberTable({ headers, children }) {
+  return (
+    <div className={`member-table member-table--cols${headers.length}`}>
+      <div className="member-table__header" aria-hidden="true">
+        {headers.map((header) => <span key={header}>{header}</span>)}
+      </div>
+      {children}
+    </div>
   )
-  const objectRelations = (item.relationships || []).filter((relationship) => !properties.includes(relationship))
+}
+
+function MemberRow({ children }) {
+  return <div className="member-table__row">{children}</div>
+}
+
+function Cell({ value, onClick, tone }) {
+  const text = value || '—'
+  if (!onClick) return <span className={`member-table__cell ${tone || ''}`} title={text}>{text}</span>
+  return (
+    <button className={`member-table__cell member-table__cell--link ${tone || ''}`} onClick={onClick} title={text}>
+      {text}
+    </button>
+  )
+}
+
+/**
+ * Where a concept name should take the reader: entity types and value types get
+ * their own panel, built-ins have nothing to open.
+ */
+function conceptTarget(name, model) {
+  const concept = model.conceptByName.get(name)
+  if (!concept) return null
+  return { kind: concept.type === 'ValueType' ? 'valueType' : 'concept', name, target: concept }
+}
+
+function relationshipTarget(member) {
+  return {
+    kind: 'relationship',
+    name: member.path,
+    target: { ...member.relationship, owner: member.owner, path: member.path },
+  }
+}
+
+/**
+ * What a role's target reads as in a table: a built-in stands alone, a named
+ * value type also names the built-in it is founded on.
+ */
+function typeLabel(name, model, t) {
+  const kind = roleKind(name, model)
+  if (kind !== 'value') return name
+  const base = resolveValueBase(name, model)
+  if (!base) return `${name} (${t('concept.unresolvedType')})`
+  return base === name ? name : `${name} (${base})`
+}
+
+function attributeTypes(member, model, t) {
+  const roles = member.relationship.roles || []
+  if (!roles.length) return []
+  return roles.map((role) => ({ name: role.concept, label: typeLabel(role.concept, model, t) }))
+}
+
+/** Everything constraining one member, condensed to chips the row can hold. */
+function constraintChips(member, concept, model, t) {
+  const chips = []
+  if (member.keyIndex >= 0) {
+    chips.push((concept.identify_by || []).length > 1
+      ? t('concept.keyIndexed', { index: member.keyIndex + 1 })
+      : t('concept.key'))
+  }
+  if (member.relationship.multiplicity) chips.push(member.relationship.multiplicity)
+  const requires = member.relationship.requires?.length || 0
+  if (requires) chips.push(t('concept.requiresCount', { count: requires }))
+  const facets = (member.relationship.roles || []).reduce((total, role) => {
+    if (roleKind(role.concept, model) !== 'value') return total
+    return total + (model.conceptByName.get(role.concept)?.requires?.length || 0)
+  }, 0)
+  if (facets) chips.push(t('concept.facetCount', { count: facets }))
+  return chips
+}
+
+/** Split members into "declared here" and one section per ancestor. */
+function groupMembers(members, t) {
+  const groups = new Map()
+  for (const member of members) {
+    const key = member.inheritedFrom || ''
+    if (!groups.has(key)) {
+      groups.set(key, {
+        key,
+        label: key ? t('concept.groupInherited', { name: key }) : t('concept.groupOwn'),
+        items: [],
+      })
+    }
+    groups.get(key).items.push(member)
+  }
+  return [...groups.values()]
+}
+
+function GroupedRows({ groups, renderRow }) {
+  const captioned = groups.length > 1
+  return groups.map((group) => (
+    <div className="member-table__group" key={group.key || 'own'}>
+      {captioned && <div className="member-table__caption">{group.label}</div>}
+      {group.items.map(renderRow)}
+    </div>
+  ))
+}
+
+function relationshipDescription(relationship, t) {
+  return relationship.description || relationship.verbalizes?.[0] || t('inspector.noDescription')
+}
+
+function ConceptDetail({ item, model, onNavigate }) {
+  const t = useT()
+  const { attributes, associations, inbound } = conceptMembers(item, model)
   const inheritedBy = model.concepts.filter((concept) => concept.extends?.includes(item.concept))
   const mappings = model.conceptMappings.filter((mapping) => mapping.concept === item.concept)
   const datasetNames = new Set(model.datasets.map((dataset) => dataset.name))
@@ -103,29 +237,103 @@ function ConceptDetail({ item, model, onNavigate }) {
 
   return (
     <>
-      <p className="detail-description">{item.description || '暂无描述。'}</p>
-      <div className="detail-kv">
-        <div><span>类型</span><strong>{item.type}</strong></div>
-        <div><span>身份关系</span><strong>{item.identify_by?.length || 0}</strong></div>
-      </div>
-      {!!item.extends?.length && <Section title="Extends"><Chips values={item.extends} tone="violet" /></Section>}
-      {!!item.identify_by?.length && <Section title="Identify by"><Chips values={item.identify_by} tone="amber" /></Section>}
-      {!!item.derived_by?.length && <Section title="Derived by"><RuleList values={item.derived_by} /></Section>}
-      {!!item.requires?.length && <Section title="Requires"><RuleList values={item.requires} /></Section>}
-      <Section title="属性" count={properties.length}>
-        <LinkList
-          items={properties.map((relationship) => ({ kind: 'relationship', name: `${item.concept}.${relationship.name}`, target: { ...relationship, owner: item.concept, path: `${item.concept}.${relationship.name}` } }))}
-          onNavigate={onNavigate}
-        />
+      <p className="detail-description">{item.description || t('inspector.noDescription')}</p>
+      {!!item.extends?.length && <Section title={t('concept.extends')}><Chips values={item.extends} tone="violet" /></Section>}
+      {!!item.derived_by?.length && <Section title={t('concept.derivedBy')}><RuleList values={item.derived_by} /></Section>}
+      {!!item.requires?.length && <Section title={t('concept.requires')}><RuleList values={item.requires} /></Section>}
+
+      <Section title={t('concept.attributes')} count={attributes.length}>
+        {attributes.length ? (
+          <MemberTable headers={[t('concept.colName'), t('concept.colType'), t('concept.colConstraint')]}>
+            <GroupedRows
+              groups={groupMembers(attributes, t)}
+              renderRow={(member) => {
+                const types = attributeTypes(member, model, t)
+                return (
+                  <MemberRow key={member.path}>
+                    <Cell value={member.name} onClick={() => onNavigate(relationshipTarget(member))} />
+                    {types.length === 1 ? (
+                      <Cell
+                        value={types[0].label}
+                        tone="member-table__cell--type"
+                        onClick={conceptTarget(types[0].name, model)
+                          ? () => onNavigate(conceptTarget(types[0].name, model))
+                          : undefined}
+                      />
+                    ) : (
+                      <Cell
+                        value={types.map((type) => type.label).join(', ') || t('concept.noType')}
+                        tone="member-table__cell--type"
+                      />
+                    )}
+                    <span className="member-table__chips">
+                      {constraintChips(member, item, model, t).map((chip) => (
+                        <span className="chip chip--amber" key={chip}>{chip}</span>
+                      ))}
+                    </span>
+                  </MemberRow>
+                )
+              }}
+            />
+          </MemberTable>
+        ) : <span className="muted">—</span>}
       </Section>
-      <Section title="对象与事实关系" count={objectRelations.length}>
-        <LinkList
-          items={objectRelations.map((relationship) => ({ kind: 'relationship', name: `${item.concept}.${relationship.name}`, target: { ...relationship, owner: item.concept, path: `${item.concept}.${relationship.name}` } }))}
-          onNavigate={onNavigate}
-        />
+
+      <Section title={t('concept.relations')} count={associations.length}>
+        {associations.length ? (
+          <MemberTable headers={[t('concept.colName'), t('concept.colDescription'), t('concept.colTarget')]}>
+            <GroupedRows
+              groups={groupMembers(associations, t)}
+              renderRow={(member) => {
+                const targets = (member.relationship.roles || []).map((role) => role.concept)
+                const first = targets[0]
+                return (
+                  <MemberRow key={member.path}>
+                    <Cell value={member.name} onClick={() => onNavigate(relationshipTarget(member))} />
+                    <Cell value={relationshipDescription(member.relationship, t)} tone="member-table__cell--muted" />
+                    <Cell
+                      value={targets.length > 1 ? targets.join(', ') : first}
+                      tone="member-table__cell--type"
+                      onClick={targets.length === 1 && conceptTarget(first, model)
+                        ? () => onNavigate(conceptTarget(first, model))
+                        : undefined}
+                    />
+                  </MemberRow>
+                )
+              }}
+            />
+          </MemberTable>
+        ) : <span className="muted">—</span>}
       </Section>
-      {!!inheritedBy.length && <Section title="Extended by"><LinkList items={inheritedBy.map((concept) => ({ kind: 'concept', name: concept.concept, target: concept }))} onNavigate={onNavigate} /></Section>}
-      <Section title="语义入口">
+
+      <Section title={t('concept.inbound')} count={inbound.length}>
+        {inbound.length ? (
+          <MemberTable headers={[t('concept.colSource'), t('concept.colName'), t('concept.colDescription')]}>
+            {inbound.map((entry) => (
+              <MemberRow key={`${entry.path}:${entry.role.name || ''}`}>
+                <Cell
+                  value={entry.owner}
+                  onClick={conceptTarget(entry.owner, model)
+                    ? () => onNavigate(conceptTarget(entry.owner, model))
+                    : undefined}
+                />
+                <Cell
+                  value={entry.relationship.name}
+                  onClick={() => onNavigate({ kind: 'relationship', name: entry.path, target: entry.relationship })}
+                />
+                <Cell value={relationshipDescription(entry.relationship, t)} tone="member-table__cell--muted" />
+              </MemberRow>
+            ))}
+          </MemberTable>
+        ) : <span className="muted">—</span>}
+      </Section>
+
+      {!!inheritedBy.length && (
+        <Section title={t('concept.extendedBy')}>
+          <LinkList items={inheritedBy.map((concept) => ({ kind: 'concept', name: concept.concept, target: concept }))} onNavigate={onNavigate} />
+        </Section>
+      )}
+      <Section title={t('concept.semanticLinks')}>
         <LinkList
           items={[
             ...datasets.map((name) => ({ kind: 'dataset', name, target: model.datasetByName.get(name) })),
@@ -138,33 +346,110 @@ function ConceptDetail({ item, model, onNavigate }) {
   )
 }
 
+function ValueTypeDetail({ item, model, onNavigate }) {
+  const t = useT()
+  const base = resolveValueBase(item.concept, model)
+  const usedBy = model.inboundByConcept.get(item.concept) || []
+  return (
+    <>
+      <p className="detail-description">{item.description || t('inspector.noDescription')}</p>
+      <div className="detail-kv detail-kv--single">
+        <div><span>{t('valueType.base')}</span><strong>{base || t('concept.unresolvedType')}</strong></div>
+      </div>
+      {!!item.extends?.length && <Section title={t('valueType.extends')}><Chips values={item.extends} tone="violet" /></Section>}
+      {!!item.requires?.length && <Section title={t('valueType.requires')}><RuleList values={item.requires} /></Section>}
+      <Section title={t('valueType.usedBy')} count={usedBy.length}>
+        {usedBy.length ? (
+          <MemberTable headers={[t('concept.colSource'), t('concept.colName'), t('concept.colDescription')]}>
+            {usedBy.map((entry) => (
+              <MemberRow key={`${entry.path}:${entry.role.name || ''}`}>
+                <Cell
+                  value={entry.owner}
+                  onClick={conceptTarget(entry.owner, model)
+                    ? () => onNavigate(conceptTarget(entry.owner, model))
+                    : undefined}
+                />
+                <Cell
+                  value={entry.relationship.name}
+                  onClick={() => onNavigate({ kind: 'relationship', name: entry.path, target: entry.relationship })}
+                />
+                <Cell value={relationshipDescription(entry.relationship, t)} tone="member-table__cell--muted" />
+              </MemberRow>
+            ))}
+          </MemberTable>
+        ) : <span className="muted">—</span>}
+      </Section>
+      {!!item.relationships?.length && (
+        <Section title={t('valueType.relationships')} count={item.relationships.length}>
+          <LinkList
+            items={item.relationships.map((relationship) => ({
+              kind: 'relationship',
+              name: `${item.concept}.${relationship.name}`,
+              target: { ...relationship, owner: item.concept, path: `${item.concept}.${relationship.name}` },
+            }))}
+            onNavigate={onNavigate}
+          />
+        </Section>
+      )}
+    </>
+  )
+}
+
 function RelationshipDetail({ item, model, onNavigate }) {
+  const t = useT()
   const mappings = model.conceptMappings.filter((mapping) => mapping.concept === item.owner)
   const datasetNames = new Set(model.datasets.map((dataset) => dataset.name))
   const datasets = [...new Set(mappings.flatMap((mapping) => referencedDatasets(mapping, datasetNames)))]
+  const kind = relationshipKind(item, model)
+  const owner = model.conceptByName.get(item.owner)
+  const participants = [
+    {
+      name: item.owner,
+      description: owner?.description,
+      role: t('relationship.implicitFirstRole'),
+      implicit: true,
+    },
+    ...(item.roles || []).map((role) => ({
+      name: role.concept,
+      description: model.conceptByName.get(role.concept)?.description,
+      role: role.name || '',
+      implicit: false,
+    })),
+  ]
+
   return (
     <>
-      <p className="detail-description">{item.description || item.verbalizes?.[0] || '暂无描述。'}</p>
-      <div className={`detail-kv ${item.multiplicity ? '' : 'detail-kv--single'}`}>
-        <div><span>所属 Concept</span><strong>{item.owner}</strong></div>
-        {item.multiplicity && <div><span>Multiplicity</span><strong>{item.multiplicity}</strong></div>}
+      <p className="detail-description">{item.description || t('inspector.noDescription')}</p>
+      <div className="detail-kv">
+        <div><span>{t('relationship.id')}</span><strong>{item.path || `${item.owner}.${item.name}`}</strong></div>
+        <div><span>{t('relationship.kind')}</span><strong>{t(RELATIONSHIP_KIND_KEYS[kind])}</strong></div>
+        <div><span>{t('relationship.owner')}</span><strong>{item.owner}</strong></div>
+        <div><span>{t('relationship.multiplicity')}</span><strong>{item.multiplicity || '—'}</strong></div>
       </div>
-      <Section title="Roles" count={(item.roles || []).length + 1}>
-        <div className="role-list">
-          <div className="role-list__header" aria-hidden="true"><span /><span>Concept</span><span>Role name</span></div>
-          <button onClick={() => onNavigate({ kind: 'concept', name: item.owner })}><KeyRound size={14} />{item.owner}<small>implicit first role</small></button>
-          {(item.roles || []).map((role) => (
-            <button key={`${role.concept}:${role.name || ''}`} onClick={() => onNavigate({ kind: 'concept', name: role.concept })}>
-              <CircleDot size={14} />{role.concept}<small>{role.name || '—'}</small>
-            </button>
+      <Section title={t('relationship.participants')} count={participants.length}>
+        <MemberTable headers={[t('relationship.colEntity'), t('relationship.colEntityDescription'), t('relationship.colRole')]}>
+          {participants.map((participant, index) => (
+            <MemberRow key={`${participant.name}:${participant.role}:${index}`}>
+              <Cell
+                value={participant.name}
+                onClick={conceptTarget(participant.name, model)
+                  ? () => onNavigate(conceptTarget(participant.name, model))
+                  : undefined}
+              />
+              <Cell value={participant.description} tone="member-table__cell--muted" />
+              <Cell
+                value={participant.role}
+                tone={participant.implicit ? 'member-table__cell--muted' : 'member-table__cell--type'}
+              />
+            </MemberRow>
           ))}
-        </div>
+        </MemberTable>
       </Section>
-      <Section title="Verbalizes"><RuleList values={item.verbalizes} /></Section>
-      {!!item.derived_by?.length && <Section title="Derived by"><RuleList values={item.derived_by} /></Section>}
-      {!!item.requires?.length && <Section title="Requires"><RuleList values={item.requires} /></Section>}
+      <Section title={t('relationship.verbalizes')}><RuleList values={item.verbalizes} /></Section>
+      {!!item.derived_by?.length && <Section title={t('relationship.derivedBy')}><RuleList values={item.derived_by} /></Section>}
+      {!!item.requires?.length && <Section title={t('relationship.requires')}><RuleList values={item.requires} /></Section>}
       {!!datasets.length && (
-        <Section title="语义入口">
+        <Section title={t('concept.semanticLinks')}>
           <LinkList items={datasets.map((name) => ({ kind: 'dataset', name, target: model.datasetByName.get(name) }))} onNavigate={onNavigate} />
         </Section>
       )}
@@ -173,15 +458,16 @@ function RelationshipDetail({ item, model, onNavigate }) {
 }
 
 function RelationshipGroupDetail({ item, onNavigate }) {
+  const t = useT()
   const relationships = [...new Map((item.items || []).map((relationship) => [relationship.path, relationship])).values()]
   return (
     <>
-      <p className="detail-description">这条连线合并了同一对 Concept 之间的多条关系。选择其中一条可查看完整角色、规则和语义入口。</p>
+      <p className="detail-description">{t('group.description')}</p>
       <div className="detail-kv">
-        <div><span>From</span><strong>{item.source}</strong></div>
-        <div><span>To</span><strong>{item.target}</strong></div>
+        <div><span>{t('group.from')}</span><strong>{item.source}</strong></div>
+        <div><span>{t('group.to')}</span><strong>{item.target}</strong></div>
       </div>
-      <Section title="Relationships" count={relationships.length}>
+      <Section title={t('group.relationships')} count={relationships.length}>
         <LinkList
           items={relationships.map((relationship) => ({ kind: 'relationship', name: relationship.path, target: relationship }))}
           onNavigate={onNavigate}
@@ -192,135 +478,149 @@ function RelationshipGroupDetail({ item, onNavigate }) {
 }
 
 function InheritanceDetail({ item, onNavigate }) {
+  const t = useT()
   return (
     <>
-      <p className="detail-description"><code>{item.child}</code> 继承 <code>{item.parent}</code>，并获得父 Concept 的关系和约束语义。</p>
+      <p className="detail-description">{t('inheritance.description', { child: item.child, parent: item.parent })}</p>
       <div className="detail-kv">
-        <div><span>Child</span><strong>{item.child}</strong></div>
-        <div><span>Parent</span><strong>{item.parent}</strong></div>
+        <div><span>{t('inheritance.child')}</span><strong>{item.child}</strong></div>
+        <div><span>{t('inheritance.parent')}</span><strong>{item.parent}</strong></div>
       </div>
-      <Section title="Concepts">
+      <Section title={t('inheritance.concepts')}>
         <LinkList items={[
           { kind: 'concept', name: item.child, target: item.childConcept },
           { kind: 'concept', name: item.parent, target: item.parentConcept },
         ]} onNavigate={onNavigate} />
       </Section>
-      {!!item.childConcept?.derived_by?.length && <Section title="Child Derived by"><RuleList values={item.childConcept.derived_by} /></Section>}
-      {!!item.childConcept?.requires?.length && <Section title="Child Requires"><RuleList values={item.childConcept.requires} /></Section>}
+      {!!item.childConcept?.derived_by?.length && <Section title={t('inheritance.childDerivedBy')}><RuleList values={item.childConcept.derived_by} /></Section>}
+      {!!item.childConcept?.requires?.length && <Section title={t('inheritance.childRequires')}><RuleList values={item.childConcept.requires} /></Section>}
     </>
   )
 }
 
 function DatasetDetail({ item, model, onNavigate }) {
+  const t = useT()
   const relatedRelationships = model.semanticRelationships.filter((relationship) => relationship.from === item.name || relationship.to === item.name)
   const relatedMetrics = model.metrics.filter((metric) => collectExpressionStrings(metric).some((expression) => expression.includes(`${item.name}.`)))
   return (
     <>
-      <p className="detail-description">{item.description || '暂无描述。'}</p>
-      <div className="source-card"><span>Source</span><code>{item.source || '未指定'}</code></div>
-      <Section title="Fields" count={item.fields?.length || 0}>
+      <p className="detail-description">{item.description || t('inspector.noDescription')}</p>
+      <div className="source-card"><span>{t('dataset.source')}</span><code>{item.source || t('dataset.sourceUnknown')}</code></div>
+      <Section title={t('dataset.fields')} count={item.fields?.length || 0}>
         <div className="field-table">
           {(item.fields || []).map((field) => (
             <button key={field.name} onClick={() => onNavigate({ kind: 'field', name: `${item.name}.${field.name}`, target: { ...field, _dataset: item.name } })}>
               <span><strong>{field.name}</strong><small>{field.description || '—'}</small></span>
-              <em>{field.datatype || 'unknown'}</em>
+              <em>{field.datatype || t('dataset.datatypeUnknown')}</em>
             </button>
           ))}
         </div>
       </Section>
-      <Section title="Dataset Relationships" count={relatedRelationships.length}>
+      <Section title={t('dataset.relationships')} count={relatedRelationships.length}>
         <LinkList items={relatedRelationships.map((relationship) => ({ kind: 'semanticRelationship', name: relationship.name, target: relationship }))} onNavigate={onNavigate} />
       </Section>
-      <Section title="Related Metrics" count={relatedMetrics.length}>
+      <Section title={t('dataset.metrics')} count={relatedMetrics.length}>
         <LinkList items={relatedMetrics.map((metric) => ({ kind: 'metric', name: metric.name, target: metric }))} onNavigate={onNavigate} />
       </Section>
-      {item.ai_context && <Section title="AI Context"><AiContext value={item.ai_context} /></Section>}
+      {item.ai_context && <Section title={t('aiContext.title')}><AiContext value={item.ai_context} /></Section>}
     </>
   )
 }
 
 function FieldDetail({ item }) {
+  const t = useT()
   return (
     <>
-      <p className="detail-description">{item.description || '暂无描述。'}</p>
+      <p className="detail-description">{item.description || t('inspector.noDescription')}</p>
       <div className="detail-kv">
-        <div><span>Dataset</span><strong>{item._dataset}</strong></div>
-        <div><span>Datatype</span><strong>{item.datatype || 'unknown'}</strong></div>
+        <div><span>{t('field.dataset')}</span><strong>{item._dataset}</strong></div>
+        <div><span>{t('field.datatype')}</span><strong>{item.datatype || t('dataset.datatypeUnknown')}</strong></div>
       </div>
-      <Section title="Expression"><pre className="expression-block">{expressionText(item.expression) || '—'}</pre></Section>
-      {item.dimension && <Section title="Dimension"><pre className="expression-block">{JSON.stringify(item.dimension, null, 2)}</pre></Section>}
-      {item.ai_context && <Section title="AI Context"><AiContext value={item.ai_context} /></Section>}
+      <Section title={t('field.expression')}><pre className="expression-block">{expressionText(item.expression) || '—'}</pre></Section>
+      {item.dimension && <Section title={t('field.dimension')}><pre className="expression-block">{JSON.stringify(item.dimension, null, 2)}</pre></Section>}
+      {item.ai_context && <Section title={t('aiContext.title')}><AiContext value={item.ai_context} /></Section>}
     </>
   )
 }
 
 function MetricDetail({ item, model, onNavigate }) {
+  const t = useT()
   const datasets = referencedDatasets(item, new Set(model.datasets.map((dataset) => dataset.name)))
   return (
     <>
-      <p className="detail-description">{item.description || '暂无描述。'}</p>
-      <div className="detail-kv"><div><span>Datatype</span><strong>{item.datatype || 'unknown'}</strong></div><div><span>Datasets</span><strong>{datasets.length}</strong></div></div>
-      <Section title="Expression"><pre className="expression-block">{expressionText(item.expression) || '—'}</pre></Section>
-      <Section title="Referenced Datasets"><LinkList items={datasets.map((name) => ({ kind: 'dataset', name, target: model.datasetByName.get(name) }))} onNavigate={onNavigate} /></Section>
-      {item.ai_context && <Section title="AI Context"><AiContext value={item.ai_context} /></Section>}
+      <p className="detail-description">{item.description || t('inspector.noDescription')}</p>
+      <div className="detail-kv">
+        <div><span>{t('metric.datatype')}</span><strong>{item.datatype || t('dataset.datatypeUnknown')}</strong></div>
+        <div><span>{t('metric.datasets')}</span><strong>{datasets.length}</strong></div>
+      </div>
+      <Section title={t('metric.expression')}><pre className="expression-block">{expressionText(item.expression) || '—'}</pre></Section>
+      <Section title={t('metric.referenced')}><LinkList items={datasets.map((name) => ({ kind: 'dataset', name, target: model.datasetByName.get(name) }))} onNavigate={onNavigate} /></Section>
+      {item.ai_context && <Section title={t('aiContext.title')}><AiContext value={item.ai_context} /></Section>}
     </>
   )
 }
 
 function SemanticRelationshipDetail({ item, model, onNavigate }) {
+  const t = useT()
   const pairs = (item.from_columns || []).map((column, index) => `${column} → ${(item.to_columns || [])[index] || '—'}`)
   return (
     <>
-      <p className="detail-description">{item.description || item.ai_context?.instructions || '连接两个 Dataset 的语义关系。'}</p>
+      <p className="detail-description">{item.description || item.ai_context?.instructions || t('semanticRelationship.description')}</p>
       <div className="detail-kv">
-        <div><span>From</span><strong>{item.from}</strong></div>
-        <div><span>To</span><strong>{item.to}</strong></div>
+        <div><span>{t('semanticRelationship.from')}</span><strong>{item.from}</strong></div>
+        <div><span>{t('semanticRelationship.to')}</span><strong>{item.to}</strong></div>
       </div>
-      <Section title="Datasets">
+      <Section title={t('semanticRelationship.datasets')}>
         <LinkList items={[
           { kind: 'dataset', name: item.from, target: model.datasetByName.get(item.from) },
           { kind: 'dataset', name: item.to, target: model.datasetByName.get(item.to) },
         ]} onNavigate={onNavigate} />
       </Section>
-      <Section title="Join Fields" count={pairs.length}><RuleList values={pairs} /></Section>
-      {item.ai_context && <Section title="AI Context"><AiContext value={item.ai_context} /></Section>}
+      <Section title={t('semanticRelationship.joinFields')} count={pairs.length}><RuleList values={pairs} /></Section>
+      {item.ai_context && <Section title={t('aiContext.title')}><AiContext value={item.ai_context} /></Section>}
     </>
   )
 }
 
 function MetricDependencyDetail({ item, onNavigate }) {
+  const t = useT()
   return (
     <>
-      <p className="detail-description">该 Dataset 为指标表达式提供字段和事实数据。</p>
+      <p className="detail-description">{t('metricDependency.description')}</p>
       <div className="detail-kv">
-        <div><span>Dataset</span><strong>{item.dataset?.name}</strong></div>
-        <div><span>Metric</span><strong>{item.metric?.name}</strong></div>
+        <div><span>{t('metricDependency.dataset')}</span><strong>{item.dataset?.name}</strong></div>
+        <div><span>{t('metricDependency.metric')}</span><strong>{item.metric?.name}</strong></div>
       </div>
-      <Section title="Navigate">
+      <Section title={t('metricDependency.navigate')}>
         <LinkList items={[
           { kind: 'dataset', name: item.dataset?.name, target: item.dataset },
           { kind: 'metric', name: item.metric?.name, target: item.metric },
         ].filter((entry) => entry.name)} onNavigate={onNavigate} />
       </Section>
-      <Section title="Metric Expression"><pre className="expression-block">{expressionText(item.metric?.expression) || '—'}</pre></Section>
+      <Section title={t('metricDependency.expression')}><pre className="expression-block">{expressionText(item.metric?.expression) || '—'}</pre></Section>
     </>
   )
 }
 
 function MappingDetail({ item, model, onNavigate }) {
+  const t = useT()
   const datasets = referencedDatasets(item, new Set(model.datasets.map((dataset) => dataset.name)))
   return (
     <>
-      <p className="detail-description">本体 Concept 与逻辑语义模型之间的映射证据。</p>
-      <div className="detail-kv"><div><span>Concept</span><strong>{item.concept}</strong></div><div><span>Mapping</span><strong>{item._mappingName}</strong></div></div>
-      <Section title="Referenced Datasets"><LinkList items={datasets.map((name) => ({ kind: 'dataset', name, target: model.datasetByName.get(name) }))} onNavigate={onNavigate} /></Section>
-      <Section title="Object Mappings" count={item.object_mappings?.length || 0}><pre className="expression-block expression-block--json">{JSON.stringify(item.object_mappings || [], null, 2)}</pre></Section>
-      <Section title="Link Mappings" count={item.link_mappings?.length || 0}><pre className="expression-block expression-block--json">{JSON.stringify(item.link_mappings || [], null, 2)}</pre></Section>
+      <p className="detail-description">{t('mapping.description')}</p>
+      <div className="detail-kv">
+        <div><span>{t('mapping.concept')}</span><strong>{item.concept}</strong></div>
+        <div><span>{t('mapping.name')}</span><strong>{item._mappingName}</strong></div>
+      </div>
+      <Section title={t('mapping.referenced')}><LinkList items={datasets.map((name) => ({ kind: 'dataset', name, target: model.datasetByName.get(name) }))} onNavigate={onNavigate} /></Section>
+      <Section title={t('mapping.objectMappings')} count={item.object_mappings?.length || 0}><pre className="expression-block expression-block--json">{JSON.stringify(item.object_mappings || [], null, 2)}</pre></Section>
+      <Section title={t('mapping.linkMappings')} count={item.link_mappings?.length || 0}><pre className="expression-block expression-block--json">{JSON.stringify(item.link_mappings || [], null, 2)}</pre></Section>
     </>
   )
 }
 
 function MappingEvidenceDetail({ item, onNavigate }) {
+  const t = useT()
   const conceptMapping = item.conceptMapping
   const datasetEvidence = item.type === 'dataset-mapping'
   const evidence = item.evidence
@@ -331,48 +631,49 @@ function MappingEvidenceDetail({ item, onNavigate }) {
   return (
     <>
       <p className="detail-description">
-        {datasetEvidence
-          ? '这条边只展示当前 Dataset 实际参与的 Object/Link Mapping 证据，不混入同一 Concept 的其他数据集。'
-          : '这条边表示 Ontology Concept 选择了哪个 Concept Mapping；字段和关系证据位于下游的 Dataset 边。'}
+        {datasetEvidence ? t('evidence.datasetDescription') : t('evidence.conceptDescription')}
       </p>
       <div className="detail-kv">
-        <div><span>Ontology Concept</span><strong>{conceptMapping.concept}</strong></div>
-        <div><span>{datasetEvidence ? 'Semantic Dataset' : 'Concept Mapping'}</span><strong>{item.dataset?.name || conceptMapping._mappingName}</strong></div>
+        <div><span>{t('evidence.ontologyConcept')}</span><strong>{conceptMapping.concept}</strong></div>
+        <div>
+          <span>{datasetEvidence ? t('evidence.semanticDataset') : t('evidence.conceptMapping')}</span>
+          <strong>{item.dataset?.name || conceptMapping._mappingName}</strong>
+        </div>
       </div>
       {datasetEvidence ? (
         <>
           <div className="detail-kv">
-            <div><span>Mapping</span><strong>{conceptMapping._mappingName}</strong></div>
-            <div><span>Evidence Fragments</span><strong>{evidence?.fragmentCount || 0}</strong></div>
+            <div><span>{t('evidence.mapping')}</span><strong>{conceptMapping._mappingName}</strong></div>
+            <div><span>{t('evidence.fragments')}</span><strong>{evidence?.fragmentCount || 0}</strong></div>
           </div>
-          <Section title="Mapped Expressions" count={evidence?.expressions?.length || 0}>
+          <Section title={t('evidence.expressions')} count={evidence?.expressions?.length || 0}>
             <RuleList values={evidence?.expressions} />
           </Section>
           {!!evidence?.relationships?.length && (
-            <Section title="Relationship References" count={evidence.relationships.length}>
+            <Section title={t('evidence.relationships')} count={evidence.relationships.length}>
               <Chips values={evidence.relationships} tone="violet" />
             </Section>
           )}
           {!!evidence?.objectMappings?.length && (
-            <Section title="Object Mapping Fragment" count={evidence.objectMappings.length}>
+            <Section title={t('evidence.objectFragment')} count={evidence.objectMappings.length}>
               <pre className="expression-block expression-block--json">{JSON.stringify(evidence.objectMappings, null, 2)}</pre>
             </Section>
           )}
           {!!evidence?.linkMappings?.length && (
-            <Section title="Link Mapping Fragment" count={evidence.linkMappings.length}>
+            <Section title={t('evidence.linkFragment')} count={evidence.linkMappings.length}>
               <pre className="expression-block expression-block--json">{JSON.stringify(evidence.linkMappings, null, 2)}</pre>
             </Section>
           )}
-          <Section title="Dataset Source"><pre className="expression-block">{item.dataset?.source || '—'}</pre></Section>
+          <Section title={t('evidence.datasetSource')}><pre className="expression-block">{item.dataset?.source || '—'}</pre></Section>
         </>
       ) : (
         <div className="detail-kv">
-          <div><span>Object Mappings</span><strong>{conceptMapping.object_mappings?.length || 0}</strong></div>
-          <div><span>Link Mappings</span><strong>{conceptMapping.link_mappings?.length || 0}</strong></div>
-          <div><span>Referenced Datasets</span><strong>{item.referencedDatasets?.length || 0}</strong></div>
+          <div><span>{t('mapping.objectMappings')}</span><strong>{conceptMapping.object_mappings?.length || 0}</strong></div>
+          <div><span>{t('mapping.linkMappings')}</span><strong>{conceptMapping.link_mappings?.length || 0}</strong></div>
+          <div><span>{t('mapping.referenced')}</span><strong>{item.referencedDatasets?.length || 0}</strong></div>
         </div>
       )}
-      <Section title="Navigate"><LinkList items={links} onNavigate={onNavigate} /></Section>
+      <Section title={t('evidence.navigate')}><LinkList items={links} onNavigate={onNavigate} /></Section>
     </>
   )
 }

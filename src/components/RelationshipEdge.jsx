@@ -1,4 +1,5 @@
 import { BaseEdge, EdgeLabelRenderer, getBezierPath, useViewport } from '@xyflow/react'
+import { useT } from '../lib/i18n'
 
 export default function RelationshipEdge({
   id,
@@ -15,6 +16,7 @@ export default function RelationshipEdge({
   label,
   selected,
 }) {
+  const t = useT()
   const { zoom } = useViewport()
   const [path, labelX, labelY] = getBezierPath({
     sourceX,
@@ -28,7 +30,7 @@ export default function RelationshipEdge({
   const towardLabelY = labelY - targetY
   const towardLabelLength = Math.max(1, Math.hypot(towardLabelX, towardLabelY))
   const count = data?.relationPaths?.length || 1
-  const title = data?.selection?.name || data?.label || '关系'
+  const title = data?.selection?.name || data?.label || t('canvas.edgeFallback')
   const mapping = data?.kind === 'mapping'
   const actionDistance = mapping ? 54 : 30
   const actionX = targetX + (towardLabelX / towardLabelLength) * actionDistance
@@ -49,7 +51,7 @@ export default function RelationshipEdge({
             type="button"
             className={`edge-action ${mapping ? 'edge-action--mapping' : ''} nodrag nopan ${selected ? 'is-selected' : ''}`}
             style={{ transform: `translate(-50%, -50%) translate(${actionX}px, ${actionY}px) scale(${1 / zoom})` }}
-            aria-label={`${mapping ? '查看映射证据' : '查看关系'} ${title}`}
+            aria-label={`${mapping ? t('canvas.viewMapping') : t('canvas.viewRelationship')} ${title}`}
             title={title}
             onClick={(event) => {
               event.stopPropagation()

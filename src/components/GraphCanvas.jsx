@@ -10,6 +10,7 @@ import {
 } from '@xyflow/react'
 import OssieNode from './OssieNode'
 import RelationshipEdge from './RelationshipEdge'
+import { useT } from '../lib/i18n'
 import { useCssTokens } from '../lib/useCssTokens'
 import { NODE_HEIGHT, NODE_WIDTH } from '../lib/graph'
 
@@ -65,6 +66,7 @@ function frameNodes(flow, canvasRef, items, duration = 340) {
 }
 
 function InnerGraphCanvas({ graph, selection, onSelect, onFocus, canvasRef }) {
+  const t = useT()
   const flow = useReactFlow()
   const tokens = useCssTokens(CANVAS_TOKENS)
   const previousGraphKey = useRef('')
@@ -122,10 +124,15 @@ function InnerGraphCanvas({ graph, selection, onSelect, onFocus, canvasRef }) {
       const related = active.enabled && active.edgeIds.has(item.id)
       const dimmed = active.enabled && !related
       const hovered = hoveredEdgeId === item.id
+      // A bundled edge names its size instead of one of the relationships it
+      // merges, and that wording follows the active language.
+      const label = item.data?.bundleCount > 1
+        ? t('canvas.bundleCount', { count: item.data.bundleCount })
+        : item.data?.label
       return {
         ...item,
         selected,
-        label: selected || hovered ? item.data?.label : undefined,
+        label: selected || hovered ? label : undefined,
         data: {
           ...item.data,
           showAnchor: item.data?.kind === 'mapping'
@@ -141,7 +148,7 @@ function InnerGraphCanvas({ graph, selection, onSelect, onFocus, canvasRef }) {
         zIndex: selected || hovered ? 8 : related ? 4 : 1,
       }
     }),
-    [active, graph.edges, graph.nodes.length, hoveredEdgeId, onSelect, selectedEdgeIds],
+    [active, graph.edges, graph.nodes.length, hoveredEdgeId, onSelect, selectedEdgeIds, t],
   )
 
   const graphKey = useMemo(
@@ -191,8 +198,8 @@ function InnerGraphCanvas({ graph, selection, onSelect, onFocus, canvasRef }) {
     return (
       <div className="empty-canvas">
         <div className="empty-canvas__mark">∅</div>
-        <h3>没有可展示的图</h3>
-        <p>当前文档未包含这一层，或筛选结果为空。</p>
+        <h3>{t('canvas.emptyTitle')}</h3>
+        <p>{t('canvas.emptyBody')}</p>
       </div>
     )
   }

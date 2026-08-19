@@ -8,6 +8,7 @@ import {
   Database,
   FolderOpen,
   GitBranch,
+  Languages,
   Layers3,
   Network,
   Search,
@@ -27,20 +28,23 @@ import {
   DropdownMenuTrigger,
 } from './components/ui/dropdown-menu'
 import { buildMappingGraph, buildOntologyGraph, buildSemanticGraph } from './lib/graph'
-import { buildSearchIndex, normalizeOssie, parseOssie, searchIndex } from './lib/ossie'
+import { issueText, useI18n, useT } from './lib/i18n'
+import { buildSearchIndex, normalizeOssie, parseOssie, relationshipKind, searchIndex } from './lib/ossie'
 
 const TABS = [
-  { id: 'overview', label: '概览', icon: Layers3 },
-  { id: 'ontology', label: '本体', icon: Network },
-  { id: 'semantic', label: '语义模型', icon: Database },
-  { id: 'mapping', label: '映射追踪', icon: GitBranch },
-  { id: 'json', label: 'JSON', icon: Braces },
+  { id: 'overview', labelKey: 'tab.overview', icon: Layers3 },
+  { id: 'ontology', labelKey: 'tab.ontology', icon: Network },
+  { id: 'semantic', labelKey: 'tab.semantic', icon: Database },
+  { id: 'mapping', labelKey: 'tab.mapping', icon: GitBranch },
+  { id: 'json', labelKey: 'tab.json', icon: Braces },
 ]
 
 const JsonView = lazy(() => import('./components/JsonView'))
 
+// Ossie's own vocabulary, deliberately the same in both languages.
 const KIND_LABELS = {
-  concept: 'Concept',
+  concept: 'Entity Type',
+  valueType: 'Value Type',
   relationship: 'Relationship',
   dataset: 'Dataset',
   field: 'Field',
@@ -49,8 +53,8 @@ const KIND_LABELS = {
 }
 
 export default function App() {
+  const { locale, setLocale, t } = useI18n()
   const [model, setModel] = useState(null)
-  const [fileName, setFileName] = useState('')
   const [warnings, setWarnings] = useState([])
   const [importErrors, setImportErrors] = useState([])
   const [importOpen, setImportOpen] = useState(false)
@@ -58,7 +62,6 @@ export default function App() {
   const [query, setQuery] = useState('')
   const [selection, setSelection] = useState(null)
   const [showRelationships, setShowRelationships] = useState(true)
-  const [showValueTypes, setShowValueTypes] = useState(true)
   const [showMetrics, setShowMetrics] = useState(false)
   const [focusDepth, setFocusDepth] = useState(0)
   const [sidebarKind, setSidebarKind] = useState('all')
@@ -67,7 +70,9 @@ export default function App() {
   const sidebarKinds = sidebarKind !== 'all'
     ? [sidebarKind]
     : activeTab === 'ontology'
-      ? ['concept', 'relationship']
+      // Value types are reached through the attribute table of the entity that
+      // uses them, so the ontology index lists entity types alone.
+      ? ['concept']
       : activeTab === 'semantic'
         ? query.trim() ? ['dataset', 'metric', 'field'] : ['dataset', 'metric']
         : activeTab === 'mapping'
@@ -78,7 +83,11 @@ export default function App() {
     [searchItems, query, sidebarKinds.join(':')],
   )
 
-  const selectedGraphName = selection?.kind === 'metric'
+  // A value type has no node on the canvas, so focusing on one would empty the
+  // graph rather than narrow it.
+  const selectedGraphName = selection?.kind === 'valueType'
+    ? ''
+    : selection?.kind === 'metric'
     ? `metric:${selection.name}`
     : selection?.kind === 'field'
       ? selection.target?._dataset || ''
@@ -106,7 +115,6 @@ export default function App() {
     if (activeTab === 'ontology') {
       return buildOntologyGraph(model, {
         showRelationships,
-        showValueTypes,
         selectedName: selectedGraphName,
         depth: focusDepth,
       })
@@ -120,16 +128,15 @@ export default function App() {
     }
     if (activeTab === 'mapping') return buildMappingGraph(model, selectedMapping)
     return { nodes: [], edges: [] }
-  }, [model, activeTab, showRelationships, showValueTypes, showMetrics, focusDepth, selectedGraphName, selectedMapping])
+  }, [model, activeTab, showRelationships, showMetrics, focusDepth, selectedGraphName, selectedMapping])
 
-  const handleImport = (text, name) => {
+  const handleImport = (text) => {
     const result = parseOssie(text)
     if (result.errors.length) {
       setImportErrors(result.errors)
       return
     }
     setModel(normalizeOssie(result.document))
-    setFileName(name)
     setWarnings(result.warnings)
     setImportErrors([])
     setImportOpen(false)
@@ -148,10 +155,13 @@ export default function App() {
     }
     const normalized = item.target ? item : { ...item, target: next.target }
     setSelection({ kind: normalized.kind, name: normalized.name, target: normalized.target })
-    if (normalized.kind === 'concept' || normalized.kind === 'relationship') setActiveTab('ontology')
+    if (['concept', 'valueType', 'relationship'].includes(normalized.kind)) setActiveTab('ontology')
     if (normalized.kind === 'relationship') {
       setShowRelationships(true)
-      setFocusDepth(1)
+      // Only relationships that are actually drawn are worth focusing on; an
+      // attribute has no edge, so focusing would blank the canvas.
+      const kind = relationshipKind(normalized.target, model)
+      if (kind === 'association' || kind === 'objectified') setFocusDepth(1)
     }
     if (['dataset', 'field', 'metric'].includes(normalized.kind)) {
       setActiveTab('semantic')
@@ -186,27 +196,29 @@ export default function App() {
       <header className="topbar">
         <div className="brand">
           <div className="brand__mark"><Network size={20} /></div>
-          <div><strong>Ossie Visualizer</strong><span>Ontology workbench</span></div>
+          <div><strong>Ossie Visualizer</strong></div>
         </div>
-        {model && (
-          <div className="document-identity">
-            <span className="status-dot" />
-            <div><strong>{model.document.name}</strong><span>{fileName} · v{model.document.version}</span></div>
-          </div>
-        )}
+        <button
+          className="button button--ghost topbar__locale"
+          onClick={() => setLocale(locale === 'zh' ? 'en' : 'zh')}
+          aria-label={t('locale.switch')}
+          title={t('locale.switch')}
+        >
+          <Languages size={16} />{t('locale.label')}
+        </button>
         <button className="button button--primary topbar__open" onClick={() => setImportOpen(true)}>
-          <FolderOpen size={16} />{model ? '更换 JSON' : '打开 JSON'}
+          <FolderOpen size={16} />{model ? t('app.import') : t('app.open')}
         </button>
       </header>
 
       {model && (
         <nav className="tabbar">
-          {TABS.map(({ id, label, icon: Icon }) => (
+          {TABS.map(({ id, labelKey, icon: Icon }) => (
             <button key={id} className={activeTab === id ? 'is-active' : ''} onClick={() => selectTab(id)}>
-              <Icon size={15} />{label}
+              <Icon size={15} />{t(labelKey)}
             </button>
           ))}
-          <div className="tabbar__status"><CheckCircle2 size={14} />结构检查通过</div>
+          <div className="tabbar__status"><CheckCircle2 size={14} />{t('app.statusOk')}</div>
         </nav>
       )}
 
@@ -215,7 +227,7 @@ export default function App() {
       ) : activeTab === 'overview' ? (
         <Overview model={model} warnings={warnings} onNavigate={navigate} onTab={selectTab} />
       ) : activeTab === 'json' ? (
-        <Suspense fallback={<main className="json-view"><div className="json-view__loading">正在加载 JSON 查看器…</div></main>}>
+        <Suspense fallback={<main className="json-view"><div className="json-view__loading">{t('app.jsonLoading')}</div></main>}>
           <JsonView document={model.document} />
         </Suspense>
       ) : (
@@ -237,8 +249,6 @@ export default function App() {
               model={model}
               showRelationships={showRelationships}
               setShowRelationships={setShowRelationships}
-              showValueTypes={showValueTypes}
-              setShowValueTypes={setShowValueTypes}
               showMetrics={showMetrics}
               setShowMetrics={setShowMetrics}
               focusDepth={focusDepth}
@@ -263,6 +273,7 @@ export default function App() {
 }
 
 function Welcome({ onOpen }) {
+  const t = useT()
   return (
     <main className="welcome">
       <div className="welcome__art">
@@ -275,26 +286,27 @@ function Welcome({ onOpen }) {
         <Network size={40} />
       </div>
       <span className="eyebrow">APACHE OSSIE · LOCAL FIRST</span>
-      <h1>看清本体，也看清语义如何连接</h1>
-      <p>导入任意 Ossie JSON，在一套工作台中浏览 Concept、关系、Semantic Model 与 Mapping。纯 Ontology 文档同样支持。</p>
-      <button className="button button--primary button--large" onClick={onOpen}><FolderOpen size={18} />打开 Ossie JSON</button>
+      <h1>{t('welcome.title')}</h1>
+      <p>{t('welcome.body')}</p>
+      <button className="button button--primary button--large" onClick={onOpen}><FolderOpen size={18} />{t('welcome.cta')}</button>
       <div className="welcome__features">
-        <span><CheckCircle2 size={15} />本地解析</span>
-        <span><CheckCircle2 size={15} />引用检查</span>
-        <span><CheckCircle2 size={15} />React Flow</span>
+        <span><CheckCircle2 size={15} />{t('welcome.featureLocal')}</span>
+        <span><CheckCircle2 size={15} />{t('welcome.featureCheck')}</span>
+        <span><CheckCircle2 size={15} />{t('welcome.featureFlow')}</span>
       </div>
     </main>
   )
 }
 
 function Overview({ model, warnings, onNavigate, onTab }) {
+  const t = useT()
   const stats = [
-    ['Entity Types', model.stats.entityTypes, CircleDot, 'ontology'],
-    ['Ontology Relations', model.stats.ontologyRelationships, Network, 'ontology'],
-    ['Datasets', model.stats.datasets, Database, 'semantic'],
-    ['Fields', model.stats.fields, Braces, 'semantic'],
-    ['Metrics', model.stats.metrics, Sigma, 'semantic'],
-    ['Concept Mappings', model.stats.conceptMappings, GitBranch, 'mapping'],
+    ['overview.statEntityTypes', model.stats.entityTypes, CircleDot, 'ontology'],
+    ['overview.statRelations', model.stats.associationRelationships, Network, 'ontology'],
+    ['overview.statAttributes', model.stats.attributeRelationships, Braces, 'ontology'],
+    ['overview.statDatasets', model.stats.datasets, Database, 'semantic'],
+    ['overview.statMetrics', model.stats.metrics, Sigma, 'semantic'],
+    ['overview.statMappings', model.stats.conceptMappings, GitBranch, 'mapping'],
   ]
   const mappedConcepts = new Set(model.conceptMappings.map((mapping) => mapping.concept))
   const unmapped = model.concepts.filter((concept) => !mappedConcepts.has(concept.concept))
@@ -302,41 +314,50 @@ function Overview({ model, warnings, onNavigate, onTab }) {
     <main className="overview">
       <section className="overview__hero">
         <div>
-          <span className="eyebrow">ONTOLOGY OVERVIEW</span>
+          <span className="eyebrow">{t('overview.eyebrow')}</span>
           <h1>{model.document.name}</h1>
-          <p>{model.document.description || '暂无文档描述。'}</p>
+          <p>{model.document.description || t('overview.noDescription')}</p>
         </div>
-        <div className="overview__health"><CheckCircle2 size={20} /><div><strong>文档可用</strong><span>结构与交叉引用检查通过</span></div></div>
+        <div className="overview__health">
+          <CheckCircle2 size={20} />
+          <div><strong>{t('overview.healthTitle')}</strong><span>{t('overview.healthBody')}</span></div>
+        </div>
       </section>
-      {!!warnings.length && <div className="warning-banner"><AlertTriangle size={17} /><span>{warnings[0].message}</span></div>}
+      {!!warnings.length && <div className="warning-banner"><AlertTriangle size={17} /><span>{issueText(warnings[0], t)}</span></div>}
       <section className="stat-grid">
-        {stats.map(([label, value, Icon, tab]) => (
-          <button key={label} onClick={() => onTab(tab)}>
-            <span><Icon size={17} /></span><strong>{value}</strong><small>{label}</small><ChevronRight size={15} />
+        {stats.map(([labelKey, value, Icon, tab]) => (
+          <button key={labelKey} onClick={() => onTab(tab)}>
+            <span><Icon size={17} /></span><strong>{value}</strong><small>{t(labelKey)}</small><ChevronRight size={15} />
           </button>
         ))}
       </section>
       <section className="overview-grid">
         <article className="overview-card overview-card--large">
-          <header><div><span className="eyebrow">MODEL LAYERS</span><h2>语义分层</h2></div><Sparkles size={18} /></header>
+          <header>
+            <div><span className="eyebrow">{t('overview.layersEyebrow')}</span><h2>{t('overview.layersTitle')}</h2></div>
+            <Sparkles size={18} />
+          </header>
           <div className="layer-flow">
-            <button onClick={() => onTab('ontology')}><CircleDot size={19} /><strong>Ontology</strong><span>{model.stats.entityTypes + model.stats.valueTypes} concepts</span></button>
+            <button onClick={() => onTab('ontology')}><CircleDot size={19} /><strong>Ontology</strong><span>{t('overview.layerConcepts', { count: model.stats.entityTypes + model.stats.valueTypes })}</span></button>
             <ChevronRight />
-            <button onClick={() => onTab('mapping')}><GitBranch size={19} /><strong>Mapping</strong><span>{model.stats.conceptMappings} concept maps</span></button>
+            <button onClick={() => onTab('mapping')}><GitBranch size={19} /><strong>Mapping</strong><span>{t('overview.layerMaps', { count: model.stats.conceptMappings })}</span></button>
             <ChevronRight />
-            <button onClick={() => onTab('semantic')}><Database size={19} /><strong>Semantic Model</strong><span>{model.stats.datasets} datasets</span></button>
+            <button onClick={() => onTab('semantic')}><Database size={19} /><strong>Semantic Model</strong><span>{t('overview.layerDatasets', { count: model.stats.datasets })}</span></button>
           </div>
         </article>
         <article className="overview-card">
-          <header><div><span className="eyebrow">MAPPING SIGNAL</span><h2>映射覆盖</h2></div></header>
-          <div className="coverage-number"><strong>{model.concepts.length ? Math.round(mappedConcepts.size / model.concepts.length * 100) : 0}%</strong><span>{mappedConcepts.size} / {model.concepts.length} concepts</span></div>
+          <header><div><span className="eyebrow">{t('overview.coverageEyebrow')}</span><h2>{t('overview.coverageTitle')}</h2></div></header>
+          <div className="coverage-number">
+            <strong>{model.concepts.length ? Math.round(mappedConcepts.size / model.concepts.length * 100) : 0}%</strong>
+            <span>{t('overview.coverageUnit', { mapped: mappedConcepts.size, total: model.concepts.length })}</span>
+          </div>
           <div className="progress"><span style={{ width: `${model.concepts.length ? mappedConcepts.size / model.concepts.length * 100 : 0}%` }} /></div>
-          <p>{model.ontologyMappings.length ? `${unmapped.length} 个 Concept 没有直接 Mapping；派生 Concept 可能继承父级映射。` : '纯 Ontology 文档不要求提供 Mapping。'}</p>
+          <p>{model.ontologyMappings.length ? t('overview.coverageNote', { count: unmapped.length }) : t('overview.coveragePure')}</p>
         </article>
         <article className="overview-card">
-          <header><div><span className="eyebrow">QUICK START</span><h2>快速进入</h2></div></header>
+          <header><div><span className="eyebrow">{t('overview.quickEyebrow')}</span><h2>{t('overview.quickTitle')}</h2></div></header>
           <div className="quick-list">
-            {model.concepts.slice(0, 5).map((concept) => (
+            {model.concepts.filter((concept) => concept.type !== 'ValueType').slice(0, 5).map((concept) => (
               <button key={concept.concept} onClick={() => onNavigate({ kind: 'concept', name: concept.concept, target: concept })}><span>{concept.concept}</span><ChevronRight size={14} /></button>
             ))}
           </div>
@@ -347,30 +368,35 @@ function Overview({ model, warnings, onNavigate, onTab }) {
 }
 
 function Sidebar({ activeTab, items, query, onQuery, selectedKind, onKind, selection, onSelect }) {
-  const title = activeTab === 'ontology' ? 'Ontology Index' : activeTab === 'semantic' ? 'Semantic Index' : 'Mapping Directory'
-  const filterOptions = activeTab === 'ontology'
-    ? [['all', '全部'], ['concept', 'Concept'], ['relationship', 'Relationship']]
-    : activeTab === 'semantic'
-      ? [['all', '全部'], ['dataset', 'Dataset'], ['metric', 'Metric'], ['field', 'Field']]
-      : []
+  const t = useT()
+  const title = activeTab === 'ontology'
+    ? t('sidebar.titleOntology')
+    : activeTab === 'semantic' ? t('sidebar.titleSemantic') : t('sidebar.titleMapping')
+  // The ontology index holds one kind only, so it has nothing to filter by.
+  const filterOptions = activeTab === 'semantic'
+    ? [['all', t('sidebar.filterAll')], ['dataset', 'Dataset'], ['metric', 'Metric'], ['field', 'Field']]
+    : []
 
   return (
     <aside className="sidebar">
-      <div className="sidebar__title"><span className="eyebrow">BROWSE</span><h2>{title}</h2></div>
-      <label className="search-box"><Search size={15} /><input value={query} onChange={(event) => onQuery(event.target.value)} placeholder="搜索名称、描述、同义词…" /></label>
+      <div className="sidebar__title"><span className="eyebrow">{t('sidebar.eyebrow')}</span><h2>{title}</h2></div>
+      <label className="search-box">
+        <Search size={15} />
+        <input value={query} onChange={(event) => onQuery(event.target.value)} placeholder={t('sidebar.search')} />
+      </label>
       <div className="sidebar__summary">
-        <span>{items.length} items</span>
+        <span>{t('sidebar.count', { count: items.length })}</span>
         {!!filterOptions.length && (
           <div className="sidebar__filter">
             <DropdownMenu>
               <DropdownMenuTrigger
                 className={`sidebar__filter-trigger ${selectedKind !== 'all' ? 'is-active' : ''}`}
-                aria-label="筛选索引类型"
+                aria-label={t('sidebar.filterAria')}
               >
                 <SlidersHorizontal size={14} />
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" aria-label="索引类型">
-                <DropdownMenuLabel>类型</DropdownMenuLabel>
+              <DropdownMenuContent align="end" aria-label={t('sidebar.filterMenu')}>
+                <DropdownMenuLabel>{t('sidebar.filterLabel')}</DropdownMenuLabel>
                 <DropdownMenuRadioGroup value={selectedKind} onValueChange={onKind}>
                   {filterOptions.map(([kind, label]) => (
                     <DropdownMenuRadioItem key={kind} value={kind}>{label}</DropdownMenuRadioItem>
@@ -389,27 +415,32 @@ function Sidebar({ activeTab, items, query, onQuery, selectedKind, onKind, selec
             <em>{KIND_LABELS[item.kind]}</em>
           </button>
         ))}
-        {!items.length && <div className="sidebar__empty">没有匹配结果</div>}
+        {!items.length && <div className="sidebar__empty">{t('sidebar.empty')}</div>}
       </div>
     </aside>
   )
 }
 
 function GraphToolbar(props) {
+  const t = useT()
   const { activeTab, selection, focusDepth, setFocusDepth } = props
   return (
     <div className="graph-toolbar">
-      <div className="graph-toolbar__title">
-        <span className="eyebrow">GRAPH VIEW</span>
-        <strong>{activeTab === 'ontology' ? '概念与关系' : activeTab === 'semantic' ? '数据集语义图' : 'Concept 映射路径'}</strong>
-        <small>{selection ? selection.name : '全局总览 · 双击节点进入一跳聚焦'}</small>
-      </div>
       <div className="graph-toolbar__actions">
-        {activeTab === 'ontology' && <><Toggle checked={props.showRelationships} onChange={props.setShowRelationships} label="对象关系" /><Toggle checked={props.showValueTypes} onChange={props.setShowValueTypes} label="ValueType" /></>}
-        {activeTab === 'semantic' && <Toggle checked={props.showMetrics} onChange={props.setShowMetrics} label="Metrics" />}
+        {activeTab === 'ontology' && <Toggle checked={props.showRelationships} onChange={props.setShowRelationships} label={t('toolbar.relationships')} />}
+        {activeTab === 'semantic' && <Toggle checked={props.showMetrics} onChange={props.setShowMetrics} label={t('toolbar.metrics')} />}
         {activeTab !== 'mapping' && (
-          <div className="depth-switch" title={selection ? '按当前选择聚焦' : '选择节点后可聚焦'}>
-            {[0, 1, 2].map((depth) => <button key={depth} disabled={!selection && depth > 0} className={focusDepth === depth ? 'is-active' : ''} onClick={() => setFocusDepth(depth)}>{depth === 0 ? '全图' : `${depth} 跳`}</button>)}
+          <div className="depth-switch" title={selection ? t('toolbar.focusHint') : t('toolbar.focusHintEmpty')}>
+            {[0, 1, 2].map((depth) => (
+              <button
+                key={depth}
+                disabled={!selection && depth > 0}
+                className={focusDepth === depth ? 'is-active' : ''}
+                onClick={() => setFocusDepth(depth)}
+              >
+                {depth === 0 ? t('toolbar.depthAll') : t('toolbar.depthHops', { count: depth })}
+              </button>
+            ))}
           </div>
         )}
       </div>
@@ -422,14 +453,20 @@ function Toggle({ checked, onChange, label }) {
 }
 
 function GraphLegend({ activeTab }) {
+  const t = useT()
+  const entries = activeTab === 'ontology'
+    ? [['legend-dot legend-dot--concept', t('legend.entityType')], ['legend-line legend-line--extends', t('legend.extends')], ['legend-line legend-line--relation', t('legend.relationship')]]
+    : activeTab === 'semantic'
+      ? [['legend-dot legend-dot--dataset', t('legend.dataset')], ['legend-dot legend-dot--metric', t('legend.metric')]]
+      : [['legend-dot legend-dot--concept', t('legend.concept')], ['legend-dot legend-dot--mapping', t('legend.mapping')], ['legend-dot legend-dot--dataset', t('legend.dataset')]]
   return (
     <div className="graph-legend">
-      {activeTab === 'ontology' ? <><span><i className="legend-dot legend-dot--concept" />EntityType</span><span><i className="legend-line legend-line--extends" />extends</span><span><i className="legend-line legend-line--relation" />relationship</span></> : activeTab === 'semantic' ? <><span><i className="legend-dot legend-dot--dataset" />Dataset</span><span><i className="legend-dot legend-dot--metric" />Metric</span></> : <><span><i className="legend-dot legend-dot--concept" />Concept</span><span><i className="legend-dot legend-dot--mapping" />Mapping</span><span><i className="legend-dot legend-dot--dataset" />Dataset</span></>}
+      {entries.map(([className, label]) => <span key={label}><i className={className} />{label}</span>)}
     </div>
   )
 }
 
 function KindIcon({ kind }) {
-  const Icon = { concept: CircleDot, relationship: Network, dataset: Database, field: Braces, metric: Sigma, mapping: GitBranch }[kind] || CircleDot
+  const Icon = { concept: CircleDot, valueType: Braces, relationship: Network, dataset: Database, field: Braces, metric: Sigma, mapping: GitBranch }[kind] || CircleDot
   return <i className={`kind-icon kind-icon--${kind}`}><Icon size={14} /></i>
 }

@@ -44,7 +44,7 @@ const document = {
         { name: 'totals', roles: [{ concept: 'money' }], verbalizes: ['{order} totals {money}'] },
       ],
     },
-    { concept: 'money', type: 'ValueType' },
+    { concept: 'money', type: 'ValueType', extends: ['Decimal'] },
   ],
   ontology_mappings: [
     {
@@ -85,7 +85,7 @@ function endpoints(graph) {
 }
 
 describe('graph layout conventions', () => {
-  const ontology = buildOntologyGraph(model, { showRelationships: true, showValueTypes: true })
+  const ontology = buildOntologyGraph(model, { showRelationships: true })
 
   it('ranks a parent concept above every concept that extends it', () => {
     const byId = new Map(ontology.nodes.map((item) => [item.id, item]))
@@ -117,7 +117,7 @@ describe('graph layout conventions', () => {
       checked += 1
     }
     // Guard against the loop skipping everything and passing vacuously.
-    expect(checked).toBeGreaterThanOrEqual(4)
+    expect(checked).toBeGreaterThanOrEqual(3)
   })
 
   it('separates what a concept points at from what points at it', () => {

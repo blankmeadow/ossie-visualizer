@@ -1,6 +1,6 @@
 import dagre from '@dagrejs/dagre'
 import { MarkerType } from '@xyflow/react'
-import { BUILTIN_CONCEPTS, mappingEvidenceForDataset, referencedDatasets } from './ossie'
+import { mappingEvidenceForDataset, referencedDatasets, relationshipKind, roleKind } from './ossie'
 
 export const NODE_WIDTH = 248
 export const NODE_HEIGHT = 136
@@ -188,7 +188,6 @@ function edge(id, source, target, label, kind, selection, extra = {}) {
 }
 
 function node(id, kind, name, subtitle, item, extra = {}) {
-  const selectionKind = kind === 'valueType' ? 'concept' : kind
   return {
     id,
     type: 'ossieNode',
@@ -198,7 +197,7 @@ function node(id, kind, name, subtitle, item, extra = {}) {
       name,
       subtitle,
       item,
-      selection: { kind: selectionKind, name, target: item },
+      selection: { kind, name, target: item },
       ...extra,
     },
   }
@@ -290,15 +289,23 @@ function graphResult(nodes, edges, direction, positioner = layout) {
   return attachHandles(positioner(nodes, edges, direction), edges, direction)
 }
 
+/**
+ * The ontology canvas is a map of entities and the links between them.
+ *
+ * Value types are not drawn: an `EntityType -> ValueType` relationship is an
+ * attribute of that entity, which the inspector shows as a row in the concept's
+ * attribute table. Mixing the two on one canvas puts links of two entirely
+ * different kinds on the same footing.
+ */
 export function buildOntologyGraph(model, options = {}) {
   const showRelationships = options.showRelationships ?? false
-  const showValueTypes = options.showValueTypes ?? false
   const selectedName = options.selectedName || ''
   const depth = options.depth ?? 0
-  const conceptNames = new Set(model.concepts.map((concept) => concept.concept))
-  const adjacency = new Map(model.concepts.map((concept) => [concept.concept, new Set()]))
+  const entities = model.concepts.filter((concept) => concept.type !== 'ValueType')
+  const conceptNames = new Set(entities.map((concept) => concept.concept))
+  const adjacency = new Map(entities.map((concept) => [concept.concept, new Set()]))
 
-  for (const concept of model.concepts) {
+  for (const concept of entities) {
     for (const parent of concept.extends || []) {
       if (conceptNames.has(parent)) {
         adjacency.get(concept.concept)?.add(parent)
@@ -307,15 +314,16 @@ export function buildOntologyGraph(model, options = {}) {
     }
     for (const relationship of concept.relationships || []) {
       for (const role of relationship.roles || []) {
-        if (conceptNames.has(role.concept)) {
-          adjacency.get(concept.concept)?.add(role.concept)
-          adjacency.get(role.concept)?.add(concept.concept)
-        }
+        // Neighbourhood focus follows entity links only, otherwise a shared
+        // value type such as `String` would drag unrelated entities in.
+        if (roleKind(role.concept, model) !== 'entity' || !conceptNames.has(role.concept)) continue
+        adjacency.get(concept.concept)?.add(role.concept)
+        adjacency.get(role.concept)?.add(concept.concept)
       }
     }
   }
 
-  let visible = new Set(model.concepts.map((concept) => concept.concept))
+  let visible = new Set(conceptNames)
   if (selectedName && depth > 0 && conceptNames.has(selectedName)) {
     visible = new Set([selectedName])
     let frontier = [selectedName]
@@ -331,13 +339,12 @@ export function buildOntologyGraph(model, options = {}) {
     }
   }
 
-  const nodes = model.concepts
+  const nodes = entities
     .filter((concept) => visible.has(concept.concept))
-    .filter((concept) => showValueTypes || concept.type !== 'ValueType')
     .map((concept) =>
       node(
         concept.concept,
-        concept.type === 'ValueType' ? 'valueType' : 'concept',
+        'concept',
         concept.concept,
         // No subtitle: the header already states EntityType / ValueType.
         '',
@@ -355,7 +362,7 @@ export function buildOntologyGraph(model, options = {}) {
 
   const nodeIds = new Set(nodes.map((item) => item.id))
   const edges = []
-  for (const concept of model.concepts) {
+  for (const concept of entities) {
     if (!nodeIds.has(concept.concept)) continue
     for (const parent of concept.extends || []) {
       if (!nodeIds.has(parent)) continue
@@ -384,12 +391,22 @@ export function buildOntologyGraph(model, options = {}) {
 
   if (showRelationships) {
     const grouped = new Map()
-    for (const concept of model.concepts) {
+    for (const concept of entities) {
       if (!nodeIds.has(concept.concept)) continue
       for (const relationship of concept.relationships || []) {
-        const enriched = { ...relationship, owner: concept.concept, path: `${concept.concept}.${relationship.name}` }
+        const kind = relationshipKind(relationship, model)
+        // An attribute belongs in the concept's attribute table, not on the canvas.
+        if (kind === 'attribute' || kind === 'unary') continue
+        const enriched = {
+          ...relationship,
+          owner: concept.concept,
+          path: `${concept.concept}.${relationship.name}`,
+          relationshipKind: kind,
+        }
         for (const role of relationship.roles || []) {
-          if (!nodeIds.has(role.concept) || BUILTIN_CONCEPTS.has(role.concept)) continue
+          // An objectified fact type mixes entity and value roles; only the
+          // entity ends can be drawn, the value ends stay in the table.
+          if (roleKind(role.concept, model) !== 'entity' || !nodeIds.has(role.concept)) continue
           const key = `${concept.concept}\u0000${role.concept}`
           const items = grouped.get(key) || []
           items.push({ ...enriched, selectedRole: role })
@@ -400,7 +417,9 @@ export function buildOntologyGraph(model, options = {}) {
     for (const [key, items] of grouped) {
       const [source, target] = key.split('\u0000')
       const uniquePaths = [...new Set(items.map((item) => item.path))]
-      const label = uniquePaths.length === 1 ? items[0].name : `${uniquePaths.length} 条关系`
+      // A bundle's label depends on the active language, so the count travels
+      // on the edge and the canvas renders the wording.
+      const label = uniquePaths.length === 1 ? items[0].name : ''
       const selection = uniquePaths.length === 1
         ? { kind: 'relationship', name: items[0].path, target: items[0] }
         : { kind: 'relationshipGroup', name: `${source} → ${target}`, target: { source, target, items } }
@@ -411,7 +430,12 @@ export function buildOntologyGraph(model, options = {}) {
         label,
         'relationship',
         selection,
-        { relationPaths: uniquePaths, relationships: items },
+        {
+          relationPaths: uniquePaths,
+          relationships: items,
+          relationshipKind: items[0].relationshipKind,
+          bundleCount: uniquePaths.length,
+        },
       ))
     }
   }

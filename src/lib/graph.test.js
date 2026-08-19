@@ -11,10 +11,13 @@ const document = {
       type: 'EntityType',
       relationships: [
         { name: 'owns', roles: [{ concept: 'account' }], verbalizes: ['{party} owns {account}'] },
+        { name: 'net_worth', roles: [{ concept: 'money' }], verbalizes: ['{party} is worth {money}'] },
+        { name: 'label', roles: [{ concept: 'String' }], verbalizes: ['{party} is called {String}'] },
       ],
     },
     { concept: 'customer', type: 'EntityType', extends: ['party'] },
     { concept: 'account', type: 'EntityType' },
+    { concept: 'money', type: 'ValueType', extends: ['Decimal'] },
   ],
   ontology_mappings: [
     {
@@ -37,6 +40,17 @@ const document = {
 
 describe('graph builders', () => {
   const model = normalizeOssie(document)
+
+  it('draws entity types only, so attributes stay off the canvas', () => {
+    const graph = buildOntologyGraph(model, { showRelationships: true })
+    expect(graph.nodes.map((node) => node.id)).not.toContain('money')
+    // `party.net_worth -> money` and `party.label -> String` are attributes of
+    // party, not links between entities.
+    expect(graph.edges.map((edge) => edge.id)).toEqual(
+      expect.not.arrayContaining(['relation:party:money', 'relation:party:String']),
+    )
+    expect(graph.edges.map((edge) => edge.id)).toContain('relation:party:account')
+  })
 
   it('keeps the ontology graph compact until object relationships are enabled', () => {
     const compact = buildOntologyGraph(model)
