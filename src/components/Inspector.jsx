@@ -116,7 +116,7 @@ function DetailHeader({ kind, name, target, model, onClose, closeLabel, CloseIco
           {!!badge && <span className="chip chip--amber">{badge}</span>}
           {!!hint && <KindHint key={name} text={hint} />}
         </h2>
-        {!!desc && <p className="inspector__header-desc"> | {desc}</p>}
+        {!!desc && <p className="inspector__header-desc">{desc}</p>}
       </div>
       <button className="icon-button" onClick={onClose} aria-label={closeLabel} title={closeLabel}>
         <CloseIcon size={17} />
@@ -460,17 +460,13 @@ function ConceptDetail({ item, model, onNavigate }) {
 
   return (
     <>
-      <div className="concept-detail__hero">
-        {!!item.identify_by?.length && (
+      {!!item.identify_by?.length && (
+        <div className="concept-detail__hero">
           <p className="detail-identity">
             <strong>ID ({t('concept.identity')}):</strong> <code>{item.identify_by.join(', ')}</code>
-            {!!item.description && <span className="detail-identity__desc"> | {item.description}</span>}
           </p>
-        )}
-        {!item.identify_by?.length && (
-          <p className="detail-description">{item.description || t('inspector.noDescription')}</p>
-        )}
-      </div>
+        </div>
+      )}
       {!!item.extends?.length && <Section title={t('concept.extends')}><ExtendsChips values={item.extends} model={model} onNavigate={onNavigate} /></Section>}
       {!!item.derived_by?.length && <Section title={t('concept.derivedBy')}><RuleList values={item.derived_by} /></Section>}
       {!!item.requires?.length && <Section title={t('concept.requires')}><RuleList values={item.requires} /></Section>}
