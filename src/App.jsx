@@ -1,6 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  AlertTriangle,
   Braces,
   CheckCircle2,
   ChevronRight,
@@ -9,7 +8,6 @@ import {
   FolderOpen,
   GitBranch,
   Languages,
-  Layers3,
   Network,
   Search,
   Sigma,
@@ -28,7 +26,7 @@ import {
   DropdownMenuTrigger,
 } from './components/ui/dropdown-menu'
 import { buildMappingGraph, buildOntologyGraph, buildSemanticGraph } from './lib/graph'
-import { issueText, useI18n, useT } from './lib/i18n'
+import { useI18n, useT } from './lib/i18n'
 import { buildSearchIndex, normalizeOssie, parseOssie, relationshipKind, searchIndex } from './lib/ossie'
 import { usePanelWidth } from './lib/usePanelWidth'
 
@@ -37,7 +35,6 @@ import { usePanelWidth } from './lib/usePanelWidth'
 // pure ontology document simply does not have -- the ontology tab stays put
 // even at zero, since it is what the document is.
 const TABS = [
-  { id: 'overview', labelKey: 'tab.overview', icon: Layers3 },
   { id: 'ontology', labelKey: 'tab.ontology', icon: Network, count: (model) => model.stats.entityTypes },
   { id: 'semantic', labelKey: 'tab.semantic', icon: Database, count: (model) => model.stats.datasets, hideWhenEmpty: true },
   { id: 'mapping', labelKey: 'tab.mapping', icon: GitBranch, count: (model) => model.stats.conceptMappings, hideWhenEmpty: true },
@@ -67,10 +64,9 @@ export default function App() {
   const inspector = usePanelWidth('inspector')
   const [model, setModel] = useState(null)
   const [source, setSource] = useState(null)
-  const [warnings, setWarnings] = useState([])
   const [importErrors, setImportErrors] = useState([])
   const [importOpen, setImportOpen] = useState(false)
-  const [activeTab, setActiveTab] = useState('overview')
+  const [activeTab, setActiveTab] = useState('ontology')
   const [query, setQuery] = useState('')
   const [selection, setSelection] = useState(null)
   const [showRelationships, setShowRelationships] = useState(true)
@@ -160,10 +156,9 @@ export default function App() {
     setModel(normalizeOssie(result.document))
     // The source tab shows what was opened, in the language it was written in.
     setSource({ text, format: result.format })
-    setWarnings(result.warnings)
     setImportErrors([])
     setImportOpen(false)
-    setActiveTab('overview')
+    setActiveTab('ontology')
     setSelection(null)
     setQuery('')
     setSidebarKind('all')
@@ -266,8 +261,6 @@ export default function App() {
 
       {!model ? (
         <Welcome onOpen={() => setImportOpen(true)} onSample={loadSample} />
-      ) : activeTab === 'overview' ? (
-        <Overview model={model} warnings={warnings} onNavigate={navigate} onTab={selectTab} />
       ) : activeTab === 'json' ? (
         <Suspense fallback={<main className="json-view"><div className="json-view__loading">{t('app.jsonLoading')}</div></main>}>
           <JsonView source={source} />
@@ -346,53 +339,6 @@ function Welcome({ onOpen, onSample }) {
         </button>
       </div>
       <p className="welcome__formats">{t('import.formats')}</p>
-    </main>
-  )
-}
-
-function Overview({ model, warnings, onNavigate, onTab }) {
-  const t = useT()
-  const stats = [
-    ['overview.statEntityTypes', model.stats.entityTypes, CircleDot, 'ontology'],
-    ['overview.statRelations', model.stats.associationRelationships, Network, 'ontology'],
-    ['overview.statAttributes', model.stats.attributeRelationships, Braces, 'ontology'],
-    ['overview.statDatasets', model.stats.datasets, Database, 'semantic'],
-    ['overview.statMetrics', model.stats.metrics, Sigma, 'semantic'],
-    ['overview.statMappings', model.stats.conceptMappings, GitBranch, 'mapping'],
-  ]
-  const mappedConcepts = new Set(model.conceptMappings.map((mapping) => mapping.concept))
-  return (
-    <main className="overview">
-      <section className="overview__hero">
-        <h1>{model.document.name}</h1>
-        <p>{model.document.description || t('overview.noDescription')}</p>
-      </section>
-      {!!warnings.length && <div className="warning-banner"><AlertTriangle size={17} /><span>{issueText(warnings[0], t)}</span></div>}
-      {/* Constraints the whole document asserts. They belong to no concept, so
-          nothing else on screen would ever show them. */}
-      {!!model.document.requires?.length && (
-        <section className="overview-requires">
-          <span className="eyebrow">{t('overview.requires')}</span>
-          <div>{model.document.requires.map((rule) => <code key={rule}>{rule}</code>)}</div>
-        </section>
-      )}
-      <section className="stat-grid">
-        {stats.map(([labelKey, value, Icon, tab]) => (
-          <button key={labelKey} onClick={() => onTab(tab)}>
-            <span><Icon size={17} /></span><strong>{value}</strong><small>{t(labelKey)}</small><ChevronRight size={15} />
-          </button>
-        ))}
-      </section>
-      {!!model.ontologyMappings.length && (
-        <section className="overview-coverage">
-          <span>{t('overview.coverageTitle')}</span>
-          <strong>{model.concepts.length ? Math.round(mappedConcepts.size / model.concepts.length * 100) : 0}%</strong>
-          <div className="progress">
-            <span style={{ width: `${model.concepts.length ? mappedConcepts.size / model.concepts.length * 100 : 0}%` }} />
-          </div>
-          <small>{t('overview.coverageUnit', { mapped: mappedConcepts.size, total: model.concepts.length })}</small>
-        </section>
-      )}
     </main>
   )
 }

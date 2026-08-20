@@ -24,7 +24,6 @@ const MESSAGES = {
     'app.statusOk': '结构检查通过',
     'app.jsonLoading': '正在加载 JSON 查看器…',
 
-    'tab.overview': '概览',
     'tab.ontology': '本体',
     'tab.semantic': '语义模型',
     'tab.mapping': '映射',
@@ -33,18 +32,6 @@ const MESSAGES = {
     'welcome.title': '导入一个 Ossie 文档开始',
     'welcome.sample': '载入 Flights 示例',
     'welcome.cta': '导入 Ossie 文档',
-
-    'overview.noDescription': '暂无文档描述。',
-    'overview.requires': '文档级约束',
-    'overview.statEntityTypes': 'Entity Types',
-    'overview.statRelations': '实体间关系',
-    'overview.statAttributes': '属性关系',
-    'overview.statDatasets': 'Datasets',
-    'overview.statFields': 'Fields',
-    'overview.statMetrics': 'Metrics',
-    'overview.statMappings': 'Concept Mappings',
-    'overview.coverageTitle': '映射覆盖',
-    'overview.coverageUnit': '{mapped} / {total} concepts',
 
     'sidebar.titleOntology': '实体目录',
     'sidebar.titleSemantic': '语义目录',
@@ -273,7 +260,6 @@ const MESSAGES = {
     'app.statusOk': 'Structure check passed',
     'app.jsonLoading': 'Loading the JSON viewer…',
 
-    'tab.overview': 'Overview',
     'tab.ontology': 'Ontology',
     'tab.semantic': 'Semantic Model',
     'tab.mapping': 'Mapping',
@@ -282,18 +268,6 @@ const MESSAGES = {
     'welcome.title': 'Open an Ossie document to begin',
     'welcome.sample': 'Load the Flights example',
     'welcome.cta': 'Import an Ossie document',
-
-    'overview.noDescription': 'No document description.',
-    'overview.requires': 'DOCUMENT CONSTRAINTS',
-    'overview.statEntityTypes': 'Entity Types',
-    'overview.statRelations': 'Entity Relations',
-    'overview.statAttributes': 'Attributes',
-    'overview.statDatasets': 'Datasets',
-    'overview.statFields': 'Fields',
-    'overview.statMetrics': 'Metrics',
-    'overview.statMappings': 'Concept Mappings',
-    'overview.coverageTitle': 'Mapping coverage',
-    'overview.coverageUnit': '{mapped} / {total} concepts',
 
     'sidebar.titleOntology': 'Ontology Index',
     'sidebar.titleSemantic': 'Semantic Index',
