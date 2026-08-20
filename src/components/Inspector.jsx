@@ -189,6 +189,30 @@ function Chips({ values, tone = 'plain' }) {
   return <div className="chips">{values.map((value) => <span className={`chip chip--${tone}`} key={value}>{value}</span>)}</div>
 }
 
+/**
+ * The concepts a concept extends, as links.
+ *
+ * A named value type is often only ever reachable this way -- `Delay` extends
+ * `NrMinutes`, and nothing else in the document points at `NrMinutes` -- so
+ * leaving these as plain text stranded whole branches of the ontology.
+ */
+function ExtendsChips({ values, model, onNavigate }) {
+  if (!values?.length) return <span className="muted">—</span>
+  return (
+    <div className="chips">
+      {values.map((value) => {
+        const target = conceptTarget(value, model)
+        if (!target) return <span className="chip chip--violet" key={value}>{value}</span>
+        return (
+          <button className="chip chip--violet chip--link" key={value} onClick={() => onNavigate(target)}>
+            {value}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 function RuleList({ values }) {
   if (!values?.length) return null
   return <div className="rule-list">{values.map((value) => <code key={value}>{value}</code>)}</div>
@@ -376,7 +400,7 @@ function ConceptDetail({ item, model, onNavigate }) {
   return (
     <>
       <p className="detail-description">{item.description || t('inspector.noDescription')}</p>
-      {!!item.extends?.length && <Section title={t('concept.extends')}><Chips values={item.extends} tone="violet" /></Section>}
+      {!!item.extends?.length && <Section title={t('concept.extends')}><ExtendsChips values={item.extends} model={model} onNavigate={onNavigate} /></Section>}
       {!!item.derived_by?.length && <Section title={t('concept.derivedBy')}><RuleList values={item.derived_by} /></Section>}
       {!!item.requires?.length && <Section title={t('concept.requires')}><RuleList values={item.requires} /></Section>}
 
@@ -480,7 +504,7 @@ function ValueTypeDetail({ item, model, onNavigate }) {
       <div className="detail-kv detail-kv--single">
         <div><span>{t('valueType.base')}</span><strong>{base || t('concept.unresolvedType')}</strong></div>
       </div>
-      {!!item.extends?.length && <Section title={t('valueType.extends')}><Chips values={item.extends} tone="violet" /></Section>}
+      {!!item.extends?.length && <Section title={t('valueType.extends')}><ExtendsChips values={item.extends} model={model} onNavigate={onNavigate} /></Section>}
       {!!item.requires?.length && <Section title={t('valueType.requires')}><RuleList values={item.requires} /></Section>}
       <Section title={t('valueType.usedBy')} count={usedBy.length}>
         <InboundTable entries={usedBy} model={model} onNavigate={onNavigate} />

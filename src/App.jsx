@@ -358,6 +358,14 @@ function Overview({ model, warnings, onNavigate, onTab }) {
         </div>
       </section>
       {!!warnings.length && <div className="warning-banner"><AlertTriangle size={17} /><span>{issueText(warnings[0], t)}</span></div>}
+      {/* Constraints the whole document asserts. They belong to no concept, so
+          nothing else on screen would ever show them. */}
+      {!!model.document.requires?.length && (
+        <section className="overview-requires">
+          <span className="eyebrow">{t('overview.requires')}</span>
+          <div>{model.document.requires.map((rule) => <code key={rule}>{rule}</code>)}</div>
+        </section>
+      )}
       <section className="stat-grid">
         {stats.map(([labelKey, value, Icon, tab]) => (
           <button key={labelKey} onClick={() => onTab(tab)}>

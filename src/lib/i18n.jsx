@@ -39,6 +39,7 @@ const MESSAGES = {
 
     'overview.eyebrow': '本体概览',
     'overview.noDescription': '暂无文档描述。',
+    'overview.requires': '文档级约束',
     'overview.healthTitle': '文档可用',
     'overview.healthBody': '结构与交叉引用检查通过',
     'overview.statEntityTypes': 'Entity Types',
@@ -283,6 +284,7 @@ const MESSAGES = {
 
     'overview.eyebrow': 'ONTOLOGY OVERVIEW',
     'overview.noDescription': 'No document description.',
+    'overview.requires': 'DOCUMENT CONSTRAINTS',
     'overview.healthTitle': 'Document ready',
     'overview.healthBody': 'Structure and cross-references check out',
     'overview.statEntityTypes': 'Entity Types',

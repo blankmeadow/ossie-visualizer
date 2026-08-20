@@ -19,6 +19,8 @@ const edgeTypes = { relationshipEdge: RelationshipEdge }
 // Framing maths has to agree with the dimensions dagre laid the graph out with.
 const nodeWidth = NODE_WIDTH
 const nodeHeight = NODE_HEIGHT
+// Node cards sit above every edge layer; the highest an edge reaches is 8.
+const NODE_LAYER = 10
 
 // Fallbacks match the light-theme values in styles/tokens.css; the live values
 // are read from CSS so the canvas follows the active theme.
@@ -112,6 +114,11 @@ function InnerGraphCanvas({ graph, selection, onSelect, onFocus, canvasRef, insp
     () => graph.nodes.map((item) => ({
       ...item,
       selected: item.id === selectedNodeId,
+      // Above every edge. Edges carry an explicit z-index so the selected one
+      // draws over its neighbours, and React Flow leaves nodes at 0, which put
+      // every edge on top of every card: a line crossing a node hid part of it
+      // and answered the click there with its own relationship.
+      zIndex: NODE_LAYER,
       data: {
         ...item.data,
         dimmed: active.enabled && !active.nodeIds.has(item.id),
