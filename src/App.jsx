@@ -279,9 +279,10 @@ export default function App() {
             onResetWidth={sidebar.reset}
           />
           <section className="canvas-panel">
-            <GraphToolbar
+            <GraphCanvas
+              graph={graph}
+              selection={selection}
               activeTab={activeTab}
-              model={model}
               showRelationships={showRelationships}
               setShowRelationships={setShowRelationships}
               showMetrics={showMetrics}
@@ -291,13 +292,6 @@ export default function App() {
               layoutEngine={layoutEngine}
               setLayoutEngine={setLayoutEngine}
               focusDepth={focusDepth}
-              setFocusDepth={setFocusDepth}
-              selection={selection}
-            />
-            <GraphCanvas
-              graph={graph}
-              selection={selection}
-              showMiniMap={showMiniMap}
               onSelect={selectGraphElement}
               onFocus={setFocusDepth}
               inspectorWidth={inspector.width}
@@ -446,48 +440,7 @@ function Sidebar({ activeTab, items, query, onQuery, selectedKind, onKind, selec
   )
 }
 
-function GraphToolbar(props) {
-  const t = useT()
-  const { activeTab, selection, focusDepth, setFocusDepth, layoutEngine, setLayoutEngine } = props
-  return (
-    <div className="graph-toolbar">
-      <div className="graph-toolbar__actions">
-        {activeTab === 'ontology' && <Toggle checked={props.showRelationships} onChange={props.setShowRelationships} label={t('toolbar.relationships')} />}
-        {activeTab === 'semantic' && <Toggle checked={props.showMetrics} onChange={props.setShowMetrics} label={t('toolbar.metrics')} />}
-        <Toggle checked={props.showMiniMap} onChange={props.setShowMiniMap} label={t('toolbar.miniMap')} />
-        <div className="depth-switch" title={t('toolbar.layoutHint')}>
-          {['dagre', 'elk'].map((engine) => (
-            <button
-              key={engine}
-              className={layoutEngine === engine ? 'is-active' : ''}
-              onClick={() => setLayoutEngine(engine)}
-            >
-              {engine === 'dagre' ? 'Dagre' : 'ELK'}
-            </button>
-          ))}
-        </div>
-        {activeTab !== 'mapping' && (
-          <div className="depth-switch" title={selection ? t('toolbar.focusHint') : t('toolbar.focusHintEmpty')}>
-            {[0, 1, 2].map((depth) => (
-              <button
-                key={depth}
-                disabled={!selection && depth > 0}
-                className={focusDepth === depth ? 'is-active' : ''}
-                onClick={() => setFocusDepth(depth)}
-              >
-                {depth === 0 ? t('toolbar.depthAll') : t('toolbar.depthHops', { count: depth })}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
 
-function Toggle({ checked, onChange, label }) {
-  return <button className={`toggle ${checked ? 'is-active' : ''}`} onClick={() => onChange(!checked)}><span />{label}</button>
-}
 
 function GraphLegend({ activeTab }) {
   const t = useT()
