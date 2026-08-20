@@ -144,12 +144,14 @@ html, body, #root { height: 100%; margin: 0; padding: 0; overflow: hidden; }
 .segmented-switch button.is-active { color: var(--ink); font-weight: 600; background: white; box-shadow: 0 1px 3px rgba(0,0,0,.14); }
 .segmented-switch button:disabled { opacity: .35; cursor: default; }
 
-.graph-canvas { flex: 1; min-height: 0; width: 100%; height: 100%; position: relative; }
+.graph-canvas { flex: 1; min-height: 0; width: 100%; height: 100%; position: relative; overflow: hidden; isolation: isolate; background: var(--canvas); }
 .graph-canvas .react-flow__minimap { width: 160px; height: 100px; bottom: 76px !important; transition: right .2s ease; overflow: hidden; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); box-shadow: 0 1px 4px rgba(0,0,0,.11); }
 .graph-canvas.has-inspector .react-flow__minimap { right: calc(var(--inspector-width, 420px) + 20px) !important; }
 .graph-canvas .react-flow__controls { border-radius: 6px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.11); }
 .graph-canvas .react-flow__controls-button { border-bottom-color: var(--line); background: var(--surface); }
 .graph-canvas .react-flow { background: var(--canvas); }
+.graph-canvas .react-flow__background { background-color: var(--canvas); }
+.graph-canvas .react-flow__viewport { will-change: transform; backface-visibility: hidden; }
 .graph-canvas .react-flow__handle {
   width: 10px;
   height: 10px;

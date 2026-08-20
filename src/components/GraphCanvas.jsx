@@ -10,7 +10,7 @@ import {
   ReactFlow,
   ReactFlowProvider,
   useReactFlow,
-  useViewport,
+  useStore,
 } from '@xyflow/react'
 import { Download, Lock, Maximize, Unlock, ZoomIn, ZoomOut } from 'lucide-react'
 import { toPng } from 'html-to-image'
@@ -28,6 +28,7 @@ const nodeHeight = NODE_HEIGHT
 // Node cards sit above every edge layer; the highest an edge reaches is 8.
 const NODE_LAYER = 10
 const EMPTY_POSITIONS = Object.freeze({})
+const selectZoom = (state) => state.transform[2]
 
 // Fallbacks match the light-theme values in styles/tokens.css; the live values
 // are read from CSS so the canvas follows the active theme.
@@ -267,7 +268,9 @@ function InnerGraphCanvas(props) {
   } = props
   const t = useT()
   const flow = useReactFlow()
-  const { zoom } = useViewport()
+  // Subscribing through useViewport also listens to x/y and re-renders the
+  // complete graph on every pan frame. Arrow sizing only needs zoom.
+  const zoom = useStore(selectZoom)
   // Quantise the zoom used by marker definitions. The visual result remains
   // smooth while avoiding a brand-new SVG marker on every wheel delta.
   const viewportMarkerZoom = Math.max(0.08, Math.round(zoom * 50) / 50)
@@ -502,7 +505,13 @@ function InnerGraphCanvas(props) {
       onEdgeClick={(_, item) => onSelect(item.data?.selection)}
       onPaneClick={() => onSelect(null)}
     >
-      <Background variant={BackgroundVariant.Dots} gap={18} size={1.25} color={tokens['canvas-dots']} />
+      <Background
+        variant={BackgroundVariant.Dots}
+        gap={18}
+        size={1.25}
+        color={tokens['canvas-dots']}
+        bgColor={tokens.canvas}
+      />
       {!nodes.length && (
         <Panel position="top-center" style={{ marginTop: '120px' }}>
           <div className="empty-canvas" style={{ height: 'auto' }}>
