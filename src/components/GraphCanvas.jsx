@@ -275,8 +275,6 @@ function InnerGraphCanvas(props) {
   const graphNodesRef = useRef(graph.nodes)
   const selectedNodeFrameRef = useRef(null)
   const edgeFrameNodesRef = useRef([])
-  const [hoveredEdgeId, setHoveredEdgeId] = useState('')
-  const [hoveredNodeId, setHoveredNodeId] = useState('')
   const [nodesLocked, setNodesLocked] = useState(true)
   const [exporting, setExporting] = useState(false)
   const [exportZoom, setExportZoom] = useState(null)
@@ -293,10 +291,6 @@ function InnerGraphCanvas(props) {
   )
   const manualPositions = manualLayout.key === graphLayoutKey ? manualLayout.positions : EMPTY_POSITIONS
 
-  useEffect(() => {
-    setHoveredNodeId('')
-  }, [graphLayoutKey])
-
   const selectedNodeId = useMemo(
     () => graph.nodes.find((item) => selectionMatches(item.data?.selection, selection))?.id || '',
     [graph.nodes, selection],
@@ -305,15 +299,13 @@ function InnerGraphCanvas(props) {
     () => new Set(graph.edges.filter((item) => edgeMatchesSelection(item, selection)).map((item) => item.id)),
     [graph.edges, selection],
   )
-  const visualNodeId = hoveredNodeId || selectedNodeId
-
   const active = useMemo(() => {
     const nodeIds = new Set()
     const edgeIds = new Set()
-    if (visualNodeId) {
-      nodeIds.add(visualNodeId)
+    if (selectedNodeId) {
+      nodeIds.add(selectedNodeId)
       for (const item of graph.edges) {
-        if (item.source !== visualNodeId && item.target !== visualNodeId) continue
+        if (item.source !== selectedNodeId && item.target !== selectedNodeId) continue
         edgeIds.add(item.id)
         nodeIds.add(item.source)
         nodeIds.add(item.target)
@@ -327,7 +319,7 @@ function InnerGraphCanvas(props) {
       }
     }
     return { nodeIds, edgeIds, enabled: nodeIds.size > 0 || edgeIds.size > 0 }
-  }, [graph.edges, selectedEdgeIds, visualNodeId])
+  }, [graph.edges, selectedEdgeIds, selectedNodeId])
 
   const nodes = useMemo(
     () => graph.nodes.map((item) => ({
@@ -337,23 +329,20 @@ function InnerGraphCanvas(props) {
       zIndex: item.id === selectedNodeId ? NODE_LAYER + 1 : NODE_LAYER,
       data: {
         ...item.data,
-        hovered: item.id === hoveredNodeId,
         dimmed: active.enabled && !active.nodeIds.has(item.id),
-        related: active.enabled && active.nodeIds.has(item.id) && item.id !== visualNodeId,
+        related: active.enabled && active.nodeIds.has(item.id) && item.id !== selectedNodeId,
       },
     })),
-    [active, graph.nodes, hoveredNodeId, manualPositions, selectedNodeId, visualNodeId],
+    [active, graph.nodes, manualPositions, selectedNodeId],
   )
 
   const edges = useMemo(
     () =>
       graph.edges.map((item) => {
         const isEdgeSelected = selectedEdgeIds.has(item.id)
-        const isConnectedToVisualNode = visualNodeId && (item.source === visualNodeId || item.target === visualNodeId)
-        const isEdgeActive = isEdgeSelected || isConnectedToVisualNode
-        const isEdgeHovered = item.id === hoveredEdgeId
-        const isEdgeHighlighted = isEdgeActive || isEdgeHovered
-        const dimmed = active.enabled && !isEdgeActive && !isEdgeHovered
+        const isConnectedToSelectedNode = selectedNodeId && (item.source === selectedNodeId || item.target === selectedNodeId)
+        const isEdgeHighlighted = isEdgeSelected || isConnectedToSelectedNode
+        const dimmed = active.enabled && !isEdgeHighlighted
         const label = item.data?.label || ''
         const strokeWidth = isEdgeHighlighted ? 1.55 : item.style?.strokeWidth || 1.1
         const markerSize = markerSizeForZoom(markerZoom, strokeWidth, isEdgeHighlighted)
@@ -386,12 +375,10 @@ function InnerGraphCanvas(props) {
             strokeWidth,
           },
           // Keep the wide, transparent edge interaction path below nodes.
-          // Otherwise it can steal the pointer as soon as hover highlights an
-          // attached edge, causing an enter/leave loop on the node.
           zIndex: isEdgeHighlighted ? NODE_LAYER - 1 : 1,
         }
       }),
-    [active.enabled, graph.edges, hoveredEdgeId, hoveredNodeId, markerZoom, onSelect, selectedEdgeIds, showEdgeLabels, tokens, visualNodeId],
+    [active.enabled, graph.edges, markerZoom, onSelect, selectedEdgeIds, selectedNodeId, showEdgeLabels, tokens],
   )
   graphNodesRef.current = nodes
 
@@ -513,10 +500,6 @@ function InnerGraphCanvas(props) {
         onFocus(1)
       }}
       onEdgeClick={(_, item) => onSelect(item.data?.selection)}
-      onEdgeMouseEnter={(_, item) => setHoveredEdgeId(item.id)}
-      onEdgeMouseLeave={() => setHoveredEdgeId('')}
-      onNodeMouseEnter={(_, item) => setHoveredNodeId(item.id)}
-      onNodeMouseLeave={(_, item) => setHoveredNodeId((current) => current === item.id ? '' : current)}
       onPaneClick={() => onSelect(null)}
     >
       <Background variant={BackgroundVariant.Dots} gap={18} size={1.25} color={tokens['canvas-dots']} />

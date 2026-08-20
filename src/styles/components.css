@@ -178,7 +178,6 @@ html, body, #root { height: 100%; margin: 0; padding: 0; overflow: hidden; }
   transition: color 0.15s ease, opacity 0.15s ease, font-weight 0.15s ease;
 }
 
-.edge-label-text:hover,
 .edge-label-text.is-active {
   color: var(--graph-selection);
   font-weight: 700;
