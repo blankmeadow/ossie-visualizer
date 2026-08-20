@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildOntologyGraph, buildSemanticGraph } from './graph'
+import { buildOntologyGraph, buildSemanticGraph, markerSizeForZoom } from './graph'
 import { normalizeOssie } from './ossie'
 
 /**
@@ -152,5 +152,18 @@ describe('graph layout conventions', () => {
     expect(customers.data.description).toBe('Customer dimension.')
     // A dataset keeps its physical source, which the description no longer hides.
     expect(customers.data.subtitle).toBe('x.customers')
+  })
+})
+
+describe('adaptive edge markers', () => {
+  it('keeps arrowheads near a stable screen size across zoom levels', () => {
+    const regularAtFit = markerSizeForZoom(0.56, 1.1, false)
+    const regularAtNative = markerSizeForZoom(1, 1.1, false)
+    const highlightedAtFit = markerSizeForZoom(0.56, 1.55, true)
+
+    expect(regularAtFit).toBeGreaterThan(regularAtNative)
+    expect(regularAtFit * 0.56 * 1.1).toBeCloseTo(13, 1)
+    expect(highlightedAtFit * 0.56 * 1.55).toBeCloseTo(15, 1)
+    expect(markerSizeForZoom(0.08, 1.1, false) * 0.08 * 1.1).toBeGreaterThanOrEqual(8.5)
   })
 })

@@ -8,13 +8,14 @@ import {
   ReactFlow,
   ReactFlowProvider,
   useReactFlow,
+  useViewport,
 } from '@xyflow/react'
 import { Maximize, ZoomIn, ZoomOut } from 'lucide-react'
 import OssieNode from './OssieNode'
 import RelationshipEdge from './RelationshipEdge'
 import { useT } from '../lib/i18n'
 import { useCssTokens } from '../lib/useCssTokens'
-import { NODE_HEIGHT, NODE_WIDTH } from '../lib/graph'
+import { markerSizeForZoom, NODE_HEIGHT, NODE_WIDTH } from '../lib/graph'
 
 const nodeTypes = { ossieNode: OssieNode }
 const edgeTypes = { relationshipEdge: RelationshipEdge }
@@ -30,6 +31,7 @@ const CANVAS_TOKENS = {
   'canvas-dots': '#b9b9b9',
   'canvas-minimap-mask': 'rgba(245, 245, 245, 0.82)',
   'edge-neutral': '#9b9b9b',
+  'edge-marker': '#767676',
   'graph-selection': '#4f8f75',
   'node-concept': '#4f8f75',
   'node-dataset': '#729b8b',
@@ -225,6 +227,10 @@ function InnerGraphCanvas(props) {
   } = props
   const t = useT()
   const flow = useReactFlow()
+  const { zoom } = useViewport()
+  // Quantise the zoom used by marker definitions. The visual result remains
+  // smooth while avoiding a brand-new SVG marker on every wheel delta.
+  const markerZoom = Math.max(0.08, Math.round(zoom * 50) / 50)
   const tokens = useCssTokens(CANVAS_TOKENS)
   const graphNodesRef = useRef(graph.nodes)
   const selectedNodeFrameRef = useRef(null)
@@ -287,13 +293,17 @@ function InnerGraphCanvas(props) {
         const isEdgeHighlighted = isEdgeActive || isEdgeHovered
         const dimmed = active.enabled && !isEdgeActive && !isEdgeHovered
         const label = item.data?.label || ''
+        const strokeWidth = isEdgeHighlighted ? 1.55 : item.style?.strokeWidth || 1.1
+        const markerSize = markerSizeForZoom(markerZoom, strokeWidth, isEdgeHighlighted)
         return {
           ...item,
           selected: isEdgeHighlighted,
           label: label || undefined,
           markerEnd: {
             ...item.markerEnd,
-            color: isEdgeHighlighted ? tokens['graph-selection'] : tokens['edge-neutral'],
+            color: isEdgeHighlighted ? tokens['graph-selection'] : tokens['edge-marker'],
+            width: markerSize,
+            height: markerSize,
           },
           labelStyle: {
             ...item.labelStyle,
@@ -311,12 +321,12 @@ function InnerGraphCanvas(props) {
             ...item.style,
             opacity: dimmed ? 0.38 : 1,
             stroke: isEdgeHighlighted ? tokens['graph-selection'] : tokens['edge-neutral'],
-            strokeWidth: isEdgeHighlighted ? 1.55 : item.style?.strokeWidth || 1.1,
+            strokeWidth,
           },
           zIndex: isEdgeHighlighted ? 100 : 1,
         }
       }),
-    [active.enabled, graph.edges, hoveredEdgeId, onSelect, selectedEdgeIds, selectedNodeId, showEdgeLabels, tokens],
+    [active.enabled, graph.edges, hoveredEdgeId, markerZoom, onSelect, selectedEdgeIds, selectedNodeId, showEdgeLabels, tokens],
   )
 
   const graphKey = useMemo(

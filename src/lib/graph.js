@@ -6,6 +6,19 @@ import { mappingEvidenceForDataset, referencedDatasets, relationshipKind, roleKi
 export const NODE_WIDTH = 224
 export const NODE_HEIGHT = 72
 
+/**
+ * SVG markers use `markerUnits="strokeWidth"` and are then scaled again by
+ * React Flow's viewport. Compensate for both factors so an arrowhead stays at
+ * a readable screen size instead of disappearing when a large graph is fit.
+ */
+export function markerSizeForZoom(zoom, strokeWidth = 1.1, highlighted = false) {
+  const safeZoom = Math.max(0.08, Number.isFinite(zoom) ? zoom : 1)
+  const safeStrokeWidth = Math.max(0.5, Number.isFinite(strokeWidth) ? strokeWidth : 1.1)
+  const desiredPixels = highlighted ? 15 : 13
+  const size = desiredPixels / (safeZoom * safeStrokeWidth)
+  return Math.round(Math.min(100, Math.max(4, size)) * 10) / 10
+}
+
 // Lazy-load ELK to keep the initial bundle small (~1.4 MB savings).
 let elkInstance = null
 async function getElk() {
