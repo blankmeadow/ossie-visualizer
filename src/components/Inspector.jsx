@@ -373,7 +373,10 @@ function constraintChips(member, concept, model, t) {
       ? t('concept.keyIndexed', { index: member.keyIndex + 1 })
       : t('concept.key'))
   }
-  if (member.relationship.multiplicity) chips.push(member.relationship.multiplicity)
+  if (member.relationship.multiplicity) {
+    const mult = member.relationship.multiplicity
+    chips.push(t(`multiplicity.${mult}`, { defaultValue: mult }))
+  }
   const requires = member.relationship.requires?.length || 0
   if (requires) chips.push(t('concept.requiresCount', { count: requires }))
   const facets = (member.relationship.roles || []).reduce((total, role) => {

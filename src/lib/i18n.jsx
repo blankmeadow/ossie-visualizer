@@ -129,6 +129,11 @@ const MESSAGES = {
     'concept.keyIndexed': 'PK{index}',
     'concept.requiresCount': 'requires ×{count}',
     'concept.facetCount': 'facet ×{count}',
+    'multiplicity.OneToOne': '一对一',
+    'multiplicity.ManyToOne': '多对一',
+    'multiplicity.OneToMany': '一对多',
+    'multiplicity.ManyToMany': '多对多',
+    'multiplicity.ZeroOrOne': '零或一',
 
     'relationship.kindAttribute': '属性',
     'relationship.kindAssociation': '实体关系',
@@ -370,6 +375,11 @@ const MESSAGES = {
     'concept.keyIndexed': 'PK{index}',
     'concept.requiresCount': 'requires ×{count}',
     'concept.facetCount': 'facet ×{count}',
+    'multiplicity.OneToOne': 'One-to-One',
+    'multiplicity.ManyToOne': 'Many-to-One',
+    'multiplicity.OneToMany': 'One-to-Many',
+    'multiplicity.ManyToMany': 'Many-to-Many',
+    'multiplicity.ZeroOrOne': 'Zero-or-One',
 
     'relationship.kindAttribute': 'Attribute',
     'relationship.kindAssociation': 'Entity relation',
