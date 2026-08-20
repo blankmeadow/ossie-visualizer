@@ -425,7 +425,7 @@ function Sidebar({ activeTab, items, query, onQuery, selectedKind, onKind, selec
         {items.map((item) => (
           <button key={item.id} className={selection?.kind === item.kind && selection?.name === item.name ? 'is-active' : ''} onClick={() => onSelect(item)}>
             <KindIcon kind={item.kind} />
-            <span><strong>{item.name}</strong><small>{item.description || KIND_LABELS[item.kind]}</small></span>
+            <span><strong>{item.name}</strong><small>{item.description || t('sidebar.noDescription')}</small></span>
             <em>{KIND_LABELS[item.kind]}</em>
           </button>
         ))}

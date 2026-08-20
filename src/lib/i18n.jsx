@@ -56,6 +56,8 @@ const MESSAGES = {
     'sidebar.filterMenu': '索引类型',
     'sidebar.filterLabel': '类型',
     'sidebar.filterAll': '全部',
+    'sidebar.noDescription': '暂无描述',
+
 
     'toolbar.relationships': '实体关系',
     'toolbar.metrics': 'Metrics',
@@ -287,6 +289,8 @@ const MESSAGES = {
     'sidebar.filterMenu': 'Index kind',
     'sidebar.filterLabel': 'Kind',
     'sidebar.filterAll': 'All',
+    'sidebar.noDescription': 'No description',
+
 
     'toolbar.relationships': 'Entity relations',
     'toolbar.metrics': 'Metrics',
