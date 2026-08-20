@@ -531,7 +531,7 @@ function ConceptDetail({ item, model, onNavigate }) {
 
       <Section title={t('concept.relations')} count={associations.length}>
         {associations.length ? (
-          <MemberTable headers={[t('concept.colName'), t('concept.colTarget'), t('concept.colConstraint')]}>
+          <MemberTable headers={[t('concept.colName'), t('concept.colTarget'), t('concept.colMultiplicity')]}>
             <GroupedRows
               groups={groupMembers(associations, model, t)}
               renderRow={(member) => {
