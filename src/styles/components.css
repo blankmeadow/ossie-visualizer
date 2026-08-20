@@ -146,7 +146,7 @@
 .detail-kv > div { min-width: 0; display: flex; flex-direction: column; gap: 4px; padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); }
 .detail-kv span, .source-card span { color: #89948f; font: 500 8px 'SFMono-Regular', Consolas, monospace; text-transform: uppercase; letter-spacing: .08em; }
 .detail-kv strong { overflow: hidden; text-overflow: ellipsis; font: 500 10px 'SFMono-Regular', Consolas, monospace; }
-.detail-section { padding: 14px 0; border-top: 1px solid var(--line); }
+.detail-section { padding: 10px 0 4px; }
 .detail-section h3 { display: flex; align-items: center; gap: 6px; margin: 0 0 9px; font-size: 10px; text-transform: uppercase; letter-spacing: .07em; }
 .detail-section h3 span { padding: 2px 5px; border-radius: 999px; color: var(--muted); background: #edf0eb; font: 500 8px 'SFMono-Regular', Consolas, monospace; }
 .chips { display: flex; flex-wrap: wrap; gap: 5px; }
