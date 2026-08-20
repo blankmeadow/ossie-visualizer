@@ -168,10 +168,15 @@
    constraint chips, so the narrow ones line their value up the same way. */
 .member-table--cols2 .member-table__line > :last-child { text-align: right; }
 .member-table--cols3 .member-table__header, .member-table--cols3 .member-table__line { grid-template-columns: minmax(0,1fr) minmax(0,1.05fr) minmax(78px,auto); }
+.member-table--cols4 .member-table__header, .member-table--cols4 .member-table__line { grid-template-columns: minmax(0,1.2fr) minmax(0,1.4fr) minmax(0,1fr) minmax(0,0.9fr); }
 .member-table--cols5 .member-table__header, .member-table--cols5 .member-table__line { grid-template-columns: minmax(0,1.1fr) minmax(0,1.2fr) minmax(0,1fr) minmax(0,0.8fr) minmax(52px,auto); }
 .cell-pk { text-align: right; font: 600 9px 'SFMono-Regular', Consolas, monospace; }
 .cell-pk--yes { color: #8d6513; }
 .cell-pk--no { color: var(--muted); opacity: 0.6; }
+.inline-key-icon { display: inline-block; margin-left: 3px; color: #8d6513; vertical-align: -1px; }
+.member-table__name-col { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.member-table__name-title { display: flex; align-items: center; gap: 3px; min-width: 0; }
+.member-table__subdesc { color: var(--muted); font: 400 8px/1.4 system-ui, sans-serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .member-table__header { padding: 0 8px 3px; color: #89948f; font: 500 7px 'SFMono-Regular', Consolas, monospace; text-transform: uppercase; letter-spacing: .08em; }
 .member-table__header span:last-child { text-align: right; }
 .member-table__group { display: flex; flex-direction: column; gap: 2px; }

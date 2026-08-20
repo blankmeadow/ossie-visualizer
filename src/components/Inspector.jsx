@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft, ArrowRight, Braces, CircleDot, Database, GitBranch, HelpCircle, Sigma, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Braces, CircleDot, Database, GitBranch, HelpCircle, Key, Sigma, X } from 'lucide-react'
 import {
   collectExpressionStrings,
   conceptMembers,
@@ -397,6 +397,20 @@ function constraintChipsWithoutPk(member, concept, model, t) {
   return chips
 }
 
+function verbalizationText(member) {
+  const verbalizes = member.relationship?.verbalizes
+  if (!verbalizes) return '—'
+  if (Array.isArray(verbalizes)) return verbalizes.join('; ') || '—'
+  return String(verbalizes) || '—'
+}
+
+function requiresText(member) {
+  const reqs = member.relationship?.requires
+  if (!reqs) return '—'
+  if (Array.isArray(reqs)) return reqs.join(', ') || '—'
+  return String(reqs) || '—'
+}
+
 /** Split members into "declared here" and one section per ancestor. */
 function groupMembers(members, model, t) {
   const groups = new Map()
@@ -481,34 +495,32 @@ function ConceptDetail({ item, model, onNavigate }) {
         {attributes.length ? (
           <MemberTable headers={[
             t('concept.colName'),
-            t('concept.colDescription'),
-            t('concept.colSemantics'),
-            t('concept.colConstraint'),
-            t('concept.colIsPk')
+            t('concept.colVerbalizes'),
+            t('concept.colType'),
+            t('concept.colRequires')
           ]}>
             <GroupedRows
               groups={groupMembers(attributes, model, t)}
               renderRow={(member) => {
                 const types = attributeTypes(member, model, t)
                 const isPk = member.keyIndex >= 0 || (item.identify_by || []).includes(member.name)
-                const pkLabel = isPk ? t('concept.yes') : t('concept.no')
-                const constraints = constraintChipsWithoutPk(member, item, model, t)
                 const typeText = types.map((type) => type.label).join(', ') || t('concept.noType')
-                const descText = member.relationship.description || '—'
+                const descText = member.relationship.description
+                const verbalText = verbalizationText(member)
+                const reqText = requiresText(member)
 
                 return (
                   <MemberRow key={member.path}>
-                    <Cell value={member.name} />
-                    <Cell value={descText} tone="member-table__cell--muted" />
+                    <div className="member-table__name-col">
+                      <span className="member-table__name-title">
+                        <strong>{member.name}</strong>
+                        {isPk && <Key size={12} className="inline-key-icon" title={t('concept.key')} />}
+                      </span>
+                      {!!descText && <small className="member-table__subdesc">{descText}</small>}
+                    </div>
+                    <Cell value={verbalText} tone="member-table__cell--muted" />
                     <Cell value={typeText} tone="member-table__cell--type" />
-                    <span className="member-table__chips">
-                      {constraints.length ? constraints.map((chip) => (
-                        <span className="chip chip--amber" key={chip}>{chip}</span>
-                      )) : <span className="member-table__cell--muted">—</span>}
-                    </span>
-                    <span className={`cell-pk ${isPk ? 'cell-pk--yes' : 'cell-pk--no'}`}>
-                      {pkLabel}
-                    </span>
+                    <Cell value={reqText} tone="member-table__cell--muted" />
                   </MemberRow>
                 )
               }}
