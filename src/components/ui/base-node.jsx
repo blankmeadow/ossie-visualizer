@@ -16,17 +16,17 @@ import { cn } from '@/lib/utils'
 
 const baseNodeVariants = cva(
   cn(
-    'w-[248px] min-h-[136px] rounded-[11px] border px-[13px] py-[12px]',
-    'bg-[rgba(252,253,250,.98)]',
+    'w-[248px] min-h-[136px] rounded-[7px] border px-[14px] py-[12px]',
+    'bg-white',
     'transition-[opacity,filter,border-color,box-shadow,transform] duration-150',
   ),
   {
     variants: {
       emphasis: {
-        default: 'border-[#c9d5cf] shadow-[0_8px_22px_rgba(30,50,42,.10)]',
-        selected: 'border-2 border-[#10b981] ring-4 ring-[#10b981]/30 shadow-[0_0_0_1px_#059669,0_16px_36px_rgba(16,185,129,.35)] -translate-y-1 z-30',
-        related: 'border-[#9ab4a8] shadow-[0_8px_24px_rgba(30,70,55,.12)]',
-        dimmed: 'border-[#c9d5cf] shadow-[0_8px_22px_rgba(30,50,42,.10)] opacity-[.16] saturate-[.35]',
+        default: 'border-[#cfcfcf] shadow-[0_2px_5px_rgba(0,0,0,.10)]',
+        selected: 'border-2 border-accent ring-2 ring-accent/20 shadow-[0_5px_14px_rgba(255,109,90,.24)] -translate-y-px z-30',
+        related: 'border-[#a9a9a9] shadow-[0_3px_9px_rgba(0,0,0,.12)]',
+        dimmed: 'border-[#d5d5d5] shadow-[0_2px_5px_rgba(0,0,0,.08)] opacity-[.16] saturate-[.35]',
       },
     },
     defaultVariants: { emphasis: 'default' },
@@ -35,7 +35,7 @@ const baseNodeVariants = cva(
 
 /** Hover lifts a node the same way selection does, but not while it is faded back. */
 const hoverable = cn(
-  'hover:border-[#56816e] hover:shadow-[0_12px_30px_rgba(30,70,55,.18)] hover:-translate-y-px',
+  'hover:border-[#a7a7a7] hover:shadow-[0_4px_11px_rgba(0,0,0,.14)] hover:-translate-y-px',
 )
 
 function BaseNode({ className, emphasis = 'default', ...props }) {
@@ -52,13 +52,13 @@ function BaseNode({ className, emphasis = 'default', ...props }) {
 }
 
 function BaseNodeHeader({ className, ...props }) {
-  return <div className={cn('flex items-center gap-[5px] text-[#7d8984]', className)} {...props} />
+  return <div className={cn('flex items-center gap-[6px] text-[#777]', className)} {...props} />
 }
 
 function BaseNodeHeaderTitle({ className, ...props }) {
   return (
     <span
-      className={cn('font-mono text-micro font-medium tracking-[.08em]', className)}
+      className={cn('font-sans text-micro font-semibold tracking-[.08em]', className)}
       {...props}
     />
   )
@@ -81,7 +81,7 @@ function BaseNodeContent({ className, ...props }) {
 function BaseNodeTitle({ className, ...props }) {
   return (
     <div
-      className={cn('truncate font-mono text-base font-medium text-[#21312b]', className)}
+      className={cn('truncate font-mono text-[13px] font-medium text-[#2d2d2d]', className)}
       {...props}
     />
   )
@@ -105,7 +105,7 @@ function BaseNodeDescription({ className, ...props }) {
   return (
     <div
       className={cn(
-        'mt-[5px] line-clamp-2 min-h-[26px] text-tiny leading-[1.45] text-[#5b6a63]',
+        'mt-[5px] line-clamp-2 min-h-[26px] text-tiny leading-[1.45] text-[#666]',
         className,
       )}
       {...props}
@@ -121,8 +121,8 @@ function BaseNodeBadge({ className, ...props }) {
   return (
     <span
       className={cn(
-        'rounded-[4px] bg-[#eef1ec] px-[5px] py-[2px]',
-        'font-mono text-[7px] font-medium text-[#5e6e67]',
+        'rounded-[4px] bg-[#f1f1f1] px-[5px] py-[2px]',
+        'font-mono text-[7px] font-medium text-[#666]',
         className,
       )}
       {...props}

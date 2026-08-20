@@ -32,7 +32,7 @@ export default function RelationshipEdge({
 
   const activeStyle = selected ? {
     ...style,
-    stroke: '#10b981',
+    stroke: '#ff6d5a',
     strokeWidth: 2.8,
   } : style
 

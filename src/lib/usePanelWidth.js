@@ -8,7 +8,7 @@ import { useCallback, useEffect, useState } from 'react'
  * frames the graph clear of the inspector -- can read one number.
  */
 export const PANEL_WIDTHS = {
-  sidebar: { min: 208, max: 520, initial: 278 },
+  sidebar: { min: 200, max: 520, initial: 224 },
   inspector: { min: 300, max: 760, initial: 370 },
 }
 

@@ -219,37 +219,48 @@ export default function App() {
   }
 
   return (
-    <div className="app-shell">
+    <div
+      className="app-shell"
+      style={{ '--sidebar-width': `${sidebar.width}px`, '--inspector-width': `${inspector.width}px` }}
+    >
       <header className="topbar">
         <div className="brand">
           <div className="brand__mark"><Network size={20} /></div>
           <div><strong>Ossie Visualizer</strong></div>
         </div>
 
-        {model && (
-          <nav className="tabbar">
-            {visibleTabs(model).map(({ id, labelKey, icon: Icon, count }) => (
-              <button key={id} className={activeTab === id ? 'is-active' : ''} onClick={() => selectTab(id)}>
-                <Icon size={15} />{t(labelKey)}
-                {!!count && <em className="tabbar__count">{count(model)}</em>}
-              </button>
-            ))}
-          </nav>
-        )}
+        <div className="topbar__main">
+          <div className="topbar__context" aria-label={model?.document.name || 'Ossie Visualizer'}>
+            <span>Workspace</span>
+            <ChevronRight size={13} />
+            <strong>{model?.document.name || 'Ossie Visualizer'}</strong>
+          </div>
 
-        <div className="topbar__actions">
-          {model && <div className="tabbar__status"><CheckCircle2 size={14} />{t('app.statusOk')}</div>}
-          <button
-            className="button button--ghost topbar__locale"
-            onClick={() => setLocale(locale === 'zh' ? 'en' : 'zh')}
-            aria-label={t('locale.switch')}
-            title={t('locale.switch')}
-          >
-            <Languages size={16} />{t('locale.label')}
-          </button>
-          <button className="button button--primary topbar__open" onClick={() => setImportOpen(true)}>
-            <FolderOpen size={16} />{t('app.import')}
-          </button>
+          {model && (
+            <nav className="tabbar">
+              {visibleTabs(model).map(({ id, labelKey, icon: Icon, count }) => (
+                <button key={id} className={activeTab === id ? 'is-active' : ''} onClick={() => selectTab(id)}>
+                  <Icon size={14} />{t(labelKey)}
+                  {!!count && <em className="tabbar__count">{count(model)}</em>}
+                </button>
+              ))}
+            </nav>
+          )}
+
+          <div className="topbar__actions">
+            {model && <div className="tabbar__status"><CheckCircle2 size={14} />{t('app.statusOk')}</div>}
+            <button
+              className="button button--ghost topbar__locale"
+              onClick={() => setLocale(locale === 'zh' ? 'en' : 'zh')}
+              aria-label={t('locale.switch')}
+              title={t('locale.switch')}
+            >
+              <Languages size={16} />{t('locale.label')}
+            </button>
+            <button className="button button--primary topbar__open" onClick={() => setImportOpen(true)}>
+              <FolderOpen size={16} />{t('app.import')}
+            </button>
+          </div>
         </div>
       </header>
 
@@ -262,10 +273,7 @@ export default function App() {
           <JsonView source={source} />
         </Suspense>
       ) : (
-        <main
-          className="workspace"
-          style={{ '--sidebar-width': `${sidebar.width}px`, '--inspector-width': `${inspector.width}px` }}
-        >
+        <main className="workspace">
           <Sidebar
             key={activeTab}
             activeTab={activeTab}

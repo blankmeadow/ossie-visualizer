@@ -27,8 +27,9 @@ const NODE_LAYER = 10
 // Fallbacks match the light-theme values in styles/tokens.css; the live values
 // are read from CSS so the canvas follows the active theme.
 const CANVAS_TOKENS = {
-  'canvas-dots': '#ccd2cb',
-  'canvas-minimap-mask': 'rgba(241, 243, 238, 0.78)',
+  'canvas-dots': '#c7c7c7',
+  'canvas-minimap-mask': 'rgba(245, 245, 245, 0.82)',
+  'selection': '#ff6d5a',
   'node-concept': '#477d6b',
   'node-dataset': '#d16f3d',
   'node-metric': '#b98b22',
@@ -291,13 +292,13 @@ function InnerGraphCanvas(props) {
           style: {
             ...item.style,
             opacity: dimmed ? 0.12 : 1,
-            stroke: isEdgeActive ? '#10b981' : item.style?.stroke,
+            stroke: isEdgeActive ? tokens.selection : item.style?.stroke,
             strokeWidth: isEdgeActive ? 2.8 : item.style?.strokeWidth || 1.5,
           },
           zIndex: isEdgeActive ? 100 : 1,
         }
       }),
-    [active.enabled, graph.edges, onSelect, selectedEdgeIds, selectedNodeId, showEdgeLabels],
+    [active.enabled, graph.edges, onSelect, selectedEdgeIds, selectedNodeId, showEdgeLabels, tokens.selection],
   )
 
   const graphKey = useMemo(
@@ -369,7 +370,7 @@ function InnerGraphCanvas(props) {
       onEdgeMouseLeave={() => setHoveredEdgeId('')}
       onPaneClick={() => onSelect(null)}
     >
-      <Background variant={BackgroundVariant.Dots} gap={22} size={1.2} color={tokens['canvas-dots']} />
+      <Background variant={BackgroundVariant.Dots} gap={16} size={1} color={tokens['canvas-dots']} />
       {!nodes.length && (
         <Panel position="top-center" style={{ marginTop: '120px' }}>
           <div className="empty-canvas" style={{ height: 'auto' }}>
