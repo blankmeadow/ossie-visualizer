@@ -169,7 +169,7 @@
 .member-table--cols2 .member-table__line > :last-child { text-align: right; }
 .member-table--cols3 .member-table__header, .member-table--cols3 .member-table__line { grid-template-columns: minmax(0, 1.8fr) minmax(0, 0.7fr) minmax(80px, auto); }
 .member-table--cols3 .member-table__line > :last-child { text-align: right; }
-.member-table--cols4 .member-table__header, .member-table--cols4 .member-table__line { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1.5fr) minmax(60px, 0.9fr) minmax(45px, 0.7fr); }
+.member-table--cols4 .member-table__header, .member-table--cols4 .member-table__line { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.2fr) minmax(0, 0.8fr) minmax(0, 1.4fr); }
 .member-table--cols5 .member-table__header, .member-table--cols5 .member-table__line { grid-template-columns: minmax(0,1.1fr) minmax(0,1.2fr) minmax(0,1fr) minmax(0,0.8fr) minmax(52px,auto); }
 .cell-pk { text-align: right; font: 600 9px 'SFMono-Regular', Consolas, monospace; }
 .cell-pk--yes { color: #8d6513; }

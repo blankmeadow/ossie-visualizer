@@ -531,27 +531,40 @@ function ConceptDetail({ item, model, onNavigate }) {
 
       <Section title={t('concept.relations')} count={associations.length}>
         {associations.length ? (
-          <MemberTable headers={[t('concept.colRelation'), t('concept.colEntity'), t('concept.colMultiplicity')]}>
+          <MemberTable headers={[
+            t('concept.colRelation'),
+            t('concept.colEntity'),
+            t('concept.colRequires'),
+            t('concept.colVerbalizes')
+          ]}>
             <GroupedRows
               groups={groupMembers(associations, model, t)}
               renderRow={(member) => {
                 const targets = (member.relationship.roles || []).map((role) => role.concept)
                 const first = targets[0]
+                const targetText = targets.length > 1 ? targets.join(', ') : (first || '—')
+                const targetConcept = targets.length === 1 && model ? model.conceptByName.get(first) : null
+                const targetDesc = targetConcept?.description
+                const relDescText = member.relationship.description
+                const reqText = requiresText(member)
+                const verbalText = verbalizationText(member)
+
                 return (
-                  <MemberRow key={member.path} note={member.relationship.description}>
-                    <Cell value={member.name} onClick={() => onNavigate(relationshipTarget(member))} />
-                    <Cell
-                      value={targets.length > 1 ? targets.join(', ') : first}
-                      tone="member-table__cell--type"
-                      onClick={targets.length === 1 && conceptTarget(first, model)
-                        ? () => onNavigate(conceptTarget(first, model))
-                        : undefined}
-                    />
-                    <span className="member-table__chips">
-                      {constraintChips(member, item, model, t).map((chip) => (
-                        <span className="chip chip--amber" key={chip}>{chip}</span>
-                      ))}
-                    </span>
+                  <MemberRow key={member.path}>
+                    <div className="member-table__name-col">
+                      <span className="member-table__name-title">
+                        <strong>{member.name}</strong>
+                      </span>
+                      {!!relDescText && <small className="member-table__subdesc">{relDescText}</small>}
+                    </div>
+                    <div className="member-table__name-col">
+                      <span className="member-table__name-title">
+                        <strong className="member-table__cell--type">{targetText}</strong>
+                      </span>
+                      {!!targetDesc && <small className="member-table__subdesc">{targetDesc}</small>}
+                    </div>
+                    <Cell value={reqText} tone="member-table__cell--muted" />
+                    <Cell value={verbalText} tone="member-table__cell--muted" />
                   </MemberRow>
                 )
               }}
