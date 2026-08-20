@@ -275,8 +275,9 @@ function LinkList({ items, onNavigate }) {
     <div className="link-list">
       {items.map((item) => {
         const desc = item.target?.description || item.description
+        const fullTitle = desc ? `${item.name}: ${desc}` : item.name
         return (
-          <button key={`${item.kind}:${item.name}`} onClick={() => onNavigate(item)}>
+          <button key={`${item.kind}:${item.name}`} onClick={() => onNavigate(item)} title={fullTitle}>
             <span>
               <strong>{item.name}</strong>
               {!!desc && <small className="muted"> | {desc}</small>}
@@ -508,11 +509,11 @@ function ConceptDetail({ item, model, onNavigate }) {
                 return (
                   <MemberRow key={member.path}>
                     <div className="member-table__name-col">
-                      <span className="member-table__name-title">
-                        <strong>{member.name}</strong>
+                      <span className="member-table__name-title" title={member.name}>
+                        <strong title={member.name}>{member.name}</strong>
                         {isPk && <Key size={12} className="inline-key-icon" title={t('concept.key')} />}
                       </span>
-                      {!!descText && <small className="member-table__subdesc">{descText}</small>}
+                      {!!descText && <small className="member-table__subdesc" title={descText}>{descText}</small>}
                     </div>
                     <Cell value={reqText} tone="member-table__cell--muted" />
                     <Cell value={typeText} tone="member-table__cell--type" />
@@ -547,16 +548,16 @@ function ConceptDetail({ item, model, onNavigate }) {
                 return (
                   <MemberRow key={member.path}>
                     <div className="member-table__name-col">
-                      <span className="member-table__name-title">
-                        <strong>{member.name}</strong>
+                      <span className="member-table__name-title" title={member.name}>
+                        <strong title={member.name}>{member.name}</strong>
                       </span>
-                      {!!relDescText && <small className="member-table__subdesc">{relDescText}</small>}
+                      {!!relDescText && <small className="member-table__subdesc" title={relDescText}>{relDescText}</small>}
                     </div>
                     <div className="member-table__name-col">
-                      <span className="member-table__name-title">
-                        <strong className="member-table__cell--type">{targetText}</strong>
+                      <span className="member-table__name-title" title={targetText}>
+                        <strong className="member-table__cell--type" title={targetText}>{targetText}</strong>
                       </span>
-                      {!!targetDesc && <small className="member-table__subdesc">{targetDesc}</small>}
+                      {!!targetDesc && <small className="member-table__subdesc" title={targetDesc}>{targetDesc}</small>}
                     </div>
                     <Cell value={reqText} tone="member-table__cell--muted" />
                     <Cell value={verbalText} tone="member-table__cell--muted" />
