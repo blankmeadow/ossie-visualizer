@@ -190,10 +190,6 @@ html, body, #root { height: 100%; margin: 0; padding: 0; overflow: hidden; }
   background: rgba(245,245,245,.9);
 }
 
-.edge-label-text.is-dimmed {
-  opacity: 0.38;
-  color: #9b9b9b;
-}
 .graph-legend { position: absolute; left: 14px; bottom: 76px; display: flex; gap: 13px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 6px; background: rgba(255,255,255,.96); box-shadow: 0 1px 4px rgba(0,0,0,.10); pointer-events: none; }
 .graph-legend span { display: flex; align-items: center; gap: 5px; color: var(--muted); font: 500 8px 'SFMono-Regular', Consolas, monospace; }
 .legend-dot { width: 8px; height: 8px; border-radius: 3px; background: var(--green); }
@@ -226,7 +222,6 @@ html, body, #root { height: 100%; margin: 0; padding: 0; overflow: hidden; }
 .chip__desc { font-weight: 400; opacity: 0.85; }
 
 .react-flow__node.selected { z-index: 1000 !important; }
-.react-flow__node.selected > div { outline: none !important; border-color: var(--graph-selection) !important; box-shadow: 0 0 0 2px rgba(79,143,117,.20), 0 6px 16px rgba(79,143,117,.22) !important; transform: translateY(-1px); }
 
 /* A relationship or value type opens stacked on the inspector rather than
    replacing it: the concept it belongs to stays behind the scrim, and the

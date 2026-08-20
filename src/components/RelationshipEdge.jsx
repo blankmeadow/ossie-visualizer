@@ -53,7 +53,7 @@ export default function RelationshipEdge({
         <EdgeLabelRenderer>
           <button
             type="button"
-            className={`edge-label-text nodrag nopan ${isVertical ? 'is-vertical' : ''} ${selected ? 'is-active' : ''} ${data?.dimmed ? 'is-dimmed' : ''}`}
+            className={`edge-label-text nodrag nopan ${isVertical ? 'is-vertical' : ''} ${selected ? 'is-active' : ''}`}
             style={{
               transform: labelTransform,
             }}

@@ -22,11 +22,9 @@ export default function OssieNode({ data, selected }) {
   const Icon = ICONS[data.kind] || CircleDot
   const emphasis = selected
     ? 'selected'
-    : data.dimmed
-      ? 'dimmed'
-      : data.related
-        ? 'related'
-        : 'default'
+    : data.related
+      ? 'related'
+      : 'default'
   const tooltip = [data.name, data.subtitle, data.description].filter(Boolean).join(' — ')
   const description = data.description || data.subtitle || '—'
 

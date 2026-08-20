@@ -25,8 +25,6 @@ const edgeTypes = { relationshipEdge: RelationshipEdge }
 // Framing maths has to agree with the dimensions dagre laid the graph out with.
 const nodeWidth = NODE_WIDTH
 const nodeHeight = NODE_HEIGHT
-// Node cards sit above every edge layer; the highest an edge reaches is 8.
-const NODE_LAYER = 10
 const EMPTY_POSITIONS = Object.freeze({})
 const selectZoom = (state) => state.transform[2]
 
@@ -302,26 +300,23 @@ function InnerGraphCanvas(props) {
     () => new Set(graph.edges.filter((item) => edgeMatchesSelection(item, selection)).map((item) => item.id)),
     [graph.edges, selection],
   )
-  const active = useMemo(() => {
+  const activeNodeIds = useMemo(() => {
     const nodeIds = new Set()
-    const edgeIds = new Set()
     if (selectedNodeId) {
       nodeIds.add(selectedNodeId)
       for (const item of graph.edges) {
         if (item.source !== selectedNodeId && item.target !== selectedNodeId) continue
-        edgeIds.add(item.id)
         nodeIds.add(item.source)
         nodeIds.add(item.target)
       }
     } else if (selectedEdgeIds.size) {
       for (const item of graph.edges) {
         if (!selectedEdgeIds.has(item.id)) continue
-        edgeIds.add(item.id)
         nodeIds.add(item.source)
         nodeIds.add(item.target)
       }
     }
-    return { nodeIds, edgeIds, enabled: nodeIds.size > 0 || edgeIds.size > 0 }
+    return nodeIds
   }, [graph.edges, selectedEdgeIds, selectedNodeId])
 
   const nodes = useMemo(
@@ -329,14 +324,13 @@ function InnerGraphCanvas(props) {
       ...item,
       position: manualPositions[item.id] || item.position,
       selected: item.id === selectedNodeId,
-      zIndex: item.id === selectedNodeId ? NODE_LAYER + 1 : NODE_LAYER,
+      zIndex: item.id === selectedNodeId ? 1000 : 0,
       data: {
         ...item.data,
-        dimmed: active.enabled && !active.nodeIds.has(item.id),
-        related: active.enabled && active.nodeIds.has(item.id) && item.id !== selectedNodeId,
+        related: activeNodeIds.has(item.id) && item.id !== selectedNodeId,
       },
     })),
-    [active, graph.nodes, manualPositions, selectedNodeId],
+    [activeNodeIds, graph.nodes, manualPositions, selectedNodeId],
   )
 
   const edges = useMemo(
@@ -345,7 +339,6 @@ function InnerGraphCanvas(props) {
         const isEdgeSelected = selectedEdgeIds.has(item.id)
         const isConnectedToSelectedNode = selectedNodeId && (item.source === selectedNodeId || item.target === selectedNodeId)
         const isEdgeHighlighted = isEdgeSelected || isConnectedToSelectedNode
-        const dimmed = active.enabled && !isEdgeHighlighted
         const label = item.data?.label || ''
         const strokeWidth = isEdgeHighlighted ? 1.55 : item.style?.strokeWidth || 1.1
         const markerSize = markerSizeForZoom(markerZoom, strokeWidth, isEdgeHighlighted)
@@ -362,26 +355,22 @@ function InnerGraphCanvas(props) {
           labelStyle: {
             ...item.labelStyle,
             fill: isEdgeHighlighted ? tokens['graph-selection'] : '#767676',
-            opacity: dimmed ? 0.38 : 1,
           },
           data: {
             ...item.data,
-            dimmed,
             showEdgeLabels,
             onSelect,
           },
-          className: [isEdgeHighlighted ? 'is-selected' : '', dimmed ? 'is-dimmed' : ''].filter(Boolean).join(' '),
+          className: isEdgeHighlighted ? 'is-selected' : '',
           style: {
             ...item.style,
-            opacity: dimmed ? 0.38 : 1,
             stroke: isEdgeHighlighted ? tokens['graph-selection'] : tokens['edge-neutral'],
             strokeWidth,
           },
-          // Keep the wide, transparent edge interaction path below nodes.
-          zIndex: isEdgeHighlighted ? NODE_LAYER - 1 : 1,
+          zIndex: 0,
         }
       }),
-    [active.enabled, graph.edges, markerZoom, onSelect, selectedEdgeIds, selectedNodeId, showEdgeLabels, tokens],
+    [graph.edges, markerZoom, onSelect, selectedEdgeIds, selectedNodeId, showEdgeLabels, tokens],
   )
   graphNodesRef.current = nodes
 

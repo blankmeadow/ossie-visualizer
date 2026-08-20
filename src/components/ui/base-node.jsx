@@ -9,23 +9,21 @@ import { cn } from '@/lib/utils'
  * Same shape: a container plus header / title / content / footer slots, so a
  * new node type composes the pieces instead of restating the class soup.
  *
- * `emphasis` carries the canvas highlight states: selection, immediate
- * neighbours, and everything else faded back.
+ * `emphasis` carries the canvas highlight states for the selection and its
+ * immediate neighbours.
  */
 
 const baseNodeVariants = cva(
   cn(
     'h-[72px] w-[224px] overflow-visible rounded-[8px] border px-[11px] py-[9px]',
     'bg-white',
-    'transition-[opacity,filter,border-color,box-shadow] duration-150',
   ),
   {
     variants: {
       emphasis: {
-        default: 'border-[1.5px] border-[#b9b9b9] shadow-[0_0_0_4px_rgba(0,0,0,.045),0_2px_5px_rgba(0,0,0,.10)]',
-        selected: 'border-2 border-[#4f8f75] ring-2 ring-[#4f8f75]/20 shadow-[0_5px_14px_rgba(79,143,117,.24)] -translate-y-px z-30',
-        related: 'border-[1.5px] border-[#a9a9a9] shadow-[0_0_0_4px_rgba(0,0,0,.045),0_3px_9px_rgba(0,0,0,.12)]',
-        dimmed: 'border-[1.5px] border-[#c9c9c9] shadow-[0_2px_5px_rgba(0,0,0,.08)] opacity-[.48] saturate-[.45]',
+        default: 'border-[1.5px] border-[#b9b9b9]',
+        selected: 'border-[1.5px] border-[#4f8f75] shadow-[0_0_0_6px_rgba(79,143,117,.12)] z-30',
+        related: 'border-[1.5px] border-[#a9a9a9]',
       },
     },
     defaultVariants: { emphasis: 'default' },
