@@ -98,6 +98,7 @@ const MESSAGES = {
     'inspector.emptyTitle': '选择一个语义元素',
     'inspector.emptyBody': '从索引、搜索结果或关系图选择 Concept、Dataset、Metric 或 Mapping。',
     'inspector.close': '关闭详情',
+    'inspector.whatIsThis': '这是什么？',
     'inspector.closeDetail': '返回概念详情',
     'inspector.noDescription': '暂无描述。',
 
@@ -196,8 +197,9 @@ const MESSAGES = {
 
     'mapping.description': '本体 Concept 与逻辑语义模型之间的映射证据。',
     'mapping.concept': 'Concept',
-    'mapping.name': 'Mapping',
     'mapping.referenced': 'Referenced Datasets',
+    'mapping.colPath': '关系路径',
+    'mapping.colExpression': '表达式',
     'mapping.objectMappings': 'Object Mappings',
     'mapping.linkMappings': 'Link Mappings',
 
@@ -343,6 +345,7 @@ const MESSAGES = {
     'inspector.emptyTitle': 'Select an element',
     'inspector.emptyBody': 'Pick a Concept, Dataset, Metric or Mapping from the index, the search results or the graph.',
     'inspector.close': 'Close details',
+    'inspector.whatIsThis': 'What is this?',
     'inspector.closeDetail': 'Back to the concept',
     'inspector.noDescription': 'No description.',
 
@@ -441,8 +444,9 @@ const MESSAGES = {
 
     'mapping.description': 'Mapping evidence between an ontology concept and the logical semantic model.',
     'mapping.concept': 'Concept',
-    'mapping.name': 'Mapping',
     'mapping.referenced': 'Referenced Datasets',
+    'mapping.colPath': 'Relationship path',
+    'mapping.colExpression': 'Expression',
     'mapping.objectMappings': 'Object Mappings',
     'mapping.linkMappings': 'Link Mappings',
 

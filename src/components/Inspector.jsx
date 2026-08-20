@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft, ArrowRight, Braces, CircleDot, Database, GitBranch, Sigma, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Braces, CircleDot, Database, GitBranch, HelpCircle, Sigma, X } from 'lucide-react'
 import {
   collectExpressionStrings,
   conceptMembers,
@@ -50,7 +50,50 @@ function resolveKind(selection) {
  */
 const OVERLAY_KINDS = new Set(['relationship', 'valueType'])
 
-function DetailHeader({ kind, name, target, model, onClose, closeLabel, CloseIcon = X }) {
+/**
+ * What kind of thing a panel is showing is a lesson, not content: it reads the
+ * same on every visit and says nothing about the item in front of the reader.
+ * It lives behind the question mark beside the title, so the panel opens on the
+ * document's own words.
+ */
+function KindHint({ text }) {
+  const t = useT()
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <button
+        className={`kind-hint__toggle ${open ? 'is-open' : ''}`}
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        aria-label={t('inspector.whatIsThis')}
+        title={t('inspector.whatIsThis')}
+      >
+        <HelpCircle size={14} />
+      </button>
+      {open && <p className="kind-hint">{text}</p>}
+    </>
+  )
+}
+
+/**
+ * The badge and the explanation a panel's header carries. Kinds whose panel
+ * used to open with a canned sentence about itself put that sentence here.
+ */
+function detailChrome(kind, target, t) {
+  if (kind === 'relationshipGroup') return { hint: t('group.description') }
+  if (kind === 'inheritance') {
+    return { hint: t('inheritance.description', { child: target?.child, parent: target?.parent }) }
+  }
+  if (kind === 'metricDependency') return { hint: t('metricDependency.description') }
+  if (kind === 'mapping') return { chip: target?._mappingName, hint: t('mapping.description') }
+  if (kind === 'mappingEvidence') {
+    return { hint: t(target?.type === 'dataset-mapping' ? 'evidence.datasetDescription' : 'evidence.conceptDescription') }
+  }
+  if (kind === 'semanticRelationship') return { hint: t('semanticRelationship.description') }
+  return {}
+}
+
+function DetailHeader({ kind, name, target, model, onClose, closeLabel, CloseIcon = X, chip, hint }) {
   const t = useT()
   const meta = KIND_META[kind] || KIND_META.concept
   const { Icon } = meta
@@ -60,15 +103,16 @@ function DetailHeader({ kind, name, target, model, onClose, closeLabel, CloseIco
   const eyebrow = kind === 'relationship'
     ? t(RELATIONSHIP_KIND_KEYS[relationshipKind(target, model)])
     : t(meta.labelKey)
-  const multiplicity = kind === 'relationship' ? target?.multiplicity : ''
+  const badge = chip ?? (kind === 'relationship' ? target?.multiplicity : '')
   return (
     <header className="inspector__header">
       <div className="inspector__symbol"><Icon size={17} /></div>
       <div>
         <span className="eyebrow">{eyebrow}</span>
         <h2 title={name}>
-          {name}
-          {!!multiplicity && <span className="chip chip--amber">{multiplicity}</span>}
+          <span className="inspector__name">{name}</span>
+          {!!badge && <span className="chip chip--amber">{badge}</span>}
+          {!!hint && <KindHint key={name} text={hint} />}
         </h2>
       </div>
       <button className="icon-button" onClick={onClose} aria-label={closeLabel} title={closeLabel}>
@@ -119,6 +163,7 @@ function DetailOverlay({ item, model, onClose, onOpen }) {
           onClose={onClose}
           closeLabel={t('inspector.closeDetail')}
           CloseIcon={ArrowLeft}
+          {...detailChrome(kind, item.target, t)}
         />
         <div className="inspector__body">
           <DetailBody kind={kind} target={item.target} model={model} onNavigate={onOpen} />
@@ -166,6 +211,7 @@ export default function Inspector({ selection, model, onClose, onNavigate, onRes
         model={model}
         onClose={onClose}
         closeLabel={t('inspector.close')}
+        {...detailChrome(kind, selection.target, t)}
       />
       <div className="inspector__body">
         <DetailBody kind={kind} target={selection.target} model={model} onNavigate={open} />
@@ -259,12 +305,13 @@ function MemberRow({ children, note }) {
   )
 }
 
-function Cell({ value, onClick, tone }) {
+function Cell({ value, onClick, tone, badge }) {
   const text = value || '—'
-  if (!onClick) return <span className={`member-table__cell ${tone || ''}`} title={text}>{text}</span>
+  const body = <>{text}{!!badge && <span className="chip chip--violet">{badge}</span>}</>
+  if (!onClick) return <span className={`member-table__cell ${tone || ''}`} title={text}>{body}</span>
   return (
     <button className={`member-table__cell member-table__cell--link ${tone || ''}`} onClick={onClick} title={text}>
-      {text}
+      {body}
     </button>
   )
 }
@@ -584,7 +631,6 @@ function RelationshipGroupDetail({ item, onNavigate }) {
   const relationships = [...new Map((item.items || []).map((relationship) => [relationship.path, relationship])).values()]
   return (
     <>
-      <p className="detail-description">{t('group.description')}</p>
       <div className="detail-kv">
         <div><span>{t('group.from')}</span><strong>{item.source}</strong></div>
         <div><span>{t('group.to')}</span><strong>{item.target}</strong></div>
@@ -603,7 +649,6 @@ function InheritanceDetail({ item, onNavigate }) {
   const t = useT()
   return (
     <>
-      <p className="detail-description">{t('inheritance.description', { child: item.child, parent: item.parent })}</p>
       <div className="detail-kv">
         <div><span>{t('inheritance.child')}</span><strong>{item.child}</strong></div>
         <div><span>{t('inheritance.parent')}</span><strong>{item.parent}</strong></div>
@@ -687,7 +732,7 @@ function SemanticRelationshipDetail({ item, model, onNavigate }) {
   const pairs = (item.from_columns || []).map((column, index) => `${column} → ${(item.to_columns || [])[index] || '—'}`)
   return (
     <>
-      <p className="detail-description">{item.description || item.ai_context?.instructions || t('semanticRelationship.description')}</p>
+      <p className="detail-description">{item.description || item.ai_context?.instructions || t('inspector.noDescription')}</p>
       <div className="detail-kv">
         <div><span>{t('semanticRelationship.from')}</span><strong>{item.from}</strong></div>
         <div><span>{t('semanticRelationship.to')}</span><strong>{item.to}</strong></div>
@@ -708,7 +753,6 @@ function MetricDependencyDetail({ item, onNavigate }) {
   const t = useT()
   return (
     <>
-      <p className="detail-description">{t('metricDependency.description')}</p>
       <div className="detail-kv">
         <div><span>{t('metricDependency.dataset')}</span><strong>{item.dataset?.name}</strong></div>
         <div><span>{t('metricDependency.metric')}</span><strong>{item.metric?.name}</strong></div>
@@ -724,19 +768,75 @@ function MetricDependencyDetail({ item, onNavigate }) {
   )
 }
 
+/**
+ * Flatten a mapping node into one row per expression.
+ *
+ * `referent_mappings` nest to follow a relationship path -- Runway is
+ * identified through `airport.code` -- so the path is joined with dots and the
+ * expression it resolves to sits beside it. That reads as a table, where the
+ * raw JSON asked the reader to parse the nesting themselves.
+ */
+function mappingRows(node, prefix = '') {
+  if (!node || typeof node !== 'object') return []
+  const rows = []
+  if (node.expression) {
+    rows.push({ path: prefix, expression: expressionText(node.expression), concept: node.concept || '' })
+  }
+  for (const child of node.referent_mappings || []) {
+    const name = child.relationship || ''
+    rows.push(...mappingRows(child, prefix && name ? `${prefix}.${name}` : name || prefix))
+  }
+  return rows
+}
+
+/** A link mapping's children are what it actually maps; its own object mapping repeats the identity. */
+function linkMappingRows(link) {
+  const children = link?.children || []
+  if (!children.length) return mappingRows(link?.object_mapping)
+  return children.flatMap((child) => mappingRows(child.object_mapping, child.relationship || ''))
+}
+
+function MappingRowsTable({ rows, fallback }) {
+  const t = useT()
+  if (!rows.length) {
+    return <pre className="expression-block expression-block--json">{JSON.stringify(fallback || [], null, 2)}</pre>
+  }
+  return (
+    <MemberTable headers={[t('mapping.colPath'), t('mapping.colExpression')]}>
+      {rows.map((row, index) => (
+        <MemberRow key={`${row.path}:${row.expression}:${index}`}>
+          <Cell value={row.path} badge={row.concept} />
+          <Cell value={row.expression} tone="member-table__cell--type" />
+        </MemberRow>
+      ))}
+    </MemberTable>
+  )
+}
+
 function MappingDetail({ item, model, onNavigate }) {
   const t = useT()
   const datasets = referencedDatasets(item, new Set(model.datasets.map((dataset) => dataset.name)))
+  const objectRows = (item.object_mappings || []).flatMap((entry) => mappingRows(entry))
+  const linkRows = (item.link_mappings || []).flatMap(linkMappingRows)
   return (
     <>
-      <p className="detail-description">{t('mapping.description')}</p>
-      <div className="detail-kv">
-        <div><span>{t('mapping.concept')}</span><strong>{item.concept}</strong></div>
-        <div><span>{t('mapping.name')}</span><strong>{item._mappingName}</strong></div>
-      </div>
-      <Section title={t('mapping.referenced')}><LinkList items={datasets.map((name) => ({ kind: 'dataset', name, target: model.datasetByName.get(name) }))} onNavigate={onNavigate} /></Section>
-      <Section title={t('mapping.objectMappings')} count={item.object_mappings?.length || 0}><pre className="expression-block expression-block--json">{JSON.stringify(item.object_mappings || [], null, 2)}</pre></Section>
-      <Section title={t('mapping.linkMappings')} count={item.link_mappings?.length || 0}><pre className="expression-block expression-block--json">{JSON.stringify(item.link_mappings || [], null, 2)}</pre></Section>
+      <Section title={t('mapping.concept')}>
+        <LinkList
+          items={[{ kind: 'concept', name: item.concept, target: model.conceptByName.get(item.concept) }]}
+          onNavigate={onNavigate}
+        />
+      </Section>
+      <Section title={t('mapping.referenced')} count={datasets.length}>
+        <LinkList items={datasets.map((name) => ({ kind: 'dataset', name, target: model.datasetByName.get(name) }))} onNavigate={onNavigate} />
+      </Section>
+      <Section title={t('mapping.objectMappings')} count={objectRows.length}>
+        <MappingRowsTable rows={objectRows} fallback={item.object_mappings} />
+      </Section>
+      {!!(item.link_mappings || []).length && (
+        <Section title={t('mapping.linkMappings')} count={linkRows.length}>
+          <MappingRowsTable rows={linkRows} fallback={item.link_mappings} />
+        </Section>
+      )}
     </>
   )
 }
@@ -752,9 +852,6 @@ function MappingEvidenceDetail({ item, onNavigate }) {
   ].filter(Boolean)
   return (
     <>
-      <p className="detail-description">
-        {datasetEvidence ? t('evidence.datasetDescription') : t('evidence.conceptDescription')}
-      </p>
       <div className="detail-kv">
         <div><span>{t('evidence.ontologyConcept')}</span><strong>{conceptMapping.concept}</strong></div>
         <div>
