@@ -75,6 +75,7 @@ export default function App() {
   const [selection, setSelection] = useState(null)
   const [showRelationships, setShowRelationships] = useState(true)
   const [showMetrics, setShowMetrics] = useState(false)
+  const [showMiniMap, setShowMiniMap] = useState(true)
   const [focusDepth, setFocusDepth] = useState(0)
   const [sidebarKind, setSidebarKind] = useState('all')
 

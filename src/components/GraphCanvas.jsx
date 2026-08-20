@@ -70,7 +70,7 @@ function frameNodes(flow, canvasRef, items, inspectorWidth, duration = 340) {
   return true
 }
 
-function InnerGraphCanvas({ graph, selection, onSelect, onFocus, canvasRef, inspectorWidth }) {
+function InnerGraphCanvas({ graph, selection, showMiniMap, onSelect, onFocus, canvasRef, inspectorWidth }) {
   const t = useT()
   const flow = useReactFlow()
   const tokens = useCssTokens(CANVAS_TOKENS)
@@ -242,7 +242,7 @@ function InnerGraphCanvas({ graph, selection, onSelect, onFocus, canvasRef, insp
     >
       <Background variant={BackgroundVariant.Dots} gap={22} size={1.2} color={tokens['canvas-dots']} />
       <Controls showInteractive={false} position="bottom-left" />
-      {props.showMiniMap !== false && (
+      {showMiniMap !== false && (
         <MiniMap
           pannable
           zoomable
