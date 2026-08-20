@@ -435,9 +435,6 @@ function InnerGraphCanvas(props) {
     if (exporting || !nodes.length) return
     setExporting(true)
     try {
-      // `onlyRenderVisibleElements` is disabled by the exporting state. Two
-      // paints give React Flow time to mount every off-screen node and edge.
-      await nextPaint()
       const viewport = canvasRef.current?.querySelector('.react-flow__viewport')
       const exportNodes = flow.getNodes()
       if (!viewport || !exportNodes.length) return
@@ -494,7 +491,6 @@ function InnerGraphCanvas(props) {
       maxZoom={2.2}
       fitView
       fitViewOptions={{ padding: 0.16, maxZoom: 1.12 }}
-      onlyRenderVisibleElements={!exporting}
       proOptions={{ hideAttribution: true }}
       onNodesChange={handleNodesChange}
       onNodeClick={(_, item) => onSelect(item.data?.selection)}
