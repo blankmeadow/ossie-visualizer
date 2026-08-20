@@ -44,9 +44,10 @@
   --canvas-dots: #b9b9b9;
   --canvas-minimap-mask: rgba(245, 245, 245, 0.82);
   --edge-neutral: #9b9b9b;
-  --node-concept: #477d6b;
-  --node-dataset: #d16f3d;
-  --node-metric: #b98b22;
+  --graph-selection: #4f8f75;
+  --node-concept: #4f8f75;
+  --node-dataset: #729b8b;
+  --node-metric: #8aa89d;
 }
 
 /* Expose the tokens to Tailwind so `bg-surface`, `text-muted`, `border-line`

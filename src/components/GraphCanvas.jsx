@@ -30,10 +30,10 @@ const CANVAS_TOKENS = {
   'canvas-dots': '#b9b9b9',
   'canvas-minimap-mask': 'rgba(245, 245, 245, 0.82)',
   'edge-neutral': '#9b9b9b',
-  'selection': '#ff6d5a',
-  'node-concept': '#477d6b',
-  'node-dataset': '#d16f3d',
-  'node-metric': '#b98b22',
+  'graph-selection': '#4f8f75',
+  'node-concept': '#4f8f75',
+  'node-dataset': '#729b8b',
+  'node-metric': '#8aa89d',
 }
 
 function selectionMatches(left, right) {
@@ -293,11 +293,11 @@ function InnerGraphCanvas(props) {
           label: label || undefined,
           markerEnd: {
             ...item.markerEnd,
-            color: isEdgeHighlighted ? tokens.selection : tokens['edge-neutral'],
+            color: isEdgeHighlighted ? tokens['graph-selection'] : tokens['edge-neutral'],
           },
           labelStyle: {
             ...item.labelStyle,
-            fill: isEdgeHighlighted ? tokens.selection : '#767676',
+            fill: isEdgeHighlighted ? tokens['graph-selection'] : '#767676',
             opacity: dimmed ? 0.38 : 1,
           },
           data: {
@@ -310,7 +310,7 @@ function InnerGraphCanvas(props) {
           style: {
             ...item.style,
             opacity: dimmed ? 0.38 : 1,
-            stroke: isEdgeHighlighted ? tokens.selection : tokens['edge-neutral'],
+            stroke: isEdgeHighlighted ? tokens['graph-selection'] : tokens['edge-neutral'],
             strokeWidth: isEdgeHighlighted ? 2.6 : item.style?.strokeWidth || 1.5,
           },
           zIndex: isEdgeHighlighted ? 100 : 1,

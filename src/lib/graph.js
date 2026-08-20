@@ -2,11 +2,9 @@ import dagre from '@dagrejs/dagre'
 import { MarkerType } from '@xyflow/react'
 import { mappingEvidenceForDataset, referencedDatasets, relationshipKind, roleKind } from './ossie'
 
-// n8n's configurable workflow cards use a 224 × 96 shell. Ossie carries one
-// extra metadata line, so the card stays just 8px taller while keeping the
-// same compact width and visual density.
+// Compact two-row card: kind on the first row, name and badges on the second.
 export const NODE_WIDTH = 224
-export const NODE_HEIGHT = 104
+export const NODE_HEIGHT = 72
 
 // Lazy-load ELK to keep the initial bundle small (~1.4 MB savings).
 let elkInstance = null
@@ -97,9 +95,9 @@ function layoutComponent(nodes, edges, direction, options) {
 function layout(nodes, edges, direction = 'LR', overrides = {}) {
   if (!nodes.length) return []
   const options = {
-    ranksep: direction === 'TB' ? 76 : 96,
-    nodesep: direction === 'TB' ? 38 : 36,
-    componentGap: 70,
+    ranksep: direction === 'TB' ? 64 : 84,
+    nodesep: direction === 'TB' ? 30 : 30,
+    componentGap: 60,
     packWidth: direction === 'TB' ? 1780 : 1960,
     ...overrides,
   }
@@ -228,9 +226,9 @@ function elkLayoutComponent(nodes, edges, direction, options) {
 async function elkLayoutAll(nodes, edges, direction = 'LR', overrides = {}) {
   if (!nodes.length) return []
   const options = {
-    ranksep: direction === 'TB' ? 96 : 118,
-    nodesep: direction === 'TB' ? 56 : 48,
-    componentGap: 86,
+    ranksep: direction === 'TB' ? 72 : 92,
+    nodesep: direction === 'TB' ? 34 : 32,
+    componentGap: 64,
     packWidth: direction === 'TB' ? 1780 : 1960,
     ...overrides,
   }
@@ -282,10 +280,10 @@ function layoutFocusedOntology(nodes, selectedId) {
     .filter((item) => item.id !== selectedId)
     .sort((left, right) => left.id.localeCompare(right.id))
   const columns = others.length <= 8 ? 3 : others.length <= 20 ? 4 : 5
-  const columnGap = 72
-  const rowGap = 74
+  const columnGap = 48
+  const rowGap = 52
   const gridWidth = columns * NODE_WIDTH + (columns - 1) * columnGap
-  const firstRowY = NODE_HEIGHT + 128
+  const firstRowY = NODE_HEIGHT + 90
 
   return [
     {
@@ -676,8 +674,8 @@ function layoutMapping(nodes) {
   const mapping = nodes[1]
   const datasets = nodes.slice(2)
   const columns = Math.min(3, Math.max(1, Math.ceil(Math.sqrt(datasets.length))))
-  const xGap = NODE_WIDTH + 44
-  const yGap = NODE_HEIGHT + 36
+  const xGap = NODE_WIDTH + 36
+  const yGap = NODE_HEIGHT + 30
   const rows = Math.ceil(datasets.length / columns)
   const centerY = Math.max(0, (rows - 1) * yGap / 2)
   return [

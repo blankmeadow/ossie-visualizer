@@ -133,7 +133,7 @@ html, body, #root { height: 100%; margin: 0; padding: 0; overflow: hidden; }
 .toggle span { width: 19px; height: 11px; padding: 2px; border-radius: 999px; background: #cbd2cd; }
 .toggle span::after { content: ''; display: block; width: 7px; height: 7px; border-radius: 50%; background: white; transition: transform .15s; }
 .toggle.is-active { color: var(--ink); }
-.toggle.is-active span { background: var(--accent); }
+.toggle.is-active span { background: var(--graph-selection); }
 .toggle.is-active span::after { transform: translateX(8px); }
 
 .segmented-switch { display: flex; padding: 2px; border: 0; border-radius: 5px; background: #e9e9e9; }
@@ -175,7 +175,7 @@ html, body, #root { height: 100%; margin: 0; padding: 0; overflow: hidden; }
 
 .edge-label-text:hover,
 .edge-label-text.is-active {
-  color: var(--accent);
+  color: var(--graph-selection);
   font-weight: 700;
   opacity: 1 !important;
 }
@@ -192,7 +192,7 @@ html, body, #root { height: 100%; margin: 0; padding: 0; overflow: hidden; }
 .graph-legend { position: absolute; left: 14px; bottom: 76px; display: flex; gap: 13px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 6px; background: rgba(255,255,255,.96); box-shadow: 0 1px 4px rgba(0,0,0,.10); pointer-events: none; }
 .graph-legend span { display: flex; align-items: center; gap: 5px; color: var(--muted); font: 500 8px 'SFMono-Regular', Consolas, monospace; }
 .legend-dot { width: 8px; height: 8px; border-radius: 3px; background: var(--green); }
-.legend-dot--dataset { background: var(--orange); }.legend-dot--metric { background: var(--amber); }.legend-dot--mapping { background: var(--violet); }
+.legend-dot--dataset { background: #729b8b; }.legend-dot--metric { background: #8aa89d; }.legend-dot--mapping { background: #688f7f; }
 .legend-line { width: 17px; border-top: 2px solid var(--edge-neutral); }.legend-line--extends { border-style: dashed; }.legend-line--relation { border-color: var(--edge-neutral); }
 .empty-canvas { height: 100%; display: grid; place-content: center; text-align: center; color: var(--muted); }
 .empty-canvas__mark { width: 48px; height: 48px; margin: auto; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 50%; font: 500 18px 'SFMono-Regular', Consolas, monospace; }
@@ -221,7 +221,7 @@ html, body, #root { height: 100%; margin: 0; padding: 0; overflow: hidden; }
 .chip__desc { font-weight: 400; opacity: 0.85; }
 
 .react-flow__node.selected { z-index: 1000 !important; }
-.react-flow__node.selected > div { outline: none !important; border-color: var(--accent) !important; box-shadow: 0 0 0 2px rgba(255,109,90,.22), 0 6px 16px rgba(255,109,90,.22) !important; transform: translateY(-1px); }
+.react-flow__node.selected > div { outline: none !important; border-color: var(--graph-selection) !important; box-shadow: 0 0 0 2px rgba(79,143,117,.20), 0 6px 16px rgba(79,143,117,.22) !important; transform: translateY(-1px); }
 
 /* A relationship or value type opens stacked on the inspector rather than
    replacing it: the concept it belongs to stays behind the scrim, and the

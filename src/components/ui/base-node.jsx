@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils'
 
 const baseNodeVariants = cva(
   cn(
-    'h-[104px] w-[224px] overflow-hidden rounded-[8px] border px-[12px] py-[9px]',
+    'h-[72px] w-[224px] overflow-hidden rounded-[8px] border px-[11px] py-[9px]',
     'bg-white',
     'transition-[opacity,filter,border-color,box-shadow,transform] duration-150',
   ),
@@ -24,7 +24,7 @@ const baseNodeVariants = cva(
     variants: {
       emphasis: {
         default: 'border-[1.5px] border-[#b9b9b9] shadow-[0_0_0_4px_rgba(0,0,0,.045),0_2px_5px_rgba(0,0,0,.10)]',
-        selected: 'border-2 border-accent ring-2 ring-accent/20 shadow-[0_5px_14px_rgba(255,109,90,.24)] -translate-y-px z-30',
+        selected: 'border-2 border-[#4f8f75] ring-2 ring-[#4f8f75]/20 shadow-[0_5px_14px_rgba(79,143,117,.24)] -translate-y-px z-30',
         related: 'border-[1.5px] border-[#a9a9a9] shadow-[0_0_0_4px_rgba(0,0,0,.045),0_3px_9px_rgba(0,0,0,.12)]',
         dimmed: 'border-[1.5px] border-[#c9c9c9] shadow-[0_2px_5px_rgba(0,0,0,.08)] opacity-[.48] saturate-[.45]',
       },
@@ -52,7 +52,7 @@ function BaseNode({ className, emphasis = 'default', ...props }) {
 }
 
 function BaseNodeHeader({ className, ...props }) {
-  return <div className={cn('flex h-[18px] items-center gap-[6px] text-[#777]', className)} {...props} />
+  return <div className={cn('flex h-[20px] items-center gap-[6px] text-[#777]', className)} {...props} />
 }
 
 function BaseNodeHeaderTitle({ className, ...props }) {
@@ -68,20 +68,20 @@ function BaseNodeHeaderTitle({ className, ...props }) {
 function BaseNodeIcon({ className, ...props }) {
   return (
     <span
-      className={cn('grid size-[18px] place-items-center rounded-[5px]', className)}
+      className={cn('grid size-[20px] place-items-center rounded-[5px]', className)}
       {...props}
     />
   )
 }
 
 function BaseNodeContent({ className, ...props }) {
-  return <div className={cn('mt-[5px]', className)} {...props} />
+  return <div className={cn('mt-[7px] flex min-w-0 items-center gap-[8px]', className)} {...props} />
 }
 
 function BaseNodeTitle({ className, ...props }) {
   return (
     <div
-      className={cn('truncate font-sans text-[14px] leading-[18px] font-medium text-[#2d2d2d]', className)}
+      className={cn('min-w-0 flex-1 truncate font-sans text-[14px] leading-[18px] font-medium text-[#2d2d2d]', className)}
       {...props}
     />
   )
@@ -114,15 +114,15 @@ function BaseNodeDescription({ className, ...props }) {
 }
 
 function BaseNodeFooter({ className, ...props }) {
-  return <div className={cn('mt-[4px] flex h-[11px] gap-[4px] overflow-hidden', className)} {...props} />
+  return <div className={cn('flex max-w-[96px] flex-none justify-end gap-[3px] overflow-hidden', className)} {...props} />
 }
 
 function BaseNodeBadge({ className, ...props }) {
   return (
     <span
       className={cn(
-        'rounded-[3px] bg-[#f1f1f1] px-[4px] py-[1px]',
-        'font-mono text-[7px] leading-[9px] font-medium text-[#666]',
+        'flex-none rounded-[3px] bg-[#f1f1f1] px-[4px] py-[1px]',
+        'font-mono text-[7px] leading-[10px] font-medium text-[#666]',
         className,
       )}
       {...props}

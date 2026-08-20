@@ -4,12 +4,10 @@ import {
   BaseNode,
   BaseNodeBadge,
   BaseNodeContent,
-  BaseNodeDescription,
   BaseNodeFooter,
   BaseNodeHeader,
   BaseNodeHeaderTitle,
   BaseNodeIcon,
-  BaseNodeSubtitle,
   BaseNodeTitle,
 } from './ui/base-node'
 
@@ -29,38 +27,30 @@ const KIND_LABELS = {
   mapping: 'MAPPING',
 }
 
-/** Icon tint per node kind; anything unmapped falls back to the concept green. */
-const KIND_TINTS = {
-  dataset: 'text-orange bg-orange-soft',
-  metric: 'text-amber bg-amber-soft',
-  mapping: 'text-violet bg-violet-soft',
-}
 const DEFAULT_TINT = 'text-green bg-green-soft'
 
 export default function OssieNode({ data, selected }) {
   const Icon = ICONS[data.kind] || CircleDot
   const emphasis = selected ? 'selected' : data.dimmed ? 'dimmed' : data.related ? 'related' : 'default'
+  const tooltip = [data.name, data.subtitle, data.description].filter(Boolean).join(' — ')
 
   return (
-    <BaseNode emphasis={emphasis}>
+    <BaseNode emphasis={emphasis} title={tooltip}>
       {(data.targetHandles || []).map((handle) => <NodeHandle key={handle.id} type="target" handle={handle} />)}
       <BaseNodeHeader>
-        <BaseNodeIcon className={KIND_TINTS[data.kind] || DEFAULT_TINT}>
+        <BaseNodeIcon className={DEFAULT_TINT}>
           <Icon size={13} strokeWidth={2} />
         </BaseNodeIcon>
         <BaseNodeHeaderTitle>{KIND_LABELS[data.kind] || data.kind.toUpperCase()}</BaseNodeHeaderTitle>
       </BaseNodeHeader>
       <BaseNodeContent>
         <BaseNodeTitle title={data.name}>{data.name}</BaseNodeTitle>
-        {!!data.subtitle && <BaseNodeSubtitle title={data.subtitle}>{data.subtitle}</BaseNodeSubtitle>}
-        {/* Rendered even when empty so cards in a rank keep a common height. */}
-        <BaseNodeDescription title={data.description}>{data.description}</BaseNodeDescription>
+        {!!data.badges?.length && (
+          <BaseNodeFooter title={data.badges.join(' · ')}>
+            {data.badges.map((badge) => <BaseNodeBadge key={badge}>{badge}</BaseNodeBadge>)}
+          </BaseNodeFooter>
+        )}
       </BaseNodeContent>
-      {!!data.badges?.length && (
-        <BaseNodeFooter>
-          {data.badges.map((badge) => <BaseNodeBadge key={badge}>{badge}</BaseNodeBadge>)}
-        </BaseNodeFooter>
-      )}
       {(data.sourceHandles || []).map((handle) => <NodeHandle key={handle.id} type="source" handle={handle} />)}
     </BaseNode>
   )
