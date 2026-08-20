@@ -9,9 +9,8 @@ import { cn } from '@/lib/utils'
  * Same shape: a container plus header / title / content / footer slots, so a
  * new node type composes the pieces instead of restating the class soup.
  *
- * `emphasis` carries the three-way highlight the canvas drives when something
- * is selected: the selection itself, its immediate neighbours, and everything
- * else faded back.
+ * `emphasis` carries the canvas highlight states: selection, stable hover,
+ * immediate neighbours, and everything else faded back.
  */
 
 const baseNodeVariants = cva(
@@ -25,6 +24,7 @@ const baseNodeVariants = cva(
       emphasis: {
         default: 'border-[1.5px] border-[#b9b9b9] shadow-[0_0_0_4px_rgba(0,0,0,.045),0_2px_5px_rgba(0,0,0,.10)]',
         selected: 'border-2 border-[#4f8f75] ring-2 ring-[#4f8f75]/20 shadow-[0_5px_14px_rgba(79,143,117,.24)] -translate-y-px z-30',
+        hovered: 'border-[1.5px] border-[#4f8f75] ring-2 ring-[#4f8f75]/14 shadow-[0_4px_12px_rgba(79,143,117,.18)] z-20',
         related: 'border-[1.5px] border-[#a9a9a9] shadow-[0_0_0_4px_rgba(0,0,0,.045),0_3px_9px_rgba(0,0,0,.12)]',
         dimmed: 'border-[1.5px] border-[#c9c9c9] shadow-[0_2px_5px_rgba(0,0,0,.08)] opacity-[.48] saturate-[.45]',
       },
@@ -33,9 +33,9 @@ const baseNodeVariants = cva(
   },
 )
 
-/** Hover lifts a node the same way selection does, but not while it is faded back. */
+/** Hover changes depth without moving the node under the pointer. */
 const hoverable = cn(
-  'hover:border-[#a7a7a7] hover:shadow-[0_4px_11px_rgba(0,0,0,.14)] hover:-translate-y-px',
+  'hover:border-[#a7a7a7] hover:shadow-[0_4px_11px_rgba(0,0,0,.14)]',
 )
 
 function BaseNode({ className, emphasis = 'default', ...props }) {
@@ -43,7 +43,7 @@ function BaseNode({ className, emphasis = 'default', ...props }) {
     <div
       className={cn(
         baseNodeVariants({ emphasis }),
-        emphasis !== 'dimmed' && hoverable,
+        emphasis === 'default' && hoverable,
         className,
       )}
       {...props}

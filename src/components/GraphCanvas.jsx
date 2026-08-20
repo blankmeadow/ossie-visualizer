@@ -333,21 +333,22 @@ function InnerGraphCanvas(props) {
     () => graph.nodes.map((item) => ({
       ...item,
       position: manualPositions[item.id] || item.position,
-      selected: item.id === visualNodeId,
-      zIndex: item.id === visualNodeId ? NODE_LAYER + 1 : NODE_LAYER,
+      selected: item.id === selectedNodeId,
+      zIndex: item.id === selectedNodeId ? NODE_LAYER + 1 : NODE_LAYER,
       data: {
         ...item.data,
+        hovered: item.id === hoveredNodeId,
         dimmed: active.enabled && !active.nodeIds.has(item.id),
         related: active.enabled && active.nodeIds.has(item.id) && item.id !== visualNodeId,
       },
     })),
-    [active, graph.nodes, manualPositions, visualNodeId],
+    [active, graph.nodes, hoveredNodeId, manualPositions, selectedNodeId, visualNodeId],
   )
 
   const edges = useMemo(
     () =>
       graph.edges.map((item) => {
-        const isEdgeSelected = !hoveredNodeId && selectedEdgeIds.has(item.id)
+        const isEdgeSelected = selectedEdgeIds.has(item.id)
         const isConnectedToVisualNode = visualNodeId && (item.source === visualNodeId || item.target === visualNodeId)
         const isEdgeActive = isEdgeSelected || isConnectedToVisualNode
         const isEdgeHovered = item.id === hoveredEdgeId
@@ -358,7 +359,7 @@ function InnerGraphCanvas(props) {
         const markerSize = markerSizeForZoom(markerZoom, strokeWidth, isEdgeHighlighted)
         return {
           ...item,
-          selected: isEdgeHighlighted,
+          selected: isEdgeSelected,
           label: label || undefined,
           markerEnd: {
             ...item.markerEnd,
@@ -384,7 +385,10 @@ function InnerGraphCanvas(props) {
             stroke: isEdgeHighlighted ? tokens['graph-selection'] : tokens['edge-neutral'],
             strokeWidth,
           },
-          zIndex: isEdgeHighlighted ? 100 : 1,
+          // Keep the wide, transparent edge interaction path below nodes.
+          // Otherwise it can steal the pointer as soon as hover highlights an
+          // attached edge, causing an enter/leave loop on the node.
+          zIndex: isEdgeHighlighted ? NODE_LAYER - 1 : 1,
         }
       }),
     [active.enabled, graph.edges, hoveredEdgeId, hoveredNodeId, markerZoom, onSelect, selectedEdgeIds, showEdgeLabels, tokens, visualNodeId],
