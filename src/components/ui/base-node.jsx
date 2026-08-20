@@ -17,14 +17,14 @@ const baseNodeVariants = cva(
   cn(
     'h-[72px] w-[224px] overflow-visible rounded-[8px] border px-[11px] py-[9px]',
     'bg-white',
-    'transition-[opacity,filter,border-color,box-shadow,transform] duration-150',
+    'transition-[opacity,filter,border-color,box-shadow] duration-150',
   ),
   {
     variants: {
       emphasis: {
         default: 'border-[1.5px] border-[#b9b9b9] shadow-[0_0_0_4px_rgba(0,0,0,.045),0_2px_5px_rgba(0,0,0,.10)]',
         selected: 'border-2 border-[#4f8f75] ring-2 ring-[#4f8f75]/20 shadow-[0_5px_14px_rgba(79,143,117,.24)] -translate-y-px z-30',
-        hovered: 'border-[1.5px] border-[#4f8f75] ring-2 ring-[#4f8f75]/14 shadow-[0_4px_12px_rgba(79,143,117,.18)] z-20',
+        hovered: 'border-[1.5px] border-[#4f8f75] shadow-[0_0_0_4px_rgba(79,143,117,.13),0_3px_9px_rgba(79,143,117,.16)] z-20',
         related: 'border-[1.5px] border-[#a9a9a9] shadow-[0_0_0_4px_rgba(0,0,0,.045),0_3px_9px_rgba(0,0,0,.12)]',
         dimmed: 'border-[1.5px] border-[#c9c9c9] shadow-[0_2px_5px_rgba(0,0,0,.08)] opacity-[.48] saturate-[.45]',
       },
@@ -33,17 +33,11 @@ const baseNodeVariants = cva(
   },
 )
 
-/** Hover changes depth without moving the node under the pointer. */
-const hoverable = cn(
-  'hover:border-[#a7a7a7] hover:shadow-[0_4px_11px_rgba(0,0,0,.14)]',
-)
-
 function BaseNode({ className, emphasis = 'default', ...props }) {
   return (
     <div
       className={cn(
         baseNodeVariants({ emphasis }),
-        emphasis === 'default' && hoverable,
         className,
       )}
       {...props}
