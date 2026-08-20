@@ -331,49 +331,47 @@ function InnerGraphCanvas({ graph, selection, showMiniMap, onSelect, onFocus, ca
   }
 
   return (
-    <>
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        nodeTypes={nodeTypes}
-        edgeTypes={edgeTypes}
-        nodesDraggable={false}
-        nodesConnectable={false}
-        elementsSelectable
-        edgesFocusable
-        minZoom={0.08}
-        maxZoom={2.2}
-        fitView
-        fitViewOptions={{ padding: 0.16, maxZoom: 1.12 }}
-        onlyRenderVisibleElements
-        proOptions={{ hideAttribution: true }}
-        onNodeClick={(_, item) => onSelect(item.data?.selection)}
-        onNodeDoubleClick={(_, item) => {
-          onSelect(item.data?.selection)
-          onFocus(1)
-        }}
-        onEdgeClick={(_, item) => onSelect(item.data?.selection)}
-        onEdgeMouseEnter={(_, item) => setHoveredEdgeId(item.id)}
-        onEdgeMouseLeave={() => setHoveredEdgeId('')}
-        onPaneClick={() => onSelect(null)}
-      >
-        <Background variant={BackgroundVariant.Dots} gap={22} size={1.2} color={tokens['canvas-dots']} />
-        {showMiniMap !== false && (
-          <MiniMap
-            pannable
-            zoomable
-            position="bottom-right"
-            nodeColor={(item) => item.data?.kind === 'dataset'
-              ? tokens['node-dataset']
-              : item.data?.kind === 'metric'
-                ? tokens['node-metric']
-                : tokens['node-concept']}
-            maskColor={tokens['canvas-minimap-mask']}
-          />
-        )}
-      </ReactFlow>
+    <ReactFlow
+      nodes={nodes}
+      edges={edges}
+      nodeTypes={nodeTypes}
+      edgeTypes={edgeTypes}
+      nodesDraggable={false}
+      nodesConnectable={false}
+      elementsSelectable
+      edgesFocusable
+      minZoom={0.08}
+      maxZoom={2.2}
+      fitView
+      fitViewOptions={{ padding: 0.16, maxZoom: 1.12 }}
+      onlyRenderVisibleElements
+      proOptions={{ hideAttribution: true }}
+      onNodeClick={(_, item) => onSelect(item.data?.selection)}
+      onNodeDoubleClick={(_, item) => {
+        onSelect(item.data?.selection)
+        onFocus(1)
+      }}
+      onEdgeClick={(_, item) => onSelect(item.data?.selection)}
+      onEdgeMouseEnter={(_, item) => setHoveredEdgeId(item.id)}
+      onEdgeMouseLeave={() => setHoveredEdgeId('')}
+      onPaneClick={() => onSelect(null)}
+    >
+      <Background variant={BackgroundVariant.Dots} gap={22} size={1.2} color={tokens['canvas-dots']} />
       <GraphToolbar {...props} />
-    </>
+      {showMiniMap !== false && (
+        <MiniMap
+          pannable
+          zoomable
+          position="bottom-right"
+          nodeColor={(item) => item.data?.kind === 'dataset'
+            ? tokens['node-dataset']
+            : item.data?.kind === 'metric'
+              ? tokens['node-metric']
+              : tokens['node-concept']}
+          maskColor={tokens['canvas-minimap-mask']}
+        />
+      )}
+    </ReactFlow>
   )
 }
 
