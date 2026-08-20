@@ -34,7 +34,7 @@
    on one number. The fallbacks keep the layout sane before the first paint. */
 .workspace { flex: 1; position: relative; min-height: 0; display: grid; grid-template-columns: var(--sidebar-width, 278px) minmax(0, 1fr); }
 .sidebar, .inspector { min-height: 0; background: var(--surface); }
-.sidebar { position: relative; display: flex; flex-direction: column; border-right: 1px solid var(--line); }
+.sidebar { position: relative; display: flex; flex-direction: column; border-right: 1px solid var(--line); overflow: hidden; }
 
 /* A thin grab strip straddling the panel edge, widened on hover so it is easy
    to catch without stealing clicks from the content beside it. */
@@ -56,7 +56,7 @@
 .sidebar__filter-trigger { width: 27px; height: 27px; display: grid; place-items: center; padding: 0; border: 1px solid transparent; border-radius: 7px; color: #7f8e88; background: transparent; cursor: pointer; }
 .sidebar__filter-trigger:hover, .sidebar__filter-trigger[aria-expanded='true'] { border-color: var(--line); color: var(--green-dark); background: var(--surface-2); }
 .sidebar__filter-trigger.is-active { border-color: #bfd2c8; color: var(--green-dark); background: var(--green-soft); }
-.sidebar__items { min-height: 0; overflow: auto; padding: 7px; }
+.sidebar__items { flex: 1; min-height: 0; overflow-y: auto; padding: 7px; }
 .sidebar__items > button { position: relative; width: 100%; min-height: 54px; display: grid; grid-template-columns: 28px minmax(0,1fr); gap: 8px; align-items: center; padding: 8px 8px; border: 1px solid transparent; border-radius: 8px; background: transparent; text-align: left; cursor: pointer; }
 .sidebar__items > button:hover { background: var(--surface-2); }
 .sidebar__items > button.is-active { border-color: #bdd0c7; background: var(--green-soft); }
@@ -73,27 +73,26 @@
 
 .canvas-panel { position: relative; flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; background: #f2f4ef; }
 
+.react-flow__panel.bottom.center {
+  margin-bottom: 16px;
+  transition: transform 0.2s ease, margin-right 0.2s ease;
+}
+
+.graph-canvas.has-inspector .react-flow__panel.bottom.center {
+  margin-right: calc(var(--inspector-width, 370px) / 2);
+}
+
 .graph-toolbar {
-  position: absolute;
-  bottom: 18px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 15;
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 5px 10px;
   border: 1px solid var(--line);
   border-radius: 12px;
-  background: rgba(251, 252, 249, 0.94);
+  background: rgba(251, 252, 249, 0.95);
   backdrop-filter: blur(12px);
   box-shadow: 0 4px 20px rgba(30, 50, 42, 0.12);
-  transition: left 0.2s ease, transform 0.2s ease;
-}
-
-.graph-canvas.has-inspector ~ .graph-toolbar,
-.graph-canvas.has-inspector .graph-toolbar {
-  left: calc((100% - var(--inspector-width, 370px)) / 2);
+  pointer-events: auto;
 }
 
 .toolbar-group { display: flex; align-items: center; gap: 3px; }

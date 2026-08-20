@@ -4,6 +4,7 @@ import {
   BackgroundVariant,
   Controls,
   MiniMap,
+  Panel,
   ReactFlow,
   ReactFlowProvider,
   useReactFlow,
@@ -357,7 +358,22 @@ function InnerGraphCanvas({ graph, selection, showMiniMap, onSelect, onFocus, ca
       onPaneClick={() => onSelect(null)}
     >
       <Background variant={BackgroundVariant.Dots} gap={22} size={1.2} color={tokens['canvas-dots']} />
-      <GraphToolbar {...props} />
+      <Panel position="bottom-center">
+        <GraphToolbar
+          activeTab={props.activeTab}
+          selection={selection}
+          focusDepth={props.focusDepth}
+          onFocus={onFocus}
+          showRelationships={props.showRelationships}
+          setShowRelationships={props.setShowRelationships}
+          showMetrics={props.showMetrics}
+          setShowMetrics={props.setShowMetrics}
+          showMiniMap={showMiniMap}
+          setShowMiniMap={props.setShowMiniMap}
+          layoutEngine={props.layoutEngine}
+          setLayoutEngine={props.setLayoutEngine}
+        />
+      </Panel>
       {showMiniMap !== false && (
         <MiniMap
           pannable
