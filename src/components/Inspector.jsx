@@ -291,9 +291,10 @@ function LinkList({ items, onNavigate }) {
 }
 
 /** Shared shell for the attribute, relationship and participant tables. */
-function MemberTable({ headers, children }) {
+function MemberTable({ headers, layout, children }) {
+  const layoutClass = layout ? ` member-table--${layout}` : ''
   return (
-    <div className={`member-table member-table--cols${headers.length}`}>
+    <div className={`member-table member-table--cols${headers.length}${layoutClass}`}>
       <div className="member-table__header" aria-hidden="true">
         {headers.map((header) => <span key={header}>{header}</span>)}
       </div>
@@ -410,6 +411,13 @@ function requiresText(member) {
   return String(reqs) || '—'
 }
 
+/** Sparse constraints sit below the member name instead of consuming a column. */
+function ConstraintNote({ value, label }) {
+  if (!value || value === '—') return null
+  const text = `${label}: ${value}`
+  return <small className="member-table__constraint" title={text}>{text}</small>
+}
+
 /** Split members into "declared here" and one section per ancestor. */
 function groupMembers(members, model, t) {
   const groups = new Map()
@@ -494,7 +502,6 @@ function ConceptDetail({ item, model, onNavigate }) {
         {attributes.length ? (
           <MemberTable headers={[
             t('concept.colName'),
-            t('concept.colRequires'),
             t('concept.colType')
           ]}>
             <GroupedRows
@@ -514,8 +521,8 @@ function ConceptDetail({ item, model, onNavigate }) {
                         {isPk && <Key size={12} className="inline-key-icon" title={t('concept.key')} />}
                       </span>
                       {!!descText && <small className="member-table__subdesc" title={descText}>{descText}</small>}
+                      <ConstraintNote value={reqText} label={t('concept.colRequires')} />
                     </div>
-                    <Cell value={reqText} tone="member-table__cell--muted" />
                     <Cell value={typeText} tone="member-table__cell--type" />
                   </MemberRow>
                 )
@@ -530,9 +537,8 @@ function ConceptDetail({ item, model, onNavigate }) {
           <MemberTable headers={[
             t('concept.colRelation'),
             t('concept.colEntity'),
-            t('concept.colRequires'),
             t('concept.colVerbalizes')
-          ]}>
+          ]} layout="relations">
             <GroupedRows
               groups={groupMembers(associations, model, t)}
               renderRow={(member) => {
@@ -552,6 +558,7 @@ function ConceptDetail({ item, model, onNavigate }) {
                         <strong title={member.name}>{member.name}</strong>
                       </span>
                       {!!relDescText && <small className="member-table__subdesc" title={relDescText}>{relDescText}</small>}
+                      <ConstraintNote value={reqText} label={t('concept.colRequires')} />
                     </div>
                     <div className="member-table__name-col">
                       <span className="member-table__name-title" title={targetText}>
@@ -559,7 +566,6 @@ function ConceptDetail({ item, model, onNavigate }) {
                       </span>
                       {!!targetDesc && <small className="member-table__subdesc" title={targetDesc}>{targetDesc}</small>}
                     </div>
-                    <Cell value={reqText} tone="member-table__cell--muted" />
                     <Cell value={verbalText} tone="member-table__cell--muted" />
                   </MemberRow>
                 )

@@ -250,6 +250,8 @@ html, body, #root { height: 100%; margin: 0; padding: 0; overflow: hidden; }
 .member-table--cols2 .member-table__line > :last-child { text-align: right; }
 .member-table--cols3 .member-table__header, .member-table--cols3 .member-table__line { grid-template-columns: minmax(0, 1.8fr) minmax(0, 0.7fr) minmax(80px, auto); }
 .member-table--cols3 .member-table__line > :last-child { text-align: right; }
+.member-table--relations .member-table__header, .member-table--relations .member-table__line { grid-template-columns: minmax(0, .9fr) minmax(0, .9fr) minmax(0, 1.35fr); }
+.member-table--relations .member-table__line > :last-child { text-align: left; }
 .member-table--cols4 .member-table__header, .member-table--cols4 .member-table__line { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.2fr) minmax(0, 0.8fr) minmax(0, 1.4fr); }
 .member-table--cols5 .member-table__header, .member-table--cols5 .member-table__line { grid-template-columns: minmax(0,1.1fr) minmax(0,1.2fr) minmax(0,1fr) minmax(0,0.8fr) minmax(52px,auto); }
 .cell-pk { text-align: right; font: 600 10px var(--font-mono); }
@@ -260,6 +262,7 @@ html, body, #root { height: 100%; margin: 0; padding: 0; overflow: hidden; }
 .member-table__name-title { min-width: 0; width: 100%; display: flex; align-items: center; gap: 3px; overflow: hidden; }
 .member-table__name-title strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 500 10px var(--font-mono); flex: 0 1 auto; }
 .member-table__subdesc { min-width: 0; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font: 400 9px/1.35 var(--font-sans); display: block; }
+.member-table__constraint { min-width: 0; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #8d6513; font: 500 8px/1.35 var(--font-mono); display: block; }
 .member-table__header { padding: 0 8px 4px; color: #777; font: 600 8px var(--font-sans); text-transform: uppercase; letter-spacing: .07em; }
 .member-table__header span:last-child { text-align: right; }
 .member-table__group { display: flex; flex-direction: column; gap: 2px; }
