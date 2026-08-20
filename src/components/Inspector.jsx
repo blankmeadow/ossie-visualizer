@@ -104,6 +104,8 @@ function DetailHeader({ kind, name, target, model, onClose, closeLabel, CloseIco
     ? t(RELATIONSHIP_KIND_KEYS[relationshipKind(target, model)])
     : t(meta.labelKey)
   const badge = chip ?? (kind === 'relationship' ? target?.multiplicity : '')
+  const desc = target?.description
+
   return (
     <header className="inspector__header">
       <div className="inspector__symbol"><Icon size={17} /></div>
@@ -114,6 +116,7 @@ function DetailHeader({ kind, name, target, model, onClose, closeLabel, CloseIco
           {!!badge && <span className="chip chip--amber">{badge}</span>}
           {!!hint && <KindHint key={name} text={hint} />}
         </h2>
+        {!!desc && <p className="inspector__header-desc"> | {desc}</p>}
       </div>
       <button className="icon-button" onClick={onClose} aria-label={closeLabel} title={closeLabel}>
         <CloseIcon size={17} />
@@ -245,13 +248,15 @@ function Chips({ values, tone = 'plain' }) {
 function ExtendsChips({ values, model, onNavigate }) {
   if (!values?.length) return <span className="muted">—</span>
   return (
-    <div className="chips">
+    <div className="chips chips--vertical">
       {values.map((value) => {
         const target = conceptTarget(value, model)
+        const desc = target?.target?.description ? ` | ${target.target.description}` : ''
         if (!target) return <span className="chip chip--violet" key={value}>{value}</span>
         return (
           <button className="chip chip--violet chip--link" key={value} onClick={() => onNavigate(target)}>
-            {value}
+            <strong>{value}</strong>
+            {!!target?.target?.description && <span className="chip__desc"> | {target.target.description}</span>}
           </button>
         )
       })}
@@ -268,11 +273,18 @@ function LinkList({ items, onNavigate }) {
   if (!items.length) return <span className="muted">—</span>
   return (
     <div className="link-list">
-      {items.map((item) => (
-        <button key={`${item.kind}:${item.name}`} onClick={() => onNavigate(item)}>
-          <span>{item.name}</span><ArrowRight size={14} />
-        </button>
-      ))}
+      {items.map((item) => {
+        const desc = item.target?.description || item.description
+        return (
+          <button key={`${item.kind}:${item.name}`} onClick={() => onNavigate(item)}>
+            <span>
+              <strong>{item.name}</strong>
+              {!!desc && <small className="muted"> | {desc}</small>}
+            </span>
+            <ArrowRight size={14} />
+          </button>
+        )
+      })}
     </div>
   )
 }
@@ -373,14 +385,16 @@ function constraintChips(member, concept, model, t) {
 }
 
 /** Split members into "declared here" and one section per ancestor. */
-function groupMembers(members, t) {
+function groupMembers(members, model, t) {
   const groups = new Map()
   for (const member of members) {
     const key = member.inheritedFrom || ''
     if (!groups.has(key)) {
+      const ancestor = key && model ? model.conceptByName.get(key) : null
+      const descText = ancestor?.description ? ` | ${ancestor.description}` : ''
       groups.set(key, {
         key,
-        label: key ? t('concept.groupInherited', { name: key }) : t('concept.groupOwn'),
+        label: key ? `${t('concept.groupInherited', { name: key })}${descText}` : t('concept.groupOwn'),
         items: [],
       })
     }
@@ -446,7 +460,17 @@ function ConceptDetail({ item, model, onNavigate }) {
 
   return (
     <>
-      <p className="detail-description">{item.description || t('inspector.noDescription')}</p>
+      <div className="concept-detail__hero">
+        {!!item.identify_by?.length && (
+          <p className="detail-identity">
+            <strong>ID ({t('concept.identity')}):</strong> <code>{item.identify_by.join(', ')}</code>
+            {!!item.description && <span className="detail-identity__desc"> | {item.description}</span>}
+          </p>
+        )}
+        {!item.identify_by?.length && (
+          <p className="detail-description">{item.description || t('inspector.noDescription')}</p>
+        )}
+      </div>
       {!!item.extends?.length && <Section title={t('concept.extends')}><ExtendsChips values={item.extends} model={model} onNavigate={onNavigate} /></Section>}
       {!!item.derived_by?.length && <Section title={t('concept.derivedBy')}><RuleList values={item.derived_by} /></Section>}
       {!!item.requires?.length && <Section title={t('concept.requires')}><RuleList values={item.requires} /></Section>}
@@ -455,7 +479,7 @@ function ConceptDetail({ item, model, onNavigate }) {
         {attributes.length ? (
           <MemberTable headers={[t('concept.colName'), t('concept.colType'), t('concept.colConstraint')]}>
             <GroupedRows
-              groups={groupMembers(attributes, t)}
+              groups={groupMembers(attributes, model, t)}
               renderRow={(member) => {
                 const types = attributeTypes(member, model, t)
                 return (
@@ -492,7 +516,7 @@ function ConceptDetail({ item, model, onNavigate }) {
         {associations.length ? (
           <MemberTable headers={[t('concept.colName'), t('concept.colTarget'), t('concept.colConstraint')]}>
             <GroupedRows
-              groups={groupMembers(associations, t)}
+              groups={groupMembers(associations, model, t)}
               renderRow={(member) => {
                 const targets = (member.relationship.roles || []).map((role) => role.concept)
                 const first = targets[0]

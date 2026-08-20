@@ -100,6 +100,7 @@ const MESSAGES = {
     'kind.mapping': 'CONCEPT MAPPING',
     'kind.mappingEvidence': 'MAPPING EVIDENCE',
 
+    'concept.identity': '标识符',
     'concept.extends': '继承自',
     'concept.derivedBy': 'Derived by',
     'concept.requires': 'Requires',
@@ -333,6 +334,7 @@ const MESSAGES = {
     'kind.mapping': 'CONCEPT MAPPING',
     'kind.mappingEvidence': 'MAPPING EVIDENCE',
 
+    'concept.identity': 'Identity',
     'concept.extends': 'Extends',
     'concept.derivedBy': 'Derived by',
     'concept.requires': 'Requires',

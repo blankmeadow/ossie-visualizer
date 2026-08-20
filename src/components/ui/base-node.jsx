@@ -24,7 +24,7 @@ const baseNodeVariants = cva(
     variants: {
       emphasis: {
         default: 'border-[#c9d5cf] shadow-[0_8px_22px_rgba(30,50,42,.10)]',
-        selected: 'border-[#56816e] shadow-[0_12px_30px_rgba(30,70,55,.18)] -translate-y-px',
+        selected: 'border-2 border-[#10b981] ring-4 ring-[#10b981]/30 shadow-[0_0_0_1px_#059669,0_16px_36px_rgba(16,185,129,.35)] -translate-y-1 z-30',
         related: 'border-[#9ab4a8] shadow-[0_8px_24px_rgba(30,70,55,.12)]',
         dimmed: 'border-[#c9d5cf] shadow-[0_8px_22px_rgba(30,50,42,.10)] opacity-[.16] saturate-[.35]',
       },
