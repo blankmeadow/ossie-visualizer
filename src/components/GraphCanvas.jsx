@@ -188,7 +188,25 @@ function GraphToolbar(props) {
   )
 }
 
-function InnerGraphCanvas({ graph, selection, showMiniMap, onSelect, onFocus, canvasRef, inspectorWidth, ...props }) {
+function InnerGraphCanvas(props) {
+  const {
+    graph,
+    selection,
+    showMiniMap,
+    onSelect,
+    onFocus,
+    canvasRef,
+    inspectorWidth,
+    activeTab,
+    showRelationships,
+    setShowRelationships,
+    showMetrics,
+    setShowMetrics,
+    setShowMiniMap,
+    layoutEngine,
+    setLayoutEngine,
+    focusDepth,
+  } = props
   const t = useT()
   const flow = useReactFlow()
   const tokens = useCssTokens(CANVAS_TOKENS)
@@ -232,10 +250,6 @@ function InnerGraphCanvas({ graph, selection, showMiniMap, onSelect, onFocus, ca
     () => graph.nodes.map((item) => ({
       ...item,
       selected: item.id === selectedNodeId,
-      // Above every edge. Edges carry an explicit z-index so the selected one
-      // draws over its neighbours, and React Flow leaves nodes at 0, which put
-      // every edge on top of every card: a line crossing a node hid part of it
-      // and answered the click there with its own relationship.
       zIndex: NODE_LAYER,
       data: {
         ...item.data,
@@ -321,16 +335,6 @@ function InnerGraphCanvas({ graph, selection, showMiniMap, onSelect, onFocus, ca
     return () => window.clearTimeout(timeout)
   }, [canvasRef, flow, graph.edges, graph.nodes, inspectorWidth, selectedEdgeIds, selectedEdgeKey])
 
-  if (!nodes.length) {
-    return (
-      <div className="empty-canvas">
-        <div className="empty-canvas__mark">∅</div>
-        <h3>{t('canvas.emptyTitle')}</h3>
-        <p>{t('canvas.emptyBody')}</p>
-      </div>
-    )
-  }
-
   return (
     <ReactFlow
       nodes={nodes}
@@ -358,23 +362,32 @@ function InnerGraphCanvas({ graph, selection, showMiniMap, onSelect, onFocus, ca
       onPaneClick={() => onSelect(null)}
     >
       <Background variant={BackgroundVariant.Dots} gap={22} size={1.2} color={tokens['canvas-dots']} />
+      {!nodes.length && (
+        <Panel position="top-center" style={{ marginTop: '120px' }}>
+          <div className="empty-canvas" style={{ height: 'auto' }}>
+            <div className="empty-canvas__mark">∅</div>
+            <h3>{t('canvas.emptyTitle')}</h3>
+            <p>{t('canvas.emptyBody')}</p>
+          </div>
+        </Panel>
+      )}
       <Panel position="bottom-center">
         <GraphToolbar
-          activeTab={props.activeTab}
+          activeTab={activeTab}
           selection={selection}
-          focusDepth={props.focusDepth}
+          focusDepth={focusDepth}
           onFocus={onFocus}
-          showRelationships={props.showRelationships}
-          setShowRelationships={props.setShowRelationships}
-          showMetrics={props.showMetrics}
-          setShowMetrics={props.setShowMetrics}
+          showRelationships={showRelationships}
+          setShowRelationships={setShowRelationships}
+          showMetrics={showMetrics}
+          setShowMetrics={setShowMetrics}
           showMiniMap={showMiniMap}
-          setShowMiniMap={props.setShowMiniMap}
-          layoutEngine={props.layoutEngine}
-          setLayoutEngine={props.setLayoutEngine}
+          setShowMiniMap={setShowMiniMap}
+          layoutEngine={layoutEngine}
+          setLayoutEngine={setLayoutEngine}
         />
       </Panel>
-      {showMiniMap !== false && (
+      {showMiniMap !== false && nodes.length > 0 && (
         <MiniMap
           pannable
           zoomable
