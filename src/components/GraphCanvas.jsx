@@ -507,10 +507,9 @@ function InnerGraphCanvas(props) {
     >
       <Background
         variant={BackgroundVariant.Dots}
-        gap={18}
-        size={1.25}
+        gap={16}
+        size={1}
         color={tokens['canvas-dots']}
-        bgColor={tokens.canvas}
       />
       {!nodes.length && (
         <Panel position="top-center" style={{ marginTop: '120px' }}>
