@@ -460,13 +460,6 @@ function ConceptDetail({ item, model, onNavigate }) {
 
   return (
     <>
-      {!!item.identify_by?.length && (
-        <div className="concept-detail__hero">
-          <p className="detail-identity">
-            <strong>ID ({t('concept.identity')}):</strong> <code>{item.identify_by.join(', ')}</code>
-          </p>
-        </div>
-      )}
       {!!item.extends?.length && <Section title={t('concept.extends')}><ExtendsChips values={item.extends} model={model} onNavigate={onNavigate} /></Section>}
       {!!item.derived_by?.length && <Section title={t('concept.derivedBy')}><RuleList values={item.derived_by} /></Section>}
       {!!item.requires?.length && <Section title={t('concept.requires')}><RuleList values={item.requires} /></Section>}
