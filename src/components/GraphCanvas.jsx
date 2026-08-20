@@ -71,7 +71,123 @@ function frameNodes(flow, canvasRef, items, inspectorWidth, duration = 340) {
   return true
 }
 
-function InnerGraphCanvas({ graph, selection, showMiniMap, onSelect, onFocus, canvasRef, inspectorWidth }) {
+function Toggle({ checked, onChange, label }) {
+  return (
+    <button className={`toggle ${checked ? 'is-active' : ''}`} onClick={() => onChange(!checked)}>
+      <span />
+      {label}
+    </button>
+  )
+}
+
+function GraphToolbar(props) {
+  const t = useT()
+  const flow = useReactFlow()
+  const {
+    activeTab,
+    selection,
+    focusDepth,
+    onFocus,
+    showRelationships,
+    setShowRelationships,
+    showMetrics,
+    setShowMetrics,
+    showMiniMap,
+    setShowMiniMap,
+    layoutEngine,
+    setLayoutEngine,
+  } = props
+
+  return (
+    <div className="graph-toolbar">
+      <div className="toolbar-group">
+        <button
+          className="toolbar-btn"
+          onClick={() => flow.zoomOut({ duration: 200 })}
+          title={t('toolbar.zoomOut')}
+        >
+          <ZoomOut size={14} />
+        </button>
+        <button
+          className="toolbar-btn toolbar-btn--text"
+          onClick={() => flow.fitView({ padding: 0.16, duration: 250 })}
+          title={t('toolbar.fitView')}
+        >
+          <Maximize2 size={13} />
+          <span>{t('toolbar.fit')}</span>
+        </button>
+        <button
+          className="toolbar-btn"
+          onClick={() => flow.zoomIn({ duration: 200 })}
+          title={t('toolbar.zoomIn')}
+        >
+          <ZoomIn size={14} />
+        </button>
+      </div>
+
+      <div className="toolbar-divider" />
+
+      <div className="toolbar-group">
+        {activeTab === 'ontology' && (
+          <Toggle
+            checked={showRelationships}
+            onChange={setShowRelationships}
+            label={t('toolbar.relationships')}
+          />
+        )}
+        {activeTab === 'semantic' && (
+          <Toggle
+            checked={showMetrics}
+            onChange={setShowMetrics}
+            label={t('toolbar.metrics')}
+          />
+        )}
+        <Toggle
+          checked={showMiniMap}
+          onChange={setShowMiniMap}
+          label={t('toolbar.miniMap')}
+        />
+      </div>
+
+      <div className="toolbar-divider" />
+
+      <div className="segmented-switch" title={t('toolbar.layoutHint')}>
+        {['dagre', 'elk'].map((engine) => (
+          <button
+            key={engine}
+            className={layoutEngine === engine ? 'is-active' : ''}
+            onClick={() => setLayoutEngine(engine)}
+          >
+            {engine === 'dagre' ? 'Dagre' : 'ELK'}
+          </button>
+        ))}
+      </div>
+
+      {activeTab !== 'mapping' && (
+        <>
+          <div className="toolbar-divider" />
+          <div
+            className="segmented-switch"
+            title={selection ? t('toolbar.focusHint') : t('toolbar.focusHintEmpty')}
+          >
+            {[0, 1, 2].map((depth) => (
+              <button
+                key={depth}
+                disabled={!selection && depth > 0}
+                className={focusDepth === depth ? 'is-active' : ''}
+                onClick={() => onFocus(depth)}
+              >
+                {depth === 0 ? t('toolbar.depthAll') : t('toolbar.depthHops', { count: depth })}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+function InnerGraphCanvas({ graph, selection, showMiniMap, onSelect, onFocus, canvasRef, inspectorWidth, ...props }) {
   const t = useT()
   const flow = useReactFlow()
   const tokens = useCssTokens(CANVAS_TOKENS)
