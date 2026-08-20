@@ -1,4 +1,4 @@
-import { lazy, Suspense, useMemo, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import {
   AlertTriangle,
   Braces,
@@ -76,6 +76,7 @@ export default function App() {
   const [showRelationships, setShowRelationships] = useState(true)
   const [showMetrics, setShowMetrics] = useState(false)
   const [showMiniMap, setShowMiniMap] = useState(true)
+  const [layoutEngine, setLayoutEngine] = useState('dagre')
   const [focusDepth, setFocusDepth] = useState(0)
   const [sidebarKind, setSidebarKind] = useState('all')
 
@@ -123,25 +124,31 @@ export default function App() {
       ? model?.conceptMappings[0]
       : null
 
-  const graph = useMemo(() => {
-    if (!model) return { nodes: [], edges: [] }
+  // Graph layout — supports both sync Dagre and async ELK.
+  const [graph, setGraph] = useState({ nodes: [], edges: [] })
+  useEffect(() => {
+    if (!model) { setGraph({ nodes: [], edges: [] }); return }
+    let cancelled = false
+    const opts = { layoutEngine }
+    let result
     if (activeTab === 'ontology') {
-      return buildOntologyGraph(model, {
-        showRelationships,
-        selectedName: selectedGraphName,
-        depth: focusDepth,
-      })
+      result = buildOntologyGraph(model, { ...opts, showRelationships, selectedName: selectedGraphName, depth: focusDepth })
+    } else if (activeTab === 'semantic') {
+      result = buildSemanticGraph(model, { ...opts, showMetrics, selectedName: selectedGraphName, depth: focusDepth })
+    } else if (activeTab === 'mapping') {
+      result = buildMappingGraph(model, selectedMapping, opts)
+    } else {
+      setGraph({ nodes: [], edges: [] })
+      return
     }
-    if (activeTab === 'semantic') {
-      return buildSemanticGraph(model, {
-        showMetrics,
-        selectedName: selectedGraphName,
-        depth: focusDepth,
-      })
+    // ELK returns a Promise, Dagre returns a plain object
+    if (result && typeof result.then === 'function') {
+      result.then((g) => { if (!cancelled) setGraph(g) })
+    } else {
+      setGraph(result)
     }
-    if (activeTab === 'mapping') return buildMappingGraph(model, selectedMapping)
-    return { nodes: [], edges: [] }
-  }, [model, activeTab, showRelationships, showMetrics, focusDepth, selectedGraphName, selectedMapping])
+    return () => { cancelled = true }
+  }, [model, activeTab, showRelationships, showMetrics, focusDepth, selectedGraphName, selectedMapping, layoutEngine])
 
   const handleImport = (text) => {
     const result = parseOssie(text)
@@ -281,6 +288,8 @@ export default function App() {
               setShowMetrics={setShowMetrics}
               showMiniMap={showMiniMap}
               setShowMiniMap={setShowMiniMap}
+              layoutEngine={layoutEngine}
+              setLayoutEngine={setLayoutEngine}
               focusDepth={focusDepth}
               setFocusDepth={setFocusDepth}
               selection={selection}
@@ -439,13 +448,24 @@ function Sidebar({ activeTab, items, query, onQuery, selectedKind, onKind, selec
 
 function GraphToolbar(props) {
   const t = useT()
-  const { activeTab, selection, focusDepth, setFocusDepth } = props
+  const { activeTab, selection, focusDepth, setFocusDepth, layoutEngine, setLayoutEngine } = props
   return (
     <div className="graph-toolbar">
       <div className="graph-toolbar__actions">
         {activeTab === 'ontology' && <Toggle checked={props.showRelationships} onChange={props.setShowRelationships} label={t('toolbar.relationships')} />}
         {activeTab === 'semantic' && <Toggle checked={props.showMetrics} onChange={props.setShowMetrics} label={t('toolbar.metrics')} />}
         <Toggle checked={props.showMiniMap} onChange={props.setShowMiniMap} label={t('toolbar.miniMap')} />
+        <div className="depth-switch" title={t('toolbar.layoutHint')}>
+          {['dagre', 'elk'].map((engine) => (
+            <button
+              key={engine}
+              className={layoutEngine === engine ? 'is-active' : ''}
+              onClick={() => setLayoutEngine(engine)}
+            >
+              {engine === 'dagre' ? 'Dagre' : 'ELK'}
+            </button>
+          ))}
+        </div>
         {activeTab !== 'mapping' && (
           <div className="depth-switch" title={selection ? t('toolbar.focusHint') : t('toolbar.focusHintEmpty')}>
             {[0, 1, 2].map((depth) => (

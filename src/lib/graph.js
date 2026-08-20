@@ -5,6 +5,16 @@ import { mappingEvidenceForDataset, referencedDatasets, relationshipKind, roleKi
 export const NODE_WIDTH = 248
 export const NODE_HEIGHT = 136
 
+// Lazy-load ELK to keep the initial bundle small (~1.4 MB savings).
+let elkInstance = null
+async function getElk() {
+  if (!elkInstance) {
+    const ELK = (await import('elkjs/lib/elk.bundled.js')).default
+    elkInstance = new ELK()
+  }
+  return elkInstance
+}
+
 function connectedComponents(nodes, edges) {
   const adjacency = new Map(nodes.map((item) => [item.id, new Set()]))
   for (const item of edges) {
@@ -32,6 +42,8 @@ function connectedComponents(nodes, edges) {
   }
   return components.sort((left, right) => right.length - left.length || left[0].localeCompare(right[0]))
 }
+
+// ─── Dagre layout ────────────────────────────────────────────────────────────
 
 function layoutComponent(nodes, edges, direction, options) {
   const graph = new dagre.graphlib.Graph().setDefaultEdgeLabel(() => ({}))
@@ -124,6 +136,139 @@ function layout(nodes, edges, direction = 'LR', overrides = {}) {
   }
   return result
 }
+
+// ─── ELK layout ──────────────────────────────────────────────────────────────
+
+const ELK_DIRECTION = { TB: 'DOWN', LR: 'RIGHT' }
+
+function elkLayoutComponent(nodes, edges, direction, options) {
+  const elkDir = ELK_DIRECTION[direction] || 'DOWN'
+
+  // Build port lists per node from edges, so ELK knows how many connections
+  // each side of a node carries and can space them properly.
+  const portMap = new Map(nodes.map((item) => [item.id, []]))
+  const edgePorts = new Map()
+  for (const item of edges) {
+    const sourcePortId = `source:${item.id}`
+    const targetPortId = `target:${item.id}`
+    const sourceSide = item.data?.rankReversed
+      ? (direction === 'TB' ? 'NORTH' : 'WEST')
+      : (direction === 'TB' ? 'SOUTH' : 'EAST')
+    const targetSide = item.data?.rankReversed
+      ? (direction === 'TB' ? 'SOUTH' : 'EAST')
+      : (direction === 'TB' ? 'NORTH' : 'WEST')
+    portMap.get(item.source)?.push({ id: sourcePortId, side: sourceSide })
+    portMap.get(item.target)?.push({ id: targetPortId, side: targetSide })
+    edgePorts.set(item.id, { sourcePortId, targetPortId })
+  }
+
+  const elkGraph = {
+    id: 'root',
+    layoutOptions: {
+      'elk.algorithm': 'layered',
+      'elk.direction': elkDir,
+      'org.eclipse.elk.portConstraints': 'FIXED_ORDER',
+      'elk.spacing.nodeNode': String(options.nodesep),
+      'elk.layered.spacing.nodeNodeBetweenLayers': String(options.ranksep),
+      'elk.layered.nodePlacement.strategy': 'BRANDES_KOEPF',
+      'elk.layered.considerModelOrder.strategy': 'NODES_AND_EDGES',
+      'elk.edgeRouting': 'ORTHOGONAL',
+    },
+    children: nodes.map((item) => ({
+      id: item.id,
+      width: NODE_WIDTH,
+      height: NODE_HEIGHT,
+      properties: { 'org.eclipse.elk.portConstraints': 'FIXED_ORDER' },
+      ports: (portMap.get(item.id) || []).map((port, index) => ({
+        id: port.id,
+        properties: {
+          'org.eclipse.elk.port.side': port.side,
+          'org.eclipse.elk.port.index': String(index),
+        },
+      })),
+    })),
+    edges: edges.map((item) => {
+      const ports = edgePorts.get(item.id)
+      return {
+        id: item.id,
+        sources: [ports.sourcePortId],
+        targets: [ports.targetPortId],
+      }
+    }),
+  }
+
+  return getElk().then((instance) => instance.layout(elkGraph)).then((layoutedGraph) => {
+    let minX = Infinity
+    let minY = Infinity
+    let maxX = -Infinity
+    let maxY = -Infinity
+    const positioned = nodes.map((item) => {
+      const elkChild = layoutedGraph.children?.find((c) => c.id === item.id)
+      const x = elkChild?.x ?? 0
+      const y = elkChild?.y ?? 0
+      minX = Math.min(minX, x)
+      minY = Math.min(minY, y)
+      maxX = Math.max(maxX, x + NODE_WIDTH)
+      maxY = Math.max(maxY, y + NODE_HEIGHT)
+      return { ...item, position: { x, y }, data: { ...item.data, direction } }
+    })
+    return {
+      nodes: positioned,
+      width: Math.max(NODE_WIDTH, maxX - minX),
+      height: Math.max(NODE_HEIGHT, maxY - minY),
+      minX,
+      minY,
+    }
+  })
+}
+
+async function elkLayoutAll(nodes, edges, direction = 'LR', overrides = {}) {
+  if (!nodes.length) return []
+  const options = {
+    ranksep: direction === 'TB' ? 96 : 118,
+    nodesep: direction === 'TB' ? 56 : 48,
+    componentGap: 86,
+    packWidth: direction === 'TB' ? 1780 : 1960,
+    ...overrides,
+  }
+  const nodeById = new Map(nodes.map((item) => [item.id, item]))
+  const components = connectedComponents(nodes, edges)
+  const layouts = await Promise.all(components.map((ids) => {
+    const idSet = new Set(ids)
+    return elkLayoutComponent(
+      ids.map((id) => nodeById.get(id)),
+      edges.filter((item) => idSet.has(item.source) && idSet.has(item.target)),
+      direction,
+      options,
+    )
+  }))
+
+  const result = []
+  let cursorX = 0
+  let cursorY = 0
+  let rowHeight = 0
+  for (const component of layouts) {
+    if (cursorX > 0 && cursorX + component.width > options.packWidth) {
+      cursorX = 0
+      cursorY += rowHeight + options.componentGap
+      rowHeight = 0
+    }
+    for (const item of component.nodes) {
+      result.push({
+        ...item,
+        position: {
+          x: item.position.x - component.minX + cursorX,
+          y: item.position.y - component.minY + cursorY,
+        },
+      })
+    }
+    cursorX += component.width + options.componentGap
+    rowHeight = Math.max(rowHeight, component.height)
+  }
+  return result
+}
+
+// ─── Shared ──────────────────────────────────────────────────────────────────
 
 function layoutFocusedOntology(nodes, selectedId) {
   if (!nodes.length) return []
@@ -285,7 +430,16 @@ function attachHandles(nodes, edges, direction) {
   }
 }
 
-function graphResult(nodes, edges, direction, positioner = layout) {
+/**
+ * Run layout and attach handles. Supports both Dagre (sync) and ELK (async).
+ * Returns a plain object when using Dagre, or a Promise when using ELK.
+ */
+function graphResult(nodes, edges, direction, positioner = layout, engine = 'dagre') {
+  if (engine === 'elk') {
+    return elkLayoutAll(nodes, edges, direction).then((positioned) =>
+      attachHandles(positioned, edges, direction),
+    )
+  }
   return attachHandles(positioner(nodes, edges, direction), edges, direction)
 }
 
@@ -298,6 +452,7 @@ function graphResult(nodes, edges, direction, positioner = layout) {
  * different kinds on the same footing.
  */
 export function buildOntologyGraph(model, options = {}) {
+  const layoutEngine = options.layoutEngine || 'dagre'
   const showRelationships = options.showRelationships ?? false
   const selectedName = options.selectedName || ''
   const depth = options.depth ?? 0
@@ -443,10 +598,11 @@ export function buildOntologyGraph(model, options = {}) {
   const positioner = selectedName && depth > 0
     ? (items) => layoutFocusedOntology(items, selectedName)
     : layout
-  return graphResult(nodes, edges, 'TB', positioner)
+  return graphResult(nodes, edges, 'TB', positioner, layoutEngine)
 }
 
 export function buildSemanticGraph(model, options = {}) {
+  const layoutEngine = options.layoutEngine || 'dagre'
   const showMetrics = options.showMetrics ?? false
   const selectedName = options.selectedName || ''
   const includeMetrics = showMetrics || selectedName.startsWith('metric:')
@@ -495,7 +651,7 @@ export function buildSemanticGraph(model, options = {}) {
     }
   }
 
-  if (!selectedName || depth === 0) return graphResult(nodes, edges, 'TB')
+  if (!selectedName || depth === 0) return graphResult(nodes, edges, 'TB', layout, layoutEngine)
   const adjacency = new Map(nodes.map((item) => [item.id, new Set()]))
   edges.forEach((item) => {
     adjacency.get(item.source)?.add(item.target)
@@ -515,7 +671,7 @@ export function buildSemanticGraph(model, options = {}) {
   }
   const filteredNodes = nodes.filter((item) => visible.has(item.id))
   const filteredEdges = edges.filter((item) => visible.has(item.source) && visible.has(item.target))
-  return graphResult(filteredNodes, filteredEdges, 'TB')
+  return graphResult(filteredNodes, filteredEdges, 'TB', layout, layoutEngine)
 }
 
 function layoutMapping(nodes) {
@@ -541,7 +697,8 @@ function layoutMapping(nodes) {
   ]
 }
 
-export function buildMappingGraph(model, conceptMapping) {
+export function buildMappingGraph(model, conceptMapping, options = {}) {
+  const layoutEngine = options.layoutEngine || 'dagre'
   if (!conceptMapping) return { nodes: [], edges: [] }
   const datasetNames = new Set(model.datasets.map((dataset) => dataset.name))
   const referenced = referencedDatasets(conceptMapping, datasetNames)
@@ -589,6 +746,11 @@ export function buildMappingGraph(model, conceptMapping) {
           target: { type: 'dataset-mapping', conceptMapping, dataset, evidence },
         },
       ),
+    )
+  }
+  if (layoutEngine === 'elk') {
+    return elkLayoutAll(nodes, edges, 'LR').then((positioned) =>
+      attachHandles(positioned, edges, 'LR'),
     )
   }
   const positioned = layoutMapping(nodes)

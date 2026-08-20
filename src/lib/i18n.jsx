@@ -66,6 +66,7 @@ const MESSAGES = {
     'toolbar.depthHops': '{count} 跳',
     'toolbar.focusHint': '按当前选择聚焦',
     'toolbar.focusHintEmpty': '选择节点后可聚焦',
+    'toolbar.layoutHint': '切换布局算法',
 
     'legend.entityType': 'EntityType',
     'legend.extends': 'extends',
@@ -309,6 +310,7 @@ const MESSAGES = {
     'toolbar.depthHops': '{count} hop',
     'toolbar.focusHint': 'Focus on the current selection',
     'toolbar.focusHintEmpty': 'Select a node to focus',
+    'toolbar.layoutHint': 'Switch layout algorithm',
 
     'legend.entityType': 'EntityType',
     'legend.extends': 'extends',
