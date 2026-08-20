@@ -103,7 +103,7 @@ function DetailHeader({ kind, name, target, model, onClose, closeLabel, CloseIco
   const eyebrow = kind === 'relationship'
     ? t(RELATIONSHIP_KIND_KEYS[relationshipKind(target, model)])
     : t(meta.labelKey)
-  const badge = chip ?? (kind === 'relationship' ? target?.multiplicity : '')
+  const badge = chip ?? ''
   const desc = target?.description
 
   return (
@@ -373,10 +373,6 @@ function constraintChips(member, concept, model, t) {
       ? t('concept.keyIndexed', { index: member.keyIndex + 1 })
       : t('concept.key'))
   }
-  if (member.relationship.multiplicity) {
-    const mult = member.relationship.multiplicity
-    chips.push(t(`multiplicity.${mult}`, { defaultValue: mult }))
-  }
   const requires = member.relationship.requires?.length || 0
   if (requires) chips.push(t('concept.requiresCount', { count: requires }))
   const facets = (member.relationship.roles || []).reduce((total, role) => {
@@ -389,7 +385,6 @@ function constraintChips(member, concept, model, t) {
 
 function constraintChipsWithoutPk(member, concept, model, t) {
   const chips = []
-  if (member.relationship.multiplicity) chips.push(member.relationship.multiplicity)
   const requires = member.relationship.requires?.length || 0
   if (requires) chips.push(t('concept.requiresCount', { count: requires }))
   const facets = (member.relationship.roles || []).reduce((total, role) => {
