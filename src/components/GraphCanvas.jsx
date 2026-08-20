@@ -26,6 +26,7 @@ const edgeTypes = { relationshipEdge: RelationshipEdge }
 const nodeWidth = NODE_WIDTH
 const nodeHeight = NODE_HEIGHT
 const EMPTY_POSITIONS = Object.freeze({})
+const EMPTY_SIZES = Object.freeze({})
 const selectZoom = (state) => state.transform[2]
 
 // Fallbacks match the light-theme values in styles/tokens.css; the live values
@@ -276,6 +277,8 @@ function InnerGraphCanvas(props) {
   const graphNodesRef = useRef(graph.nodes)
   const selectedNodeFrameRef = useRef(null)
   const edgeFrameNodesRef = useRef([])
+  const nodeCacheRef = useRef(new Map())
+  const [nodeSizes, setNodeSizes] = useState(EMPTY_SIZES)
   const [nodesLocked, setNodesLocked] = useState(true)
   const [exporting, setExporting] = useState(false)
   const [exportZoom, setExportZoom] = useState(null)
@@ -319,19 +322,46 @@ function InnerGraphCanvas(props) {
     return nodeIds
   }, [graph.edges, selectedEdgeIds, selectedNodeId])
 
-  const nodes = useMemo(
-    () => graph.nodes.map((item) => ({
-      ...item,
-      position: manualPositions[item.id] || item.position,
-      selected: item.id === selectedNodeId,
-      zIndex: item.id === selectedNodeId ? 1000 : 0,
-      data: {
-        ...item.data,
-        related: activeNodeIds.has(item.id) && item.id !== selectedNodeId,
-      },
-    })),
-    [activeNodeIds, graph.nodes, manualPositions, selectedNodeId],
-  )
+  // React Flow keeps a node's measurements only for as long as it keeps seeing
+  // the same node object, and it hides any node it considers unmeasured along
+  // with every edge attached to it. Dragging rebuilds this array on every
+  // pointer frame, so nodes carry the measured size back in and untouched nodes
+  // keep their identity; otherwise the graph blanks out until the resize
+  // observer has measured it all over again, frame after frame.
+  const nodes = useMemo(() => {
+    const previous = nodeCacheRef.current
+    const cache = new Map()
+    const items = graph.nodes.map((item) => {
+      const position = manualPositions[item.id] || item.position
+      const selected = item.id === selectedNodeId
+      const related = activeNodeIds.has(item.id) && !selected
+      const measured = nodeSizes[item.id]
+      const cached = previous.get(item.id)
+      if (
+        cached
+        && cached.source === item
+        && cached.node.position === position
+        && cached.node.measured === measured
+        && cached.node.selected === selected
+        && cached.node.data.related === related
+      ) {
+        cache.set(item.id, cached)
+        return cached.node
+      }
+      const node = {
+        ...item,
+        position,
+        measured,
+        selected,
+        zIndex: selected ? 1000 : 0,
+        data: { ...item.data, related },
+      }
+      cache.set(item.id, { source: item, node })
+      return node
+    })
+    nodeCacheRef.current = cache
+    return items
+  }, [activeNodeIds, graph.nodes, manualPositions, nodeSizes, selectedNodeId])
 
   const edges = useMemo(
     () =>
@@ -410,6 +440,22 @@ function InnerGraphCanvas(props) {
   }, [activeInspectorWidth, canvasRef, edgeFrameKey, flow, selectedEdgeKey])
 
   const handleNodesChange = useCallback((changes) => {
+    // The size React Flow measured for a node is reported once, here. Keeping
+    // it lets every later render hand the node back as an already measured one.
+    const sizeChanges = changes.filter((change) => change.type === 'dimensions' && change.dimensions)
+    if (sizeChanges.length) {
+      setNodeSizes((current) => {
+        let next = current
+        for (const change of sizeChanges) {
+          const { width, height } = change.dimensions
+          const size = current[change.id]
+          if (size && size.width === width && size.height === height) continue
+          if (next === current) next = { ...current }
+          next[change.id] = { width, height }
+        }
+        return next
+      })
+    }
     if (nodesLocked) return
     const positionChanges = changes.filter((change) => change.type === 'position' && change.position)
     if (!positionChanges.length) return
