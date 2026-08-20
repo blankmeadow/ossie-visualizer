@@ -313,10 +313,10 @@ function edge(id, source, target, label, kind, selection, extra = {}) {
     // endpoint action so overlapping paths cannot silently select a neighboring edge.
     type: ['relationship', 'mapping'].includes(kind) ? 'relationshipEdge' : 'smoothstep',
     interactionWidth: kind === 'mapping' ? 7 : 28,
-    markerEnd: { type: MarkerType.ArrowClosed, color: neutral },
+    markerEnd: { type: MarkerType.ArrowClosed, color: neutral, width: 10, height: 10 },
     style: {
       stroke: neutral,
-      strokeWidth: kind === 'inheritance' ? 2.2 : 1.7,
+      strokeWidth: kind === 'inheritance' ? 1.3 : 1.2,
       strokeDasharray: kind === 'inheritance' ? '7 5' : undefined,
     },
     labelStyle: { fontSize: 10, fill: '#767676', fontWeight: 600 },

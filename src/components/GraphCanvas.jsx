@@ -311,7 +311,7 @@ function InnerGraphCanvas(props) {
             ...item.style,
             opacity: dimmed ? 0.38 : 1,
             stroke: isEdgeHighlighted ? tokens['graph-selection'] : tokens['edge-neutral'],
-            strokeWidth: isEdgeHighlighted ? 2.6 : item.style?.strokeWidth || 1.5,
+            strokeWidth: isEdgeHighlighted ? 1.8 : item.style?.strokeWidth || 1.2,
           },
           zIndex: isEdgeHighlighted ? 100 : 1,
         }

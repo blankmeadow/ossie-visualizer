@@ -22,6 +22,7 @@ export default function RelationshipEdge({
     targetY,
     sourcePosition,
     targetPosition,
+    curvature: 0.18,
   })
 
   // Keep labels readable like n8n: horizontal edges place the label above the
@@ -34,7 +35,7 @@ export default function RelationshipEdge({
   const activeStyle = selected ? {
     ...style,
     stroke: '#4f8f75',
-    strokeWidth: 2.8,
+    strokeWidth: 1.8,
   } : style
 
   const showLabel = data?.showEdgeLabels !== false && !!label
