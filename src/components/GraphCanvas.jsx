@@ -273,7 +273,7 @@ function InnerGraphCanvas(props) {
         return {
           ...item,
           selected,
-          label: selected || hovered ? label : undefined,
+          label: label || undefined,
           data: {
             ...item.data,
             showAnchor: item.data?.kind === 'mapping'

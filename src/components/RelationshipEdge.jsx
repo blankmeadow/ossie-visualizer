@@ -14,10 +14,7 @@ export default function RelationshipEdge({
   interactionWidth,
   data,
   label,
-  selected,
 }) {
-  const t = useT()
-  const { zoom } = useViewport()
   const [path, labelX, labelY] = getBezierPath({
     sourceX,
     sourceY,
@@ -26,15 +23,6 @@ export default function RelationshipEdge({
     sourcePosition,
     targetPosition,
   })
-  const towardLabelX = labelX - targetX
-  const towardLabelY = labelY - targetY
-  const towardLabelLength = Math.max(1, Math.hypot(towardLabelX, towardLabelY))
-  const count = data?.relationPaths?.length || 1
-  const title = data?.selection?.name || data?.label || t('canvas.edgeFallback')
-  const mapping = data?.kind === 'mapping'
-  const actionDistance = mapping ? 54 : 30
-  const actionX = targetX + (towardLabelX / towardLabelLength) * actionDistance
-  const actionY = targetY + (towardLabelY / towardLabelLength) * actionDistance
 
   return (
     <>
@@ -45,23 +33,8 @@ export default function RelationshipEdge({
         style={style}
         interactionWidth={interactionWidth}
       />
-      <EdgeLabelRenderer>
-        {data?.showAnchor && (
-          <button
-            type="button"
-            className={`edge-action ${mapping ? 'edge-action--mapping' : ''} nodrag nopan ${selected ? 'is-selected' : ''}`}
-            style={{ transform: `translate(-50%, -50%) translate(${actionX}px, ${actionY}px) scale(${1 / zoom})` }}
-            aria-label={`${mapping ? t('canvas.viewMapping') : t('canvas.viewRelationship')} ${title}`}
-            title={title}
-            onClick={(event) => {
-              event.stopPropagation()
-              data?.onSelect?.(data.selection)
-            }}
-          >
-            {mapping ? '↗' : count > 1 ? count : '·'}
-          </button>
-        )}
-        {label && (
+      {label && (
+        <EdgeLabelRenderer>
           <button
             type="button"
             className="edge-label nodrag nopan"
@@ -73,8 +46,8 @@ export default function RelationshipEdge({
           >
             {label}
           </button>
-        )}
-      </EdgeLabelRenderer>
+        </EdgeLabelRenderer>
+      )}
     </>
   )
 }

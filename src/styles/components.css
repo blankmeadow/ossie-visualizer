@@ -139,12 +139,29 @@ html, body, #root { height: 100%; margin: 0; padding: 0; overflow: hidden; }
 .graph-canvas .react-flow__controls-button { border-bottom-color: var(--line); background: var(--surface); }
 .graph-canvas .react-flow__minimap { overflow: hidden; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); }
 .react-flow__edge { cursor: pointer; }.react-flow__edge-path { transition: opacity .16s, stroke-width .16s; }.react-flow__edge-text { font-family: 'SFMono-Regular', Consolas, monospace; }
-.edge-action, .edge-label { position: absolute; pointer-events: all; border: 1px solid #9fb7ad; color: var(--green); background: rgba(251,252,249,.96); box-shadow: 0 3px 10px rgba(30,55,45,.12); cursor: pointer; }
-.edge-action { z-index: 20; width: 18px; height: 18px; padding: 0; display: grid; place-items: center; border-radius: 50%; font: 800 13px/1 ui-monospace, SFMono-Regular, Menlo, monospace; }
-.edge-action:hover, .edge-action.is-selected, .edge-label:hover { color: white; border-color: var(--green); background: var(--green); }
-.edge-action--mapping { color: #6549b4; border-color: #cfc2ef; background: rgba(248,246,255,.98); font-size: 9px; }
-.edge-action--mapping:hover, .edge-action--mapping.is-selected { color: white; border-color: #7256c2; background: #7256c2; }
-.edge-label { max-width: 190px; padding: 5px 8px; overflow: hidden; border-radius: 7px; text-overflow: ellipsis; white-space: nowrap; font: 650 10px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.edge-label {
+  position: absolute;
+  pointer-events: all;
+  max-width: 210px;
+  padding: 4px 8px;
+  overflow: hidden;
+  border-radius: 7px;
+  border: 1px solid var(--line);
+  color: #34443d;
+  background: rgba(251, 252, 249, 0.94);
+  box-shadow: 0 2px 8px rgba(30, 50, 42, 0.08);
+  font: 600 10px/1.2 'SFMono-Regular', Consolas, monospace;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.edge-label:hover, .edge-label.is-selected {
+  color: white;
+  border-color: var(--green);
+  background: var(--green);
+  box-shadow: 0 4px 12px rgba(30, 50, 42, 0.18);
+}
 .graph-legend { position: absolute; left: 14px; bottom: 14px; display: flex; gap: 13px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: rgba(251,252,249,.94); box-shadow: 0 5px 18px rgba(30,50,42,.08); pointer-events: none; }
 .graph-legend span { display: flex; align-items: center; gap: 5px; color: var(--muted); font: 500 8px 'SFMono-Regular', Consolas, monospace; }
 .legend-dot { width: 8px; height: 8px; border-radius: 3px; background: var(--green); }
