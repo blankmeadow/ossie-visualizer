@@ -35,7 +35,7 @@ export default function RelationshipEdge({
   const activeStyle = selected ? {
     ...style,
     stroke: '#4f8f75',
-    strokeWidth: 1.8,
+    strokeWidth: 1.55,
   } : style
 
   const showLabel = data?.showEdgeLabels !== false && !!label
