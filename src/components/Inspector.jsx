@@ -384,6 +384,19 @@ function constraintChips(member, concept, model, t) {
   return chips
 }
 
+function constraintChipsWithoutPk(member, concept, model, t) {
+  const chips = []
+  if (member.relationship.multiplicity) chips.push(member.relationship.multiplicity)
+  const requires = member.relationship.requires?.length || 0
+  if (requires) chips.push(t('concept.requiresCount', { count: requires }))
+  const facets = (member.relationship.roles || []).reduce((total, role) => {
+    if (roleKind(role.concept, model) !== 'value') return total
+    return total + (model.conceptByName.get(role.concept)?.requires?.length || 0)
+  }, 0)
+  if (facets) chips.push(t('concept.facetCount', { count: facets }))
+  return chips
+}
+
 /** Split members into "declared here" and one section per ancestor. */
 function groupMembers(members, model, t) {
   const groups = new Map()
@@ -466,32 +479,35 @@ function ConceptDetail({ item, model, onNavigate }) {
 
       <Section title={t('concept.attributes')} count={attributes.length}>
         {attributes.length ? (
-          <MemberTable headers={[t('concept.colName'), t('concept.colType'), t('concept.colConstraint')]}>
+          <MemberTable headers={[
+            t('concept.colName'),
+            t('concept.colDescription'),
+            t('concept.colSemantics'),
+            t('concept.colConstraint'),
+            t('concept.colIsPk')
+          ]}>
             <GroupedRows
               groups={groupMembers(attributes, model, t)}
               renderRow={(member) => {
                 const types = attributeTypes(member, model, t)
+                const isPk = member.keyIndex >= 0 || (item.identify_by || []).includes(member.name)
+                const pkLabel = isPk ? t('concept.yes') : t('concept.no')
+                const constraints = constraintChipsWithoutPk(member, item, model, t)
+                const typeText = types.map((type) => type.label).join(', ') || t('concept.noType')
+                const descText = member.relationship.description || '—'
+
                 return (
-                  <MemberRow key={member.path} note={member.relationship.description}>
-                    <Cell value={member.name} onClick={() => onNavigate(relationshipTarget(member))} />
-                    {types.length === 1 ? (
-                      <Cell
-                        value={types[0].label}
-                        tone="member-table__cell--type"
-                        onClick={conceptTarget(types[0].name, model)
-                          ? () => onNavigate(conceptTarget(types[0].name, model))
-                          : undefined}
-                      />
-                    ) : (
-                      <Cell
-                        value={types.map((type) => type.label).join(', ') || t('concept.noType')}
-                        tone="member-table__cell--type"
-                      />
-                    )}
+                  <MemberRow key={member.path}>
+                    <Cell value={member.name} />
+                    <Cell value={descText} tone="member-table__cell--muted" />
+                    <Cell value={typeText} tone="member-table__cell--type" />
                     <span className="member-table__chips">
-                      {constraintChips(member, item, model, t).map((chip) => (
+                      {constraints.length ? constraints.map((chip) => (
                         <span className="chip chip--amber" key={chip}>{chip}</span>
-                      ))}
+                      )) : <span className="member-table__cell--muted">—</span>}
+                    </span>
+                    <span className={`cell-pk ${isPk ? 'cell-pk--yes' : 'cell-pk--no'}`}>
+                      {pkLabel}
                     </span>
                   </MemberRow>
                 )
