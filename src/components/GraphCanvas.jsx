@@ -242,17 +242,19 @@ function InnerGraphCanvas({ graph, selection, onSelect, onFocus, canvasRef, insp
     >
       <Background variant={BackgroundVariant.Dots} gap={22} size={1.2} color={tokens['canvas-dots']} />
       <Controls showInteractive={false} position="bottom-left" />
-      <MiniMap
-        pannable
-        zoomable
-        position="bottom-right"
-        nodeColor={(item) => item.data?.kind === 'dataset'
-          ? tokens['node-dataset']
-          : item.data?.kind === 'metric'
-            ? tokens['node-metric']
-            : tokens['node-concept']}
-        maskColor={tokens['canvas-minimap-mask']}
-      />
+      {props.showMiniMap !== false && (
+        <MiniMap
+          pannable
+          zoomable
+          position="bottom-right"
+          nodeColor={(item) => item.data?.kind === 'dataset'
+            ? tokens['node-dataset']
+            : item.data?.kind === 'metric'
+              ? tokens['node-metric']
+              : tokens['node-concept']}
+          maskColor={tokens['canvas-minimap-mask']}
+        />
+      )}
     </ReactFlow>
   )
 }

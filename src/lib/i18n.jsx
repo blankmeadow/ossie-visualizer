@@ -61,6 +61,7 @@ const MESSAGES = {
 
     'toolbar.relationships': '实体关系',
     'toolbar.metrics': 'Metrics',
+    'toolbar.miniMap': '缩略图',
     'toolbar.depthAll': '全图',
     'toolbar.depthHops': '{count} 跳',
     'toolbar.focusHint': '按当前选择聚焦',
@@ -303,6 +304,7 @@ const MESSAGES = {
 
     'toolbar.relationships': 'Entity relations',
     'toolbar.metrics': 'Metrics',
+    'toolbar.miniMap': 'MiniMap',
     'toolbar.depthAll': 'Whole graph',
     'toolbar.depthHops': '{count} hop',
     'toolbar.focusHint': 'Focus on the current selection',

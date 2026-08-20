@@ -181,8 +181,6 @@ export default function App() {
     if (['concept', 'valueType', 'relationship'].includes(normalized.kind)) setActiveTab('ontology')
     if (normalized.kind === 'relationship') {
       setShowRelationships(true)
-      // Only relationships that are actually drawn are worth focusing on; an
-      // attribute has no edge, so focusing would blank the canvas.
       const kind = relationshipKind(normalized.target, model)
       if (kind === 'association' || kind === 'objectified') setFocusDepth(1)
     }
@@ -193,8 +191,10 @@ export default function App() {
     if (normalized.kind === 'mapping') setActiveTab('mapping')
   }
 
+  const selectionMatches = (a, b) => a?.kind === b?.kind && a?.name === b?.name
+
   const selectGraphElement = (next) => {
-    if (!next) {
+    if (selectionMatches(selection, next)) {
       setSelection(null)
       return
     }
@@ -206,12 +206,7 @@ export default function App() {
     setQuery('')
     setSidebarKind('all')
     setFocusDepth(0)
-    if (tab === 'mapping' && model?.conceptMappings.length) {
-      const mapping = model.conceptMappings[0]
-      setSelection({ kind: 'mapping', name: mapping.concept, target: mapping })
-    } else {
-      setSelection(null)
-    }
+    setSelection(null)
   }
 
   return (
@@ -221,30 +216,33 @@ export default function App() {
           <div className="brand__mark"><Network size={20} /></div>
           <div><strong>Ossie Visualizer</strong></div>
         </div>
-        <button
-          className="button button--ghost topbar__locale"
-          onClick={() => setLocale(locale === 'zh' ? 'en' : 'zh')}
-          aria-label={t('locale.switch')}
-          title={t('locale.switch')}
-        >
-          <Languages size={16} />{t('locale.label')}
-        </button>
-        <button className="button button--primary topbar__open" onClick={() => setImportOpen(true)}>
-          <FolderOpen size={16} />{t('app.import')}
-        </button>
-      </header>
 
-      {model && (
-        <nav className="tabbar">
-          {visibleTabs(model).map(({ id, labelKey, icon: Icon, count }) => (
-            <button key={id} className={activeTab === id ? 'is-active' : ''} onClick={() => selectTab(id)}>
-              <Icon size={15} />{t(labelKey)}
-              {!!count && <em className="tabbar__count">{count(model)}</em>}
-            </button>
-          ))}
-          <div className="tabbar__status"><CheckCircle2 size={14} />{t('app.statusOk')}</div>
-        </nav>
-      )}
+        {model && (
+          <nav className="tabbar">
+            {visibleTabs(model).map(({ id, labelKey, icon: Icon, count }) => (
+              <button key={id} className={activeTab === id ? 'is-active' : ''} onClick={() => selectTab(id)}>
+                <Icon size={15} />{t(labelKey)}
+                {!!count && <em className="tabbar__count">{count(model)}</em>}
+              </button>
+            ))}
+          </nav>
+        )}
+
+        <div className="topbar__actions">
+          {model && <div className="tabbar__status"><CheckCircle2 size={14} />{t('app.statusOk')}</div>}
+          <button
+            className="button button--ghost topbar__locale"
+            onClick={() => setLocale(locale === 'zh' ? 'en' : 'zh')}
+            aria-label={t('locale.switch')}
+            title={t('locale.switch')}
+          >
+            <Languages size={16} />{t('locale.label')}
+          </button>
+          <button className="button button--primary topbar__open" onClick={() => setImportOpen(true)}>
+            <FolderOpen size={16} />{t('app.import')}
+          </button>
+        </div>
+      </header>
 
       {!model ? (
         <Welcome onOpen={() => setImportOpen(true)} onSample={loadSample} />
@@ -280,6 +278,8 @@ export default function App() {
               setShowRelationships={setShowRelationships}
               showMetrics={showMetrics}
               setShowMetrics={setShowMetrics}
+              showMiniMap={showMiniMap}
+              setShowMiniMap={setShowMiniMap}
               focusDepth={focusDepth}
               setFocusDepth={setFocusDepth}
               selection={selection}
@@ -287,6 +287,7 @@ export default function App() {
             <GraphCanvas
               graph={graph}
               selection={selection}
+              showMiniMap={showMiniMap}
               onSelect={selectGraphElement}
               onFocus={setFocusDepth}
               inspectorWidth={inspector.width}
@@ -443,6 +444,7 @@ function GraphToolbar(props) {
       <div className="graph-toolbar__actions">
         {activeTab === 'ontology' && <Toggle checked={props.showRelationships} onChange={props.setShowRelationships} label={t('toolbar.relationships')} />}
         {activeTab === 'semantic' && <Toggle checked={props.showMetrics} onChange={props.setShowMetrics} label={t('toolbar.metrics')} />}
+        <Toggle checked={props.showMiniMap} onChange={props.setShowMiniMap} label={t('toolbar.miniMap')} />
         {activeTab !== 'mapping' && (
           <div className="depth-switch" title={selection ? t('toolbar.focusHint') : t('toolbar.focusHintEmpty')}>
             {[0, 1, 2].map((depth) => (
