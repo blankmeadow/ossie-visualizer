@@ -24,11 +24,12 @@ export default function RelationshipEdge({
     targetPosition,
   })
 
-  // Calculate rotation angle of the edge text so it aligns with the edge path direction
-  let angle = Math.atan2(targetY - sourceY, targetX - sourceX) * (180 / Math.PI)
-  if (angle > 90 || angle < -90) {
-    angle += 180
-  }
+  // Keep labels readable like n8n: horizontal edges place the label above the
+  // line; vertical edges place it beside the line instead of rotating text.
+  const isVertical = Math.abs(targetY - sourceY) > Math.abs(targetX - sourceX)
+  const labelTransform = isVertical
+    ? `translate(${labelX}px, ${labelY}px) translate(12px, -50%)`
+    : `translate(${labelX}px, ${labelY}px) translate(-50%, calc(-100% - 5px))`
 
   const activeStyle = selected ? {
     ...style,
@@ -51,9 +52,9 @@ export default function RelationshipEdge({
         <EdgeLabelRenderer>
           <button
             type="button"
-            className={`edge-label-text nodrag nopan ${selected ? 'is-active' : ''} ${data?.dimmed ? 'is-dimmed' : ''}`}
+            className={`edge-label-text nodrag nopan ${isVertical ? 'is-vertical' : ''} ${selected ? 'is-active' : ''} ${data?.dimmed ? 'is-dimmed' : ''}`}
             style={{
-              transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px) rotate(${angle}deg)`,
+              transform: labelTransform,
             }}
             onClick={(event) => {
               event.stopPropagation()

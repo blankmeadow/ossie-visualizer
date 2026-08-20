@@ -82,7 +82,7 @@ function NodeHandle({ type, handle }) {
       type={type}
       position={position}
       style={style}
-      className="size-[8px] border border-[#a5a5a5] bg-white opacity-90"
+      className="size-[10px] border-[1.5px] border-[#a5a5a5] bg-white opacity-100 shadow-[0_1px_2px_rgba(0,0,0,.08)]"
     />
   )
 }

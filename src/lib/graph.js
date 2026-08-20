@@ -305,13 +305,7 @@ function layoutFocusedOntology(nodes, selectedId) {
 }
 
 function edge(id, source, target, label, kind, selection, extra = {}) {
-  const colors = {
-    inheritance: '#7c5ce7',
-    relationship: '#3f718b',
-    semantic: '#d16f3d',
-    metric: '#b98b22',
-    mapping: '#3f8068',
-  }
+  const neutral = '#9b9b9b'
   return {
     id,
     source,
@@ -321,14 +315,14 @@ function edge(id, source, target, label, kind, selection, extra = {}) {
     // endpoint action so overlapping paths cannot silently select a neighboring edge.
     type: ['relationship', 'mapping'].includes(kind) ? 'relationshipEdge' : 'smoothstep',
     interactionWidth: kind === 'mapping' ? 7 : 28,
-    markerEnd: { type: MarkerType.ArrowClosed, color: colors[kind] },
+    markerEnd: { type: MarkerType.ArrowClosed, color: neutral },
     style: {
-      stroke: colors[kind],
+      stroke: neutral,
       strokeWidth: kind === 'inheritance' ? 2.2 : 1.7,
       strokeDasharray: kind === 'inheritance' ? '7 5' : undefined,
     },
-    labelStyle: { fontSize: 10, fill: '#34443d', fontWeight: 650 },
-    labelBgStyle: { fill: '#fbfcf9', fillOpacity: 0.96, stroke: '#d5ddd8', strokeWidth: 1 },
+    labelStyle: { fontSize: 10, fill: '#767676', fontWeight: 600 },
+    labelBgStyle: { fill: '#f5f5f5', fillOpacity: 0.92, stroke: 'transparent', strokeWidth: 0 },
     labelBgPadding: [7, 4],
     labelBgBorderRadius: 6,
     data: { kind, label, selection, ...extra },

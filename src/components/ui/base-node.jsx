@@ -23,10 +23,10 @@ const baseNodeVariants = cva(
   {
     variants: {
       emphasis: {
-        default: 'border-[#cfcfcf] shadow-[0_2px_5px_rgba(0,0,0,.10)]',
+        default: 'border-[1.5px] border-[#b9b9b9] shadow-[0_0_0_4px_rgba(0,0,0,.045),0_2px_5px_rgba(0,0,0,.10)]',
         selected: 'border-2 border-accent ring-2 ring-accent/20 shadow-[0_5px_14px_rgba(255,109,90,.24)] -translate-y-px z-30',
-        related: 'border-[#a9a9a9] shadow-[0_3px_9px_rgba(0,0,0,.12)]',
-        dimmed: 'border-[#d5d5d5] shadow-[0_2px_5px_rgba(0,0,0,.08)] opacity-[.16] saturate-[.35]',
+        related: 'border-[1.5px] border-[#a9a9a9] shadow-[0_0_0_4px_rgba(0,0,0,.045),0_3px_9px_rgba(0,0,0,.12)]',
+        dimmed: 'border-[1.5px] border-[#c9c9c9] shadow-[0_2px_5px_rgba(0,0,0,.08)] opacity-[.48] saturate-[.45]',
       },
     },
     defaultVariants: { emphasis: 'default' },

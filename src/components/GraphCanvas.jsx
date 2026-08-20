@@ -27,8 +27,9 @@ const NODE_LAYER = 10
 // Fallbacks match the light-theme values in styles/tokens.css; the live values
 // are read from CSS so the canvas follows the active theme.
 const CANVAS_TOKENS = {
-  'canvas-dots': '#c7c7c7',
+  'canvas-dots': '#b9b9b9',
   'canvas-minimap-mask': 'rgba(245, 245, 245, 0.82)',
+  'edge-neutral': '#9b9b9b',
   'selection': '#ff6d5a',
   'node-concept': '#477d6b',
   'node-dataset': '#d16f3d',
@@ -282,29 +283,40 @@ function InnerGraphCanvas(props) {
         const isEdgeSelected = selectedEdgeIds.has(item.id)
         const isConnectedToSelectedNode = selectedNodeId && (item.source === selectedNodeId || item.target === selectedNodeId)
         const isEdgeActive = isEdgeSelected || isConnectedToSelectedNode
-        const dimmed = active.enabled && !isEdgeActive
+        const isEdgeHovered = item.id === hoveredEdgeId
+        const isEdgeHighlighted = isEdgeActive || isEdgeHovered
+        const dimmed = active.enabled && !isEdgeActive && !isEdgeHovered
         const label = item.data?.label || ''
         return {
           ...item,
-          selected: isEdgeActive,
+          selected: isEdgeHighlighted,
           label: label || undefined,
+          markerEnd: {
+            ...item.markerEnd,
+            color: isEdgeHighlighted ? tokens.selection : tokens['edge-neutral'],
+          },
+          labelStyle: {
+            ...item.labelStyle,
+            fill: isEdgeHighlighted ? tokens.selection : '#767676',
+            opacity: dimmed ? 0.38 : 1,
+          },
           data: {
             ...item.data,
             dimmed,
             showEdgeLabels,
             onSelect,
           },
-          className: [isEdgeActive ? 'is-selected' : '', dimmed ? 'is-dimmed' : ''].filter(Boolean).join(' '),
+          className: [isEdgeHighlighted ? 'is-selected' : '', dimmed ? 'is-dimmed' : ''].filter(Boolean).join(' '),
           style: {
             ...item.style,
-            opacity: dimmed ? 0.12 : 1,
-            stroke: isEdgeActive ? tokens.selection : item.style?.stroke,
-            strokeWidth: isEdgeActive ? 2.8 : item.style?.strokeWidth || 1.5,
+            opacity: dimmed ? 0.38 : 1,
+            stroke: isEdgeHighlighted ? tokens.selection : tokens['edge-neutral'],
+            strokeWidth: isEdgeHighlighted ? 2.6 : item.style?.strokeWidth || 1.5,
           },
-          zIndex: isEdgeActive ? 100 : 1,
+          zIndex: isEdgeHighlighted ? 100 : 1,
         }
       }),
-    [active.enabled, graph.edges, onSelect, selectedEdgeIds, selectedNodeId, showEdgeLabels, tokens.selection],
+    [active.enabled, graph.edges, hoveredEdgeId, onSelect, selectedEdgeIds, selectedNodeId, showEdgeLabels, tokens],
   )
 
   const graphKey = useMemo(
@@ -377,7 +389,7 @@ function InnerGraphCanvas(props) {
       onEdgeMouseLeave={() => setHoveredEdgeId('')}
       onPaneClick={() => onSelect(null)}
     >
-      <Background variant={BackgroundVariant.Dots} gap={16} size={1} color={tokens['canvas-dots']} />
+      <Background variant={BackgroundVariant.Dots} gap={18} size={1.25} color={tokens['canvas-dots']} />
       {!nodes.length && (
         <Panel position="top-center" style={{ marginTop: '120px' }}>
           <div className="empty-canvas" style={{ height: 'auto' }}>

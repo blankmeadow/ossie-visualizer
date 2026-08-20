@@ -41,8 +41,9 @@
 
   /* Graph canvas. These were hardcoded inside GraphCanvas.jsx, which meant the
      React Flow surface could not follow the rest of the theme. */
-  --canvas-dots: #c7c7c7;
+  --canvas-dots: #b9b9b9;
   --canvas-minimap-mask: rgba(245, 245, 245, 0.82);
+  --edge-neutral: #9b9b9b;
   --node-concept: #477d6b;
   --node-dataset: #d16f3d;
   --node-metric: #b98b22;
