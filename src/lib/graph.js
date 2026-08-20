@@ -2,7 +2,7 @@ import dagre from '@dagrejs/dagre'
 import { MarkerType } from '@xyflow/react'
 import { mappingEvidenceForDataset, referencedDatasets, relationshipKind, roleKind } from './ossie'
 
-// Compact two-row card: kind on the first row, name and badges on the second.
+// Compact two-row card: name on the first row, description on the second.
 export const NODE_WIDTH = 224
 export const NODE_HEIGHT = 72
 
@@ -496,7 +496,7 @@ export function buildOntologyGraph(model, options = {}) {
         concept.concept,
         'concept',
         concept.concept,
-        // No subtitle: the header already states EntityType / ValueType.
+        // Concepts use their description as the second line on the node.
         '',
         concept,
         {

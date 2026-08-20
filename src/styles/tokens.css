@@ -21,17 +21,19 @@
   --placeholder: #858585;
 
   /* Interaction accent. Semantic categories keep their own colours below. */
-  --accent: #ff6d5a;
-  --accent-dark: #e65341;
-  --accent-soft: #fff0ed;
+  --accent: #4f8f75;
+  --accent-dark: #3f745f;
+  --accent-soft: #eaf4f0;
 
   /* Accents. Each pairs a saturated tone with a tinted background used for
      icon chips, badges and selected rows. */
   --green: #568f7b;
   --green-dark: #386c5a;
   --green-soft: #eaf4f0;
-  --orange: #d86f42;
-  --orange-soft: #fff1eb;
+  /* Legacy aliases retained for utility compatibility; the product palette
+     is now deliberately monochromatic green rather than orange. */
+  --orange: #4f8f75;
+  --orange-soft: #eaf4f0;
   --violet: #7657c8;
   --violet-soft: #f1edfb;
   --amber: #a87916;

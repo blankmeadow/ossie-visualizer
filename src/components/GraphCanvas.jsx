@@ -9,7 +9,7 @@ import {
   ReactFlowProvider,
   useReactFlow,
 } from '@xyflow/react'
-import { Maximize2, ZoomIn, ZoomOut } from 'lucide-react'
+import { Maximize, ZoomIn, ZoomOut } from 'lucide-react'
 import OssieNode from './OssieNode'
 import RelationshipEdge from './RelationshipEdge'
 import { useT } from '../lib/i18n'
@@ -119,12 +119,12 @@ function GraphToolbar(props) {
           <ZoomOut size={14} />
         </button>
         <button
-          className="toolbar-btn toolbar-btn--text"
+          className="toolbar-btn toolbar-btn--icon"
           onClick={() => flow.fitView({ padding: 0.16, duration: 250 })}
           title={t('toolbar.fitView')}
+          aria-label={t('toolbar.fitView')}
         >
-          <Maximize2 size={13} />
-          <span>{t('toolbar.fit')}</span>
+          <Maximize size={14} />
         </button>
         <button
           className="toolbar-btn"

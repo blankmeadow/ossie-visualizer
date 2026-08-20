@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils'
 
 const baseNodeVariants = cva(
   cn(
-    'h-[72px] w-[224px] overflow-hidden rounded-[8px] border px-[11px] py-[9px]',
+    'h-[72px] w-[224px] overflow-visible rounded-[8px] border px-[11px] py-[9px]',
     'bg-white',
     'transition-[opacity,filter,border-color,box-shadow,transform] duration-150',
   ),
@@ -105,7 +105,7 @@ function BaseNodeDescription({ className, ...props }) {
   return (
     <div
       className={cn(
-        'mt-[2px] line-clamp-1 min-h-[12px] font-sans text-[9px] leading-[12px] text-[#666]',
+        'mt-[4px] line-clamp-2 h-[24px] font-sans text-[9px] leading-[12px] text-[#666]',
         className,
       )}
       {...props}

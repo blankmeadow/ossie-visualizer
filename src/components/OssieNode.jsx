@@ -2,11 +2,8 @@ import { Handle, Position } from '@xyflow/react'
 import { Braces, CircleDot, Database, GitBranch, Sigma } from 'lucide-react'
 import {
   BaseNode,
-  BaseNodeBadge,
-  BaseNodeContent,
-  BaseNodeFooter,
+  BaseNodeDescription,
   BaseNodeHeader,
-  BaseNodeHeaderTitle,
   BaseNodeIcon,
   BaseNodeTitle,
 } from './ui/base-node'
@@ -19,20 +16,13 @@ const ICONS = {
   mapping: GitBranch,
 }
 
-const KIND_LABELS = {
-  concept: 'ENTITY TYPE',
-  valueType: 'VALUE TYPE',
-  dataset: 'DATASET',
-  metric: 'METRIC',
-  mapping: 'MAPPING',
-}
-
 const DEFAULT_TINT = 'text-green bg-green-soft'
 
 export default function OssieNode({ data, selected }) {
   const Icon = ICONS[data.kind] || CircleDot
   const emphasis = selected ? 'selected' : data.dimmed ? 'dimmed' : data.related ? 'related' : 'default'
   const tooltip = [data.name, data.subtitle, data.description].filter(Boolean).join(' — ')
+  const description = data.description || data.subtitle || '—'
 
   return (
     <BaseNode emphasis={emphasis} title={tooltip}>
@@ -41,16 +31,9 @@ export default function OssieNode({ data, selected }) {
         <BaseNodeIcon className={DEFAULT_TINT}>
           <Icon size={13} strokeWidth={2} />
         </BaseNodeIcon>
-        <BaseNodeHeaderTitle>{KIND_LABELS[data.kind] || data.kind.toUpperCase()}</BaseNodeHeaderTitle>
-      </BaseNodeHeader>
-      <BaseNodeContent>
         <BaseNodeTitle title={data.name}>{data.name}</BaseNodeTitle>
-        {!!data.badges?.length && (
-          <BaseNodeFooter title={data.badges.join(' · ')}>
-            {data.badges.map((badge) => <BaseNodeBadge key={badge}>{badge}</BaseNodeBadge>)}
-          </BaseNodeFooter>
-        )}
-      </BaseNodeContent>
+      </BaseNodeHeader>
+      <BaseNodeDescription title={description}>{description}</BaseNodeDescription>
       {(data.sourceHandles || []).map((handle) => <NodeHandle key={handle.id} type="source" handle={handle} />)}
     </BaseNode>
   )
