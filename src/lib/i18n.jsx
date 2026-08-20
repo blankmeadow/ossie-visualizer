@@ -59,6 +59,10 @@ const MESSAGES = {
     'toolbar.zoomOut': '缩小',
     'toolbar.fitView': '自适应居中',
     'toolbar.fit': '居中',
+    'toolbar.lockNodes': '锁定节点',
+    'toolbar.unlockNodes': '解锁节点',
+    'toolbar.downloadImage': '下载图片',
+    'toolbar.exportingImage': '正在生成图片…',
 
     'legend.entityType': 'EntityType',
     'legend.extends': 'extends',
@@ -295,6 +299,10 @@ const MESSAGES = {
     'toolbar.zoomOut': 'Zoom out',
     'toolbar.fitView': 'Fit view',
     'toolbar.fit': 'Fit',
+    'toolbar.lockNodes': 'Lock nodes',
+    'toolbar.unlockNodes': 'Unlock nodes',
+    'toolbar.downloadImage': 'Download image',
+    'toolbar.exportingImage': 'Generating image…',
 
     'legend.entityType': 'EntityType',
     'legend.extends': 'extends',

@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Background,
   BackgroundVariant,
   Controls,
+  getNodesBounds,
+  getViewportForBounds,
   MiniMap,
   Panel,
   ReactFlow,
@@ -10,7 +12,8 @@ import {
   useReactFlow,
   useViewport,
 } from '@xyflow/react'
-import { Maximize, ZoomIn, ZoomOut } from 'lucide-react'
+import { Download, Lock, Maximize, Unlock, ZoomIn, ZoomOut } from 'lucide-react'
+import { toPng } from 'html-to-image'
 import OssieNode from './OssieNode'
 import RelationshipEdge from './RelationshipEdge'
 import { useT } from '../lib/i18n'
@@ -24,10 +27,12 @@ const nodeWidth = NODE_WIDTH
 const nodeHeight = NODE_HEIGHT
 // Node cards sit above every edge layer; the highest an edge reaches is 8.
 const NODE_LAYER = 10
+const EMPTY_POSITIONS = Object.freeze({})
 
 // Fallbacks match the light-theme values in styles/tokens.css; the live values
 // are read from CSS so the canvas follows the active theme.
 const CANVAS_TOKENS = {
+  canvas: '#f5f5f5',
   'canvas-dots': '#b9b9b9',
   'canvas-minimap-mask': 'rgba(245, 245, 245, 0.82)',
   'edge-neutral': '#9b9b9b',
@@ -81,6 +86,18 @@ function frameNodes(flow, canvasRef, items, inspectorWidth, duration = 340) {
   return true
 }
 
+function imageName(documentName, activeTab) {
+  const safeName = (documentName || 'ossie-graph')
+    .trim()
+    .replace(/[^a-zA-Z0-9._-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+  return `${safeName || 'ossie-graph'}-${activeTab}.png`
+}
+
+function nextPaint() {
+  return new Promise((resolve) => window.requestAnimationFrame(() => window.requestAnimationFrame(resolve)))
+}
+
 function Toggle({ checked, onChange, label }) {
   return (
     <button className={`toggle ${checked ? 'is-active' : ''}`} onClick={() => onChange(!checked)}>
@@ -108,6 +125,10 @@ function GraphToolbar(props) {
     setShowEdgeLabels,
     layoutEngine,
     setLayoutEngine,
+    nodesLocked,
+    setNodesLocked,
+    onDownload,
+    exporting,
   } = props
 
   return (
@@ -134,6 +155,24 @@ function GraphToolbar(props) {
           title={t('toolbar.zoomIn')}
         >
           <ZoomIn size={14} />
+        </button>
+        <button
+          className={`toolbar-btn toolbar-btn--icon ${!nodesLocked ? 'is-active' : ''}`}
+          onClick={() => setNodesLocked(!nodesLocked)}
+          title={t(nodesLocked ? 'toolbar.unlockNodes' : 'toolbar.lockNodes')}
+          aria-label={t(nodesLocked ? 'toolbar.unlockNodes' : 'toolbar.lockNodes')}
+          aria-pressed={!nodesLocked}
+        >
+          {nodesLocked ? <Lock size={13} /> : <Unlock size={13} />}
+        </button>
+        <button
+          className="toolbar-btn toolbar-btn--icon"
+          onClick={onDownload}
+          title={t(exporting ? 'toolbar.exportingImage' : 'toolbar.downloadImage')}
+          aria-label={t(exporting ? 'toolbar.exportingImage' : 'toolbar.downloadImage')}
+          disabled={exporting}
+        >
+          <Download size={14} />
         </button>
       </div>
 
@@ -224,19 +263,39 @@ function InnerGraphCanvas(props) {
     layoutEngine,
     setLayoutEngine,
     focusDepth,
+    documentName,
   } = props
   const t = useT()
   const flow = useReactFlow()
   const { zoom } = useViewport()
   // Quantise the zoom used by marker definitions. The visual result remains
   // smooth while avoiding a brand-new SVG marker on every wheel delta.
-  const markerZoom = Math.max(0.08, Math.round(zoom * 50) / 50)
+  const viewportMarkerZoom = Math.max(0.08, Math.round(zoom * 50) / 50)
   const tokens = useCssTokens(CANVAS_TOKENS)
   const graphNodesRef = useRef(graph.nodes)
   const selectedNodeFrameRef = useRef(null)
   const edgeFrameNodesRef = useRef([])
   const [hoveredEdgeId, setHoveredEdgeId] = useState('')
+  const [hoveredNodeId, setHoveredNodeId] = useState('')
+  const [nodesLocked, setNodesLocked] = useState(true)
+  const [exporting, setExporting] = useState(false)
+  const [exportZoom, setExportZoom] = useState(null)
+  const [manualLayout, setManualLayout] = useState({ key: '', positions: {} })
   const activeInspectorWidth = selection ? inspectorWidth : 0
+  const markerZoom = exportZoom || viewportMarkerZoom
+
+  const graphLayoutKey = useMemo(
+    () => `${graph.nodes
+      .map((item) => `${item.id}@${item.position.x},${item.position.y}`)
+      .sort()
+      .join(',')}:${graph.edges.map((item) => item.id).sort().join(',')}`,
+    [graph.edges, graph.nodes],
+  )
+  const manualPositions = manualLayout.key === graphLayoutKey ? manualLayout.positions : EMPTY_POSITIONS
+
+  useEffect(() => {
+    setHoveredNodeId('')
+  }, [graphLayoutKey])
 
   const selectedNodeId = useMemo(
     () => graph.nodes.find((item) => selectionMatches(item.data?.selection, selection))?.id || '',
@@ -246,14 +305,15 @@ function InnerGraphCanvas(props) {
     () => new Set(graph.edges.filter((item) => edgeMatchesSelection(item, selection)).map((item) => item.id)),
     [graph.edges, selection],
   )
+  const visualNodeId = hoveredNodeId || selectedNodeId
 
   const active = useMemo(() => {
     const nodeIds = new Set()
     const edgeIds = new Set()
-    if (selectedNodeId) {
-      nodeIds.add(selectedNodeId)
+    if (visualNodeId) {
+      nodeIds.add(visualNodeId)
       for (const item of graph.edges) {
-        if (item.source !== selectedNodeId && item.target !== selectedNodeId) continue
+        if (item.source !== visualNodeId && item.target !== visualNodeId) continue
         edgeIds.add(item.id)
         nodeIds.add(item.source)
         nodeIds.add(item.target)
@@ -267,28 +327,29 @@ function InnerGraphCanvas(props) {
       }
     }
     return { nodeIds, edgeIds, enabled: nodeIds.size > 0 || edgeIds.size > 0 }
-  }, [graph.edges, selectedEdgeIds, selectedNodeId])
+  }, [graph.edges, selectedEdgeIds, visualNodeId])
 
   const nodes = useMemo(
     () => graph.nodes.map((item) => ({
       ...item,
-      selected: item.id === selectedNodeId,
-      zIndex: NODE_LAYER,
+      position: manualPositions[item.id] || item.position,
+      selected: item.id === visualNodeId,
+      zIndex: item.id === visualNodeId ? NODE_LAYER + 1 : NODE_LAYER,
       data: {
         ...item.data,
         dimmed: active.enabled && !active.nodeIds.has(item.id),
-        related: active.enabled && active.nodeIds.has(item.id) && item.id !== selectedNodeId,
+        related: active.enabled && active.nodeIds.has(item.id) && item.id !== visualNodeId,
       },
     })),
-    [active, graph.nodes, selectedNodeId],
+    [active, graph.nodes, manualPositions, visualNodeId],
   )
 
   const edges = useMemo(
     () =>
       graph.edges.map((item) => {
-        const isEdgeSelected = selectedEdgeIds.has(item.id)
-        const isConnectedToSelectedNode = selectedNodeId && (item.source === selectedNodeId || item.target === selectedNodeId)
-        const isEdgeActive = isEdgeSelected || isConnectedToSelectedNode
+        const isEdgeSelected = !hoveredNodeId && selectedEdgeIds.has(item.id)
+        const isConnectedToVisualNode = visualNodeId && (item.source === visualNodeId || item.target === visualNodeId)
+        const isEdgeActive = isEdgeSelected || isConnectedToVisualNode
         const isEdgeHovered = item.id === hoveredEdgeId
         const isEdgeHighlighted = isEdgeActive || isEdgeHovered
         const dimmed = active.enabled && !isEdgeActive && !isEdgeHovered
@@ -326,14 +387,9 @@ function InnerGraphCanvas(props) {
           zIndex: isEdgeHighlighted ? 100 : 1,
         }
       }),
-    [active.enabled, graph.edges, hoveredEdgeId, markerZoom, onSelect, selectedEdgeIds, selectedNodeId, showEdgeLabels, tokens],
+    [active.enabled, graph.edges, hoveredEdgeId, hoveredNodeId, markerZoom, onSelect, selectedEdgeIds, showEdgeLabels, tokens, visualNodeId],
   )
-
-  const graphKey = useMemo(
-    () => `${graph.nodes.map((n) => n.id).sort().join(',')}:${graph.edges.map((e) => e.id).sort().join(',')}`,
-    [graph.edges, graph.nodes],
-  )
-  graphNodesRef.current = graph.nodes
+  graphNodesRef.current = nodes
 
   useEffect(() => {
     if (!graphNodesRef.current.length) return undefined
@@ -341,12 +397,12 @@ function InnerGraphCanvas(props) {
       frameNodes(flow, canvasRef, graphNodesRef.current, activeInspectorWidth)
     }, 60)
     return () => window.clearTimeout(timeout)
-  }, [activeInspectorWidth, canvasRef, flow, graphKey])
+  }, [activeInspectorWidth, canvasRef, flow, graphLayoutKey])
 
-  const selectedNode = graph.nodes.find((item) => item.id === selectedNodeId)
+  const selectedNode = nodes.find((item) => item.id === selectedNodeId)
   selectedNodeFrameRef.current = selectedNode || null
   const selectedNodeKey = selectedNode
-    ? `${selectedNode.id}@${selectedNode.position.x},${selectedNode.position.y}`
+    ? `${selectedNode.id}:${graphLayoutKey}`
     : ''
   useEffect(() => {
     if (!selectedNodeKey || !selectedNodeFrameRef.current) return undefined
@@ -359,12 +415,9 @@ function InnerGraphCanvas(props) {
   const selectedEdgeKey = selectedEdgeIds.size ? [...selectedEdgeIds].sort().join(',') : ''
   const selectedEdges = graph.edges.filter((item) => selectedEdgeIds.has(item.id))
   const selectedEdgeNodeIds = new Set(selectedEdges.flatMap((item) => [item.source, item.target]))
-  const edgeFrameNodes = graph.nodes.filter((item) => selectedEdgeNodeIds.has(item.id))
+  const edgeFrameNodes = nodes.filter((item) => selectedEdgeNodeIds.has(item.id))
   edgeFrameNodesRef.current = edgeFrameNodes
-  const edgeFrameKey = edgeFrameNodes
-    .map((item) => `${item.id}@${item.position.x},${item.position.y}`)
-    .sort()
-    .join('|')
+  const edgeFrameKey = selectedEdgeKey ? `${selectedEdgeKey}:${graphLayoutKey}` : ''
   useEffect(() => {
     if (!selectedEdgeKey || !edgeFrameNodesRef.current.length) return undefined
     const timeout = window.setTimeout(() => {
@@ -373,13 +426,73 @@ function InnerGraphCanvas(props) {
     return () => window.clearTimeout(timeout)
   }, [activeInspectorWidth, canvasRef, edgeFrameKey, flow, selectedEdgeKey])
 
+  const handleNodesChange = useCallback((changes) => {
+    if (nodesLocked) return
+    const positionChanges = changes.filter((change) => change.type === 'position' && change.position)
+    if (!positionChanges.length) return
+    setManualLayout((current) => {
+      const positions = current.key === graphLayoutKey ? { ...current.positions } : {}
+      for (const change of positionChanges) positions[change.id] = change.position
+      return { key: graphLayoutKey, positions }
+    })
+  }, [graphLayoutKey, nodesLocked])
+
+  const downloadImage = useCallback(async () => {
+    if (exporting || !nodes.length) return
+    setExporting(true)
+    try {
+      // `onlyRenderVisibleElements` is disabled by the exporting state. Two
+      // paints give React Flow time to mount every off-screen node and edge.
+      await nextPaint()
+      const viewport = canvasRef.current?.querySelector('.react-flow__viewport')
+      const exportNodes = flow.getNodes()
+      if (!viewport || !exportNodes.length) return
+
+      const bounds = getNodesBounds(exportNodes)
+      // Leave enough room for labels and marker tips, which can extend beyond
+      // the node-only bounds returned by React Flow.
+      const imageWidth = Math.ceil(Math.min(3200, Math.max(1200, bounds.width + 480)))
+      const imageHeight = Math.ceil(Math.min(2400, Math.max(720, bounds.height + 360)))
+      const exportViewport = getViewportForBounds(bounds, imageWidth, imageHeight, 0.05, 1.25, 0.12)
+      // Arrowheads are screen-space adaptive. Recalculate them for the export
+      // transform rather than baking in whichever zoom the user was viewing.
+      setExportZoom(exportViewport.zoom)
+      await nextPaint()
+      const dataUrl = await toPng(viewport, {
+        backgroundColor: tokens.canvas,
+        cacheBust: true,
+        width: imageWidth,
+        height: imageHeight,
+        pixelRatio: 1.5,
+        style: {
+          width: `${imageWidth}px`,
+          height: `${imageHeight}px`,
+          transformOrigin: 'top left',
+          transform: `translate(${exportViewport.x}px, ${exportViewport.y}px) scale(${exportViewport.zoom})`,
+        },
+      })
+      const link = document.createElement('a')
+      link.download = imageName(documentName, activeTab)
+      link.href = dataUrl
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+    } catch (error) {
+      console.error('Unable to export graph image', error)
+    } finally {
+      setExportZoom(null)
+      setExporting(false)
+    }
+  }, [activeTab, canvasRef, documentName, exporting, flow, nodes.length, tokens.canvas])
+
   return (
     <ReactFlow
+      className={nodesLocked ? 'is-locked' : 'is-unlocked'}
       nodes={nodes}
       edges={edges}
       nodeTypes={nodeTypes}
       edgeTypes={edgeTypes}
-      nodesDraggable={false}
+      nodesDraggable={!nodesLocked}
       nodesConnectable={false}
       elementsSelectable
       edgesFocusable
@@ -387,8 +500,9 @@ function InnerGraphCanvas(props) {
       maxZoom={2.2}
       fitView
       fitViewOptions={{ padding: 0.16, maxZoom: 1.12 }}
-      onlyRenderVisibleElements
+      onlyRenderVisibleElements={!exporting}
       proOptions={{ hideAttribution: true }}
+      onNodesChange={handleNodesChange}
       onNodeClick={(_, item) => onSelect(item.data?.selection)}
       onNodeDoubleClick={(_, item) => {
         onSelect(item.data?.selection)
@@ -397,6 +511,8 @@ function InnerGraphCanvas(props) {
       onEdgeClick={(_, item) => onSelect(item.data?.selection)}
       onEdgeMouseEnter={(_, item) => setHoveredEdgeId(item.id)}
       onEdgeMouseLeave={() => setHoveredEdgeId('')}
+      onNodeMouseEnter={(_, item) => setHoveredNodeId(item.id)}
+      onNodeMouseLeave={(_, item) => setHoveredNodeId((current) => current === item.id ? '' : current)}
       onPaneClick={() => onSelect(null)}
     >
       <Background variant={BackgroundVariant.Dots} gap={18} size={1.25} color={tokens['canvas-dots']} />
@@ -425,6 +541,10 @@ function InnerGraphCanvas(props) {
           setShowEdgeLabels={setShowEdgeLabels}
           layoutEngine={layoutEngine}
           setLayoutEngine={setLayoutEngine}
+          nodesLocked={nodesLocked}
+          setNodesLocked={setNodesLocked}
+          onDownload={downloadImage}
+          exporting={exporting}
         />
       </Panel>
       {showMiniMap !== false && nodes.length > 0 && (

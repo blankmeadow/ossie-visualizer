@@ -283,6 +283,7 @@ export default function App() {
           <section className="canvas-panel">
             <GraphCanvas
               graph={graph}
+              documentName={model.document.name}
               selection={selection}
               activeTab={activeTab}
               showRelationships={showRelationships}
