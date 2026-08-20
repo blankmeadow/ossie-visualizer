@@ -14,7 +14,6 @@ import {
   Search,
   Sigma,
   SlidersHorizontal,
-  Sparkles,
 } from 'lucide-react'
 import GraphCanvas from './components/GraphCanvas'
 import ImportDialog from './components/ImportDialog'
@@ -161,6 +160,15 @@ export default function App() {
     setSidebarKind('all')
   }
 
+  const loadSample = async () => {
+    try {
+      const response = await fetch(`${import.meta.env.BASE_URL}flights.yaml`)
+      handleImport(await response.text())
+    } catch {
+      setImportOpen(true)
+    }
+  }
+
   const navigate = (next) => {
     if (!model || !next) return
     let item = next
@@ -239,7 +247,7 @@ export default function App() {
       )}
 
       {!model ? (
-        <Welcome onOpen={() => setImportOpen(true)} />
+        <Welcome onOpen={() => setImportOpen(true)} onSample={loadSample} />
       ) : activeTab === 'overview' ? (
         <Overview model={model} warnings={warnings} onNavigate={navigate} onTab={selectTab} />
       ) : activeTab === 'json' ? (
@@ -306,28 +314,22 @@ export default function App() {
   )
 }
 
-function Welcome({ onOpen }) {
+function Welcome({ onOpen, onSample }) {
   const t = useT()
   return (
     <main className="welcome">
-      <div className="welcome__art">
-        <span className="orbit orbit--one" />
-        <span className="orbit orbit--two" />
-        <span className="welcome-node welcome-node--a">Concept</span>
-        <span className="welcome-node welcome-node--b">Relationship</span>
-        <span className="welcome-node welcome-node--c">Dataset</span>
-        <span className="welcome-node welcome-node--d">Metric</span>
-        <Network size={40} />
-      </div>
-      <span className="eyebrow">APACHE OSSIE · LOCAL FIRST</span>
       <h1>{t('welcome.title')}</h1>
-      <p>{t('welcome.body')}</p>
-      <button className="button button--primary button--large" onClick={onOpen}><FolderOpen size={18} />{t('welcome.cta')}</button>
-      <div className="welcome__features">
-        <span><CheckCircle2 size={15} />{t('welcome.featureLocal')}</span>
-        <span><CheckCircle2 size={15} />{t('welcome.featureCheck')}</span>
-        <span><CheckCircle2 size={15} />{t('welcome.featureFlow')}</span>
+      <div className="welcome__actions">
+        <button className="button button--primary button--large" onClick={onOpen}>
+          <FolderOpen size={18} />{t('welcome.cta')}
+        </button>
+        {/* The bundled Apache Ossie example, one click away rather than a file
+            the reader has to go and find. */}
+        <button className="button button--ghost button--large" onClick={onSample}>
+          {t('welcome.sample')}
+        </button>
       </div>
+      <p className="welcome__formats">{t('import.formats')}</p>
     </main>
   )
 }
@@ -343,19 +345,11 @@ function Overview({ model, warnings, onNavigate, onTab }) {
     ['overview.statMappings', model.stats.conceptMappings, GitBranch, 'mapping'],
   ]
   const mappedConcepts = new Set(model.conceptMappings.map((mapping) => mapping.concept))
-  const unmapped = model.concepts.filter((concept) => !mappedConcepts.has(concept.concept))
   return (
     <main className="overview">
       <section className="overview__hero">
-        <div>
-          <span className="eyebrow">{t('overview.eyebrow')}</span>
-          <h1>{model.document.name}</h1>
-          <p>{model.document.description || t('overview.noDescription')}</p>
-        </div>
-        <div className="overview__health">
-          <CheckCircle2 size={20} />
-          <div><strong>{t('overview.healthTitle')}</strong><span>{t('overview.healthBody')}</span></div>
-        </div>
+        <h1>{model.document.name}</h1>
+        <p>{model.document.description || t('overview.noDescription')}</p>
       </section>
       {!!warnings.length && <div className="warning-banner"><AlertTriangle size={17} /><span>{issueText(warnings[0], t)}</span></div>}
       {/* Constraints the whole document asserts. They belong to no concept, so
@@ -373,38 +367,16 @@ function Overview({ model, warnings, onNavigate, onTab }) {
           </button>
         ))}
       </section>
-      <section className="overview-grid">
-        <article className="overview-card overview-card--large">
-          <header>
-            <div><span className="eyebrow">{t('overview.layersEyebrow')}</span><h2>{t('overview.layersTitle')}</h2></div>
-            <Sparkles size={18} />
-          </header>
-          <div className="layer-flow">
-            <button onClick={() => onTab('ontology')}><CircleDot size={19} /><strong>Ontology</strong><span>{t('overview.layerConcepts', { count: model.stats.entityTypes + model.stats.valueTypes })}</span></button>
-            <ChevronRight />
-            <button onClick={() => onTab('mapping')}><GitBranch size={19} /><strong>Mapping</strong><span>{t('overview.layerMaps', { count: model.stats.conceptMappings })}</span></button>
-            <ChevronRight />
-            <button onClick={() => onTab('semantic')}><Database size={19} /><strong>Semantic Model</strong><span>{t('overview.layerDatasets', { count: model.stats.datasets })}</span></button>
+      {!!model.ontologyMappings.length && (
+        <section className="overview-coverage">
+          <span>{t('overview.coverageTitle')}</span>
+          <strong>{model.concepts.length ? Math.round(mappedConcepts.size / model.concepts.length * 100) : 0}%</strong>
+          <div className="progress">
+            <span style={{ width: `${model.concepts.length ? mappedConcepts.size / model.concepts.length * 100 : 0}%` }} />
           </div>
-        </article>
-        <article className="overview-card">
-          <header><div><span className="eyebrow">{t('overview.coverageEyebrow')}</span><h2>{t('overview.coverageTitle')}</h2></div></header>
-          <div className="coverage-number">
-            <strong>{model.concepts.length ? Math.round(mappedConcepts.size / model.concepts.length * 100) : 0}%</strong>
-            <span>{t('overview.coverageUnit', { mapped: mappedConcepts.size, total: model.concepts.length })}</span>
-          </div>
-          <div className="progress"><span style={{ width: `${model.concepts.length ? mappedConcepts.size / model.concepts.length * 100 : 0}%` }} /></div>
-          <p>{model.ontologyMappings.length ? t('overview.coverageNote', { count: unmapped.length }) : t('overview.coveragePure')}</p>
-        </article>
-        <article className="overview-card">
-          <header><div><span className="eyebrow">{t('overview.quickEyebrow')}</span><h2>{t('overview.quickTitle')}</h2></div></header>
-          <div className="quick-list">
-            {model.concepts.filter((concept) => concept.type !== 'ValueType').slice(0, 5).map((concept) => (
-              <button key={concept.concept} onClick={() => onNavigate({ kind: 'concept', name: concept.concept, target: concept })}><span>{concept.concept}</span><ChevronRight size={14} /></button>
-            ))}
-          </div>
-        </article>
-      </section>
+          <small>{t('overview.coverageUnit', { mapped: mappedConcepts.size, total: model.concepts.length })}</small>
+        </section>
+      )}
     </main>
   )
 }
