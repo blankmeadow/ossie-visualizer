@@ -76,6 +76,7 @@ export default function App() {
   const [showRelationships, setShowRelationships] = useState(true)
   const [showMetrics, setShowMetrics] = useState(false)
   const [showMiniMap, setShowMiniMap] = useState(true)
+  const [showEdgeLabels, setShowEdgeLabels] = useState(true)
   const [layoutEngine, setLayoutEngine] = useState('dagre')
   const [focusDepth, setFocusDepth] = useState(0)
   const [sidebarKind, setSidebarKind] = useState('all')
@@ -289,6 +290,8 @@ export default function App() {
               setShowMetrics={setShowMetrics}
               showMiniMap={showMiniMap}
               setShowMiniMap={setShowMiniMap}
+              showEdgeLabels={showEdgeLabels}
+              setShowEdgeLabels={setShowEdgeLabels}
               layoutEngine={layoutEngine}
               setLayoutEngine={setLayoutEngine}
               focusDepth={focusDepth}

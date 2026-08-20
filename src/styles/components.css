@@ -139,28 +139,33 @@ html, body, #root { height: 100%; margin: 0; padding: 0; overflow: hidden; }
 .graph-canvas .react-flow__controls-button { border-bottom-color: var(--line); background: var(--surface); }
 .graph-canvas .react-flow__minimap { overflow: hidden; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); }
 .react-flow__edge { cursor: pointer; }.react-flow__edge-path { transition: opacity .16s, stroke-width .16s; }.react-flow__edge-text { font-family: 'SFMono-Regular', Consolas, monospace; }
-.edge-label {
+.edge-label-text {
   position: absolute;
-  pointer-events: all;
-  max-width: 210px;
-  padding: 4px 8px;
-  overflow: hidden;
-  border-radius: 7px;
-  border: 1px solid var(--line);
-  color: #34443d;
-  background: rgba(251, 252, 249, 0.94);
-  box-shadow: 0 2px 8px rgba(30, 50, 42, 0.08);
-  font: 600 10px/1.2 'SFMono-Regular', Consolas, monospace;
-  text-overflow: ellipsis;
+  pointer-events: auto;
+  background: transparent;
+  border: 0;
+  padding: 2px 4px;
+  margin: 0;
+  box-shadow: none;
+  outline: 0;
+  color: #475569;
+  font: 600 10.5px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
   white-space: nowrap;
   cursor: pointer;
-  transition: all 0.15s ease;
+  user-select: none;
+  transition: color 0.15s ease, opacity 0.15s ease, font-weight 0.15s ease;
 }
-.edge-label:hover, .edge-label.is-selected {
-  color: white;
-  border-color: var(--green);
-  background: var(--green);
-  box-shadow: 0 4px 12px rgba(30, 50, 42, 0.18);
+
+.edge-label-text:hover,
+.edge-label-text.is-active {
+  color: #10b981;
+  font-weight: 700;
+  opacity: 1 !important;
+}
+
+.edge-label-text.is-dimmed {
+  opacity: 0.15;
+  color: #9ca3af;
 }
 .graph-legend { position: absolute; left: 14px; bottom: 14px; display: flex; gap: 13px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: rgba(251,252,249,.94); box-shadow: 0 5px 18px rgba(30,50,42,.08); pointer-events: none; }
 .graph-legend span { display: flex; align-items: center; gap: 5px; color: var(--muted); font: 500 8px 'SFMono-Regular', Consolas, monospace; }

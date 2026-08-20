@@ -95,6 +95,8 @@ function GraphToolbar(props) {
     setShowMetrics,
     showMiniMap,
     setShowMiniMap,
+    showEdgeLabels,
+    setShowEdgeLabels,
     layoutEngine,
     setLayoutEngine,
   } = props
@@ -143,6 +145,11 @@ function GraphToolbar(props) {
             label={t('toolbar.metrics')}
           />
         )}
+        <Toggle
+          checked={showEdgeLabels}
+          onChange={setShowEdgeLabels}
+          label={t('toolbar.edgeLabels')}
+        />
         <Toggle
           checked={showMiniMap}
           onChange={setShowMiniMap}
@@ -193,6 +200,8 @@ function InnerGraphCanvas(props) {
     graph,
     selection,
     showMiniMap,
+    showEdgeLabels,
+    setShowEdgeLabels,
     onSelect,
     onFocus,
     canvasRef,
@@ -263,33 +272,32 @@ function InnerGraphCanvas(props) {
   const edges = useMemo(
     () =>
       graph.edges.map((item) => {
-        const selected = selectedEdgeIds.has(item.id)
-        const related = active.enabled && active.edgeIds.has(item.id)
-        const dimmed = active.enabled && !related
-        const hovered = hoveredEdgeId === item.id
-        const label = item.data?.bundleCount > 1
-          ? t('canvas.bundleCount', { count: item.data.bundleCount })
-          : item.data?.label
+        const isEdgeSelected = selectedEdgeIds.has(item.id)
+        const isConnectedToSelectedNode = selectedNodeId && (item.source === selectedNodeId || item.target === selectedNodeId)
+        const isEdgeActive = isEdgeSelected || isConnectedToSelectedNode
+        const dimmed = active.enabled && !isEdgeActive
+        const label = item.data?.label || ''
         return {
           ...item,
-          selected,
+          selected: isEdgeActive,
           label: label || undefined,
           data: {
             ...item.data,
-            showAnchor: item.data?.kind === 'mapping'
-              || (item.data?.kind === 'relationship' && graph.nodes.length <= 24),
+            dimmed,
+            showEdgeLabels,
             onSelect,
           },
-          className: [selected ? 'is-selected' : '', related ? 'is-related' : '', dimmed ? 'is-dimmed' : ''].filter(Boolean).join(' '),
+          className: [isEdgeActive ? 'is-selected' : '', dimmed ? 'is-dimmed' : ''].filter(Boolean).join(' '),
           style: {
             ...item.style,
-            opacity: dimmed ? 0.1 : 1,
-            strokeWidth: selected ? 3.4 : related ? 2.25 : item.style?.strokeWidth,
+            opacity: dimmed ? 0.12 : 1,
+            stroke: isEdgeActive ? '#10b981' : item.style?.stroke,
+            strokeWidth: isEdgeActive ? 2.8 : item.style?.strokeWidth || 1.5,
           },
-          zIndex: selected || hovered ? 8 : related ? 4 : 1,
+          zIndex: isEdgeActive ? 100 : 1,
         }
       }),
-    [active, graph.edges, graph.nodes.length, hoveredEdgeId, onSelect, selectedEdgeIds, t],
+    [active.enabled, graph.edges, onSelect, selectedEdgeIds, selectedNodeId, showEdgeLabels],
   )
 
   const graphKey = useMemo(
@@ -383,6 +391,8 @@ function InnerGraphCanvas(props) {
           setShowMetrics={setShowMetrics}
           showMiniMap={showMiniMap}
           setShowMiniMap={setShowMiniMap}
+          showEdgeLabels={showEdgeLabels}
+          setShowEdgeLabels={setShowEdgeLabels}
           layoutEngine={layoutEngine}
           setLayoutEngine={setLayoutEngine}
         />
