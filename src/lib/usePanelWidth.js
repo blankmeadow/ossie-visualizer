@@ -9,7 +9,7 @@ import { useCallback, useEffect, useState } from 'react'
  */
 export const PANEL_WIDTHS = {
   sidebar: { min: 200, max: 520, initial: 224 },
-  inspector: { min: 300, max: 760, initial: 370 },
+  inspector: { min: 340, max: 760, initial: 420 },
 }
 
 function clamp(value, { min, max }) {

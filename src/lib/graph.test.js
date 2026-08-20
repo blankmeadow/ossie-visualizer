@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildMappingGraph, buildOntologyGraph, buildSemanticGraph } from './graph'
+import { NODE_HEIGHT, NODE_WIDTH, buildMappingGraph, buildOntologyGraph, buildSemanticGraph } from './graph'
 import { normalizeOssie } from './ossie'
 
 const document = {
@@ -126,10 +126,10 @@ describe('graph builders', () => {
       for (let rightIndex = leftIndex + 1; rightIndex < graph.nodes.length; rightIndex += 1) {
         const left = graph.nodes[leftIndex].position
         const right = graph.nodes[rightIndex].position
-        const overlaps = left.x < right.x + 248
-          && left.x + 248 > right.x
-          && left.y < right.y + 108
-          && left.y + 108 > right.y
+        const overlaps = left.x < right.x + NODE_WIDTH
+          && left.x + NODE_WIDTH > right.x
+          && left.y < right.y + NODE_HEIGHT
+          && left.y + NODE_HEIGHT > right.y
         expect(overlaps, `${graph.nodes[leftIndex].id} overlaps ${graph.nodes[rightIndex].id}`).toBe(false)
       }
     }
@@ -146,10 +146,10 @@ describe('graph builders', () => {
       for (let rightIndex = leftIndex + 1; rightIndex < graph.nodes.length; rightIndex += 1) {
         const left = graph.nodes[leftIndex].position
         const right = graph.nodes[rightIndex].position
-        const overlaps = left.x < right.x + 248
-          && left.x + 248 > right.x
-          && left.y < right.y + 108
-          && left.y + 108 > right.y
+        const overlaps = left.x < right.x + NODE_WIDTH
+          && left.x + NODE_WIDTH > right.x
+          && left.y < right.y + NODE_HEIGHT
+          && left.y + NODE_HEIGHT > right.y
         expect(overlaps).toBe(false)
       }
     }

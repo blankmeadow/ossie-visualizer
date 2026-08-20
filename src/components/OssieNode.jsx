@@ -46,7 +46,7 @@ export default function OssieNode({ data, selected }) {
       {(data.targetHandles || []).map((handle) => <NodeHandle key={handle.id} type="target" handle={handle} />)}
       <BaseNodeHeader>
         <BaseNodeIcon className={KIND_TINTS[data.kind] || DEFAULT_TINT}>
-          <Icon size={15} strokeWidth={2} />
+          <Icon size={13} strokeWidth={2} />
         </BaseNodeIcon>
         <BaseNodeHeaderTitle>{KIND_LABELS[data.kind] || data.kind.toUpperCase()}</BaseNodeHeaderTitle>
       </BaseNodeHeader>
@@ -82,7 +82,7 @@ function NodeHandle({ type, handle }) {
       type={type}
       position={position}
       style={style}
-      className="size-[6px] border border-[#92aaa0] bg-[#fafffc] opacity-75"
+      className="size-[8px] border border-[#a5a5a5] bg-white opacity-90"
     />
   )
 }

@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils'
 
 const baseNodeVariants = cva(
   cn(
-    'w-[248px] min-h-[136px] rounded-[7px] border px-[14px] py-[12px]',
+    'h-[104px] w-[224px] overflow-hidden rounded-[8px] border px-[12px] py-[9px]',
     'bg-white',
     'transition-[opacity,filter,border-color,box-shadow,transform] duration-150',
   ),
@@ -52,13 +52,13 @@ function BaseNode({ className, emphasis = 'default', ...props }) {
 }
 
 function BaseNodeHeader({ className, ...props }) {
-  return <div className={cn('flex items-center gap-[6px] text-[#777]', className)} {...props} />
+  return <div className={cn('flex h-[18px] items-center gap-[6px] text-[#777]', className)} {...props} />
 }
 
 function BaseNodeHeaderTitle({ className, ...props }) {
   return (
     <span
-      className={cn('font-sans text-micro font-semibold tracking-[.08em]', className)}
+      className={cn('font-sans text-[8px] font-semibold tracking-[.09em]', className)}
       {...props}
     />
   )
@@ -68,20 +68,20 @@ function BaseNodeHeaderTitle({ className, ...props }) {
 function BaseNodeIcon({ className, ...props }) {
   return (
     <span
-      className={cn('grid size-[21px] place-items-center rounded-[6px]', className)}
+      className={cn('grid size-[18px] place-items-center rounded-[5px]', className)}
       {...props}
     />
   )
 }
 
 function BaseNodeContent({ className, ...props }) {
-  return <div className={cn('mt-[7px]', className)} {...props} />
+  return <div className={cn('mt-[5px]', className)} {...props} />
 }
 
 function BaseNodeTitle({ className, ...props }) {
   return (
     <div
-      className={cn('truncate font-mono text-[13px] font-medium text-[#2d2d2d]', className)}
+      className={cn('truncate font-sans text-[14px] leading-[18px] font-medium text-[#2d2d2d]', className)}
       {...props}
     />
   )
@@ -91,7 +91,7 @@ function BaseNodeTitle({ className, ...props }) {
 function BaseNodeSubtitle({ className, ...props }) {
   return (
     <div
-      className={cn('mt-[4px] h-[14px] truncate font-mono text-tiny text-muted', className)}
+      className={cn('mt-[2px] h-[12px] truncate font-mono text-[8px] leading-[12px] text-muted', className)}
       {...props}
     />
   )
@@ -105,7 +105,7 @@ function BaseNodeDescription({ className, ...props }) {
   return (
     <div
       className={cn(
-        'mt-[5px] line-clamp-2 min-h-[26px] text-tiny leading-[1.45] text-[#666]',
+        'mt-[2px] line-clamp-1 min-h-[12px] font-sans text-[9px] leading-[12px] text-[#666]',
         className,
       )}
       {...props}
@@ -114,15 +114,15 @@ function BaseNodeDescription({ className, ...props }) {
 }
 
 function BaseNodeFooter({ className, ...props }) {
-  return <div className={cn('mt-[7px] flex gap-[4px]', className)} {...props} />
+  return <div className={cn('mt-[4px] flex h-[11px] gap-[4px] overflow-hidden', className)} {...props} />
 }
 
 function BaseNodeBadge({ className, ...props }) {
   return (
     <span
       className={cn(
-        'rounded-[4px] bg-[#f1f1f1] px-[5px] py-[2px]',
-        'font-mono text-[7px] font-medium text-[#666]',
+        'rounded-[3px] bg-[#f1f1f1] px-[4px] py-[1px]',
+        'font-mono text-[7px] leading-[9px] font-medium text-[#666]',
         className,
       )}
       {...props}

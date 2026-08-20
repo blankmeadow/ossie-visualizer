@@ -61,7 +61,12 @@ function frameNodes(flow, canvasRef, items, inspectorWidth, duration = 340) {
   const inspectorReserve = Math.min(inspectorWidth + 20, canvas.width * 0.5)
   const availableWidth = Math.max(260, canvas.width - inspectorReserve - 72)
   const availableHeight = Math.max(220, canvas.height - 96)
-  const zoom = Math.max(0.1, Math.min(1.06, availableWidth / boundsWidth, availableHeight / boundsHeight))
+  const fitZoom = Math.min(1.06, availableWidth / boundsWidth, availableHeight / boundsHeight)
+  // A mathematically complete fit can make metadata unreadable on a dense
+  // ontology. Keep the initial overview legible (the toolbar still offers a
+  // true fit-to-screen action) and bring a focused node close to native size.
+  const minimumReadableZoom = items.length === 1 ? 0.92 : 0.56
+  const zoom = Math.max(minimumReadableZoom, fitZoom)
   const contentCenterX = minX + boundsWidth / 2
   const contentCenterY = minY + boundsHeight / 2
 
@@ -220,10 +225,11 @@ function InnerGraphCanvas(props) {
   const t = useT()
   const flow = useReactFlow()
   const tokens = useCssTokens(CANVAS_TOKENS)
-  const previousGraphKey = useRef('')
-  const previousCenteredNode = useRef('')
-  const previousCenteredEdge = useRef('')
+  const graphNodesRef = useRef(graph.nodes)
+  const selectedNodeFrameRef = useRef(null)
+  const edgeFrameNodesRef = useRef([])
   const [hoveredEdgeId, setHoveredEdgeId] = useState('')
+  const activeInspectorWidth = selection ? inspectorWidth : 0
 
   const selectedNodeId = useMemo(
     () => graph.nodes.find((item) => selectionMatches(item.data?.selection, selection))?.id || '',
@@ -305,44 +311,45 @@ function InnerGraphCanvas(props) {
     () => `${graph.nodes.map((n) => n.id).sort().join(',')}:${graph.edges.map((e) => e.id).sort().join(',')}`,
     [graph.edges, graph.nodes],
   )
+  graphNodesRef.current = graph.nodes
 
   useEffect(() => {
-    if (!nodes.length) return undefined
-    if (previousGraphKey.current === graphKey) return undefined
-    previousGraphKey.current = graphKey
+    if (!graphNodesRef.current.length) return undefined
     const timeout = window.setTimeout(() => {
-      frameNodes(flow, canvasRef, nodes, inspectorWidth)
+      frameNodes(flow, canvasRef, graphNodesRef.current, activeInspectorWidth)
     }, 60)
     return () => window.clearTimeout(timeout)
-  }, [canvasRef, flow, graphKey, inspectorWidth, nodes])
+  }, [activeInspectorWidth, canvasRef, flow, graphKey])
 
-  const selectedNodeKey = selection?.kind === 'concept' || selection?.kind === 'dataset' || selection?.kind === 'metric'
-    ? selection.name
+  const selectedNode = graph.nodes.find((item) => item.id === selectedNodeId)
+  selectedNodeFrameRef.current = selectedNode || null
+  const selectedNodeKey = selectedNode
+    ? `${selectedNode.id}@${selectedNode.position.x},${selectedNode.position.y}`
     : ''
   useEffect(() => {
-    if (!selectedNodeKey || previousCenteredNode.current === selectedNodeKey) return undefined
-    previousCenteredNode.current = selectedNodeKey
-    const targetNode = graph.nodes.find((item) => item.id === selectedNodeKey)
-    if (!targetNode) return undefined
+    if (!selectedNodeKey || !selectedNodeFrameRef.current) return undefined
     const timeout = window.setTimeout(() => {
-      frameNodes(flow, canvasRef, [targetNode], inspectorWidth, 240)
+      frameNodes(flow, canvasRef, [selectedNodeFrameRef.current], activeInspectorWidth, 240)
     }, 80)
     return () => window.clearTimeout(timeout)
-  }, [canvasRef, flow, graph.nodes, inspectorWidth, selectedNodeKey])
+  }, [activeInspectorWidth, canvasRef, flow, selectedNodeKey])
 
   const selectedEdgeKey = selectedEdgeIds.size ? [...selectedEdgeIds].sort().join(',') : ''
+  const selectedEdges = graph.edges.filter((item) => selectedEdgeIds.has(item.id))
+  const selectedEdgeNodeIds = new Set(selectedEdges.flatMap((item) => [item.source, item.target]))
+  const edgeFrameNodes = graph.nodes.filter((item) => selectedEdgeNodeIds.has(item.id))
+  edgeFrameNodesRef.current = edgeFrameNodes
+  const edgeFrameKey = edgeFrameNodes
+    .map((item) => `${item.id}@${item.position.x},${item.position.y}`)
+    .sort()
+    .join('|')
   useEffect(() => {
-    if (!selectedEdgeKey || previousCenteredEdge.current === selectedEdgeKey) return undefined
-    previousCenteredEdge.current = selectedEdgeKey
-    const selectedEdges = graph.edges.filter((item) => selectedEdgeIds.has(item.id))
-    const selectedNodeIds = new Set(selectedEdges.flatMap((item) => [item.source, item.target]))
-    const selectedNodes = graph.nodes.filter((item) => selectedNodeIds.has(item.id))
-    if (!selectedNodes.length) return undefined
+    if (!selectedEdgeKey || !edgeFrameNodesRef.current.length) return undefined
     const timeout = window.setTimeout(() => {
-      frameNodes(flow, canvasRef, selectedNodes, inspectorWidth)
+      frameNodes(flow, canvasRef, edgeFrameNodesRef.current, activeInspectorWidth)
     }, 120)
     return () => window.clearTimeout(timeout)
-  }, [canvasRef, flow, graph.edges, graph.nodes, inspectorWidth, selectedEdgeIds, selectedEdgeKey])
+  }, [activeInspectorWidth, canvasRef, edgeFrameKey, flow, selectedEdgeKey])
 
   return (
     <ReactFlow

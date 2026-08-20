@@ -2,8 +2,11 @@ import dagre from '@dagrejs/dagre'
 import { MarkerType } from '@xyflow/react'
 import { mappingEvidenceForDataset, referencedDatasets, relationshipKind, roleKind } from './ossie'
 
-export const NODE_WIDTH = 248
-export const NODE_HEIGHT = 136
+// n8n's configurable workflow cards use a 224 × 96 shell. Ossie carries one
+// extra metadata line, so the card stays just 8px taller while keeping the
+// same compact width and visual density.
+export const NODE_WIDTH = 224
+export const NODE_HEIGHT = 104
 
 // Lazy-load ELK to keep the initial bundle small (~1.4 MB savings).
 let elkInstance = null
@@ -94,9 +97,9 @@ function layoutComponent(nodes, edges, direction, options) {
 function layout(nodes, edges, direction = 'LR', overrides = {}) {
   if (!nodes.length) return []
   const options = {
-    ranksep: direction === 'TB' ? 96 : 118,
-    nodesep: direction === 'TB' ? 56 : 48,
-    componentGap: 86,
+    ranksep: direction === 'TB' ? 76 : 96,
+    nodesep: direction === 'TB' ? 38 : 36,
+    componentGap: 70,
     packWidth: direction === 'TB' ? 1780 : 1960,
     ...overrides,
   }
@@ -679,8 +682,8 @@ function layoutMapping(nodes) {
   const mapping = nodes[1]
   const datasets = nodes.slice(2)
   const columns = Math.min(3, Math.max(1, Math.ceil(Math.sqrt(datasets.length))))
-  const xGap = NODE_WIDTH + 58
-  const yGap = NODE_HEIGHT + 46
+  const xGap = NODE_WIDTH + 44
+  const yGap = NODE_HEIGHT + 36
   const rows = Math.ceil(datasets.length / columns)
   const centerY = Math.max(0, (rows - 1) * yGap / 2)
   return [
