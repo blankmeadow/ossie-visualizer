@@ -560,10 +560,6 @@ function ConceptDetail({ item, model, onNavigate }) {
         ) : <span className="muted">—</span>}
       </Section>
 
-      <Section title={t('concept.inbound')} count={inbound.length}>
-        <InboundTable entries={inbound} model={model} onNavigate={onNavigate} />
-      </Section>
-
       {!!inheritedBy.length && (
         <Section title={t('concept.extendedBy')}>
           <LinkList items={inheritedBy.map((concept) => ({ kind: 'concept', name: concept.concept, target: concept }))} onNavigate={onNavigate} />
