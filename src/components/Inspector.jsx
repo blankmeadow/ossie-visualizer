@@ -495,9 +495,8 @@ function ConceptDetail({ item, model, onNavigate }) {
         {attributes.length ? (
           <MemberTable headers={[
             t('concept.colName'),
-            t('concept.colVerbalizes'),
-            t('concept.colType'),
-            t('concept.colRequires')
+            t('concept.colRequires'),
+            t('concept.colType')
           ]}>
             <GroupedRows
               groups={groupMembers(attributes, model, t)}
@@ -506,7 +505,6 @@ function ConceptDetail({ item, model, onNavigate }) {
                 const isPk = member.keyIndex >= 0 || (item.identify_by || []).includes(member.name)
                 const typeText = types.map((type) => type.label).join(', ') || t('concept.noType')
                 const descText = member.relationship.description
-                const verbalText = verbalizationText(member)
                 const reqText = requiresText(member)
 
                 return (
@@ -518,9 +516,8 @@ function ConceptDetail({ item, model, onNavigate }) {
                       </span>
                       {!!descText && <small className="member-table__subdesc">{descText}</small>}
                     </div>
-                    <Cell value={verbalText} tone="member-table__cell--muted" />
-                    <Cell value={typeText} tone="member-table__cell--type" />
                     <Cell value={reqText} tone="member-table__cell--muted" />
+                    <Cell value={typeText} tone="member-table__cell--type" />
                   </MemberRow>
                 )
               }}
