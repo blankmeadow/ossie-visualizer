@@ -86,6 +86,53 @@ describe('Ossie parsing and validation', () => {
     })
   })
 
+  it('rejects a multiplicity outside the enum, OneToMany above all', () => {
+    const invalid = structuredClone(pureOntology)
+    invalid.ontology[0].relationships[0].multiplicity = 'OneToMany'
+    expect(validateOssie(invalid).errors).toContainEqual({
+      path: '$.ontology[0].relationships[0].multiplicity',
+      code: 'issue.multiplicityInvalid',
+      params: { name: 'OneToMany' },
+    })
+    const valid = structuredClone(pureOntology)
+    valid.ontology[0].relationships[0].multiplicity = 'ManyToOne'
+    expect(validateOssie(valid).errors).toEqual([])
+  })
+
+  it('refuses a concept that reuses a built-in name instead of shadowing it', () => {
+    const invalid = structuredClone(pureOntology)
+    invalid.ontology.push({ concept: 'String', type: 'EntityType' })
+    expect(validateOssie(invalid).errors).toContainEqual({
+      path: '$.ontology[2].concept',
+      code: 'issue.builtinRedeclared',
+      params: { name: 'String' },
+    })
+    // The reason it has to be an error: resolution never reaches the concept.
+    expect(roleKind('String', normalizeOssie(invalid))).toBe('builtinValue')
+  })
+
+  it('requires a value type to be founded on a built-in value type', () => {
+    const invalid = structuredClone(pureOntology)
+    invalid.ontology.push({ concept: 'money', type: 'ValueType' })
+    expect(validateOssie(invalid).errors).toContainEqual({
+      path: '$.ontology[2].extends',
+      code: 'issue.valueTypeWithoutBase',
+      params: { name: 'money' },
+    })
+  })
+
+  it('treats core-spec data types that are not ontology concepts as dangling', () => {
+    // `Time`, `DateTimeTz` and `Opaque` are semantic-model DataTypes; the
+    // ontology's built-in concepts stop at the seven value types plus `Any`.
+    const invalid = structuredClone(pureOntology)
+    invalid.ontology.push({ concept: 'clock', type: 'ValueType', extends: ['Time'] })
+    const codes = validateOssie(invalid).errors.map((error) => error.code)
+    expect(codes).toContain('issue.unknownParent')
+    expect(codes).toContain('issue.valueTypeWithoutBase')
+    expect(roleKind('Time', normalizeOssie(invalid))).toBe('unknown')
+    expect(roleKind('DateTime', normalizeOssie(invalid))).toBe('builtinValue')
+  })
+
   it('normalizes semantic models and finds datasets from mapping expressions', () => {
     const model = normalizeOssie(fullDocument)
     expect(model.stats).toMatchObject({
