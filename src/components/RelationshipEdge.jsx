@@ -25,7 +25,16 @@ function step(from, to, length) {
  * The bends come from the layout, which knows where the other cards are; the
  * rounding is what keeps a detour from reading as a hard mechanical turn.
  */
-function bentPath(points) {
+/** The point `fraction` of the way along a quadratic curve. */
+function quadraticPoint(from, control, to, fraction) {
+  const rest = 1 - fraction
+  return {
+    x: rest * rest * from.x + 2 * rest * fraction * control.x + fraction * fraction * to.x,
+    y: rest * rest * from.y + 2 * rest * fraction * control.y + fraction * fraction * to.y,
+  }
+}
+
+function bentPath(points, fraction = 0.5) {
   let path = `M ${points[0].x},${points[0].y}`
   for (let index = 1; index < points.length - 1; index++) {
     const corner = points[index]
@@ -42,12 +51,12 @@ function bentPath(points) {
   path += ` L ${last.x},${last.y}`
 
   const lengths = points.slice(1).map((point, index) => distance(points[index], point))
-  const half = lengths.reduce((total, value) => total + value, 0) / 2
+  const mark = lengths.reduce((total, value) => total + value, 0) * fraction
   let walked = 0
   for (let index = 0; index < lengths.length; index++) {
-    if (walked + lengths[index] >= half) {
-      const middle = step(points[index], points[index + 1], half - walked)
-      return [path, middle.x, middle.y]
+    if (walked + lengths[index] >= mark) {
+      const anchor = step(points[index], points[index + 1], mark - walked)
+      return [path, anchor.x, anchor.y]
     }
     walked += lengths[index]
   }
@@ -70,6 +79,8 @@ export default function RelationshipEdge({
   selected,
 }) {
   const bends = data?.points || []
+  const bow = data?.bow
+  const fraction = data?.labelFraction ?? 0.5
   const acrossFlow = VERTICAL_SIDES.includes(sourcePosition)
     ? Math.abs(targetX - sourceX)
     : Math.abs(targetY - sourceY)
@@ -77,25 +88,36 @@ export default function RelationshipEdge({
   const [path, labelX, labelY] = bends.length
     // The bends are laid out for the handles this edge left the layout with, so
     // they join the ends React Flow reports rather than replacing them.
-    ? bentPath([{ x: sourceX, y: sourceY }, ...bends, { x: targetX, y: targetY }])
-    : acrossFlow <= STRAIGHT_TOLERANCE
-      ? getStraightPath({ sourceX, sourceY, targetX, targetY })
-      : getBezierPath({
-        sourceX,
-        sourceY,
-        targetX,
-        targetY,
-        sourcePosition,
-        targetPosition,
-        curvature: 0.18,
-      })
+    ? bentPath([{ x: sourceX, y: sourceY }, ...bends, { x: targetX, y: targetY }], fraction)
+    : bow
+      // One arc per edge running between the same two cards.
+      ? [
+        `M ${sourceX},${sourceY} Q ${bow.x},${bow.y} ${targetX},${targetY}`,
+        quadraticPoint({ x: sourceX, y: sourceY }, bow, { x: targetX, y: targetY }, fraction).x,
+        quadraticPoint({ x: sourceX, y: sourceY }, bow, { x: targetX, y: targetY }, fraction).y,
+      ]
+      : acrossFlow <= STRAIGHT_TOLERANCE
+        ? getStraightPath({ sourceX, sourceY, targetX, targetY })
+        : getBezierPath({
+          sourceX,
+          sourceY,
+          targetX,
+          targetY,
+          sourcePosition,
+          targetPosition,
+          curvature: 0.18,
+        })
 
   // Keep labels readable like n8n: horizontal edges place the label above the
   // line; vertical edges place it beside the line instead of rotating text.
+  // An edge bowed aside from its twin takes its label to the side it bowed to,
+  // which is what actually keeps two long relationship names apart on a short
+  // run between the same two cards.
   const isVertical = Math.abs(targetY - sourceY) > Math.abs(targetX - sourceX)
+  const side = data?.labelSide || 0
   const labelTransform = isVertical
-    ? `translate(${labelX}px, ${labelY}px) translate(12px, -50%)`
-    : `translate(${labelX}px, ${labelY}px) translate(-50%, calc(-100% - 5px))`
+    ? `translate(${labelX}px, ${labelY}px) translate(${side < 0 ? 'calc(-100% - 12px)' : '12px'}, -50%)`
+    : `translate(${labelX}px, ${labelY}px) translate(-50%, ${side > 0 ? '5px' : 'calc(-100% - 5px)'})`
 
   const activeStyle = selected ? {
     ...style,

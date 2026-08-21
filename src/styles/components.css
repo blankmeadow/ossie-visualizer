@@ -171,10 +171,15 @@ html, body, #root { height: 100%; margin: 0; padding: 0; overflow: hidden; }
 .graph-canvas .react-flow.is-unlocked .react-flow__node { cursor: grab; }
 .graph-canvas .react-flow.is-unlocked .react-flow__node.dragging { cursor: grabbing; }
 .react-flow__edge { cursor: pointer; }.react-flow__edge-path { transition: opacity .16s, stroke .16s, stroke-width .16s; }.react-flow__edge-text { font-family: 'SFMono-Regular', Consolas, monospace; }
+/* Labels ride above the cards. Under them, a label whose edge happens to pass
+   over a card is not dimmed but gone, which reads as a bug rather than as a
+   crowded graph. */
+.graph-canvas .react-flow__edgelabel-renderer { z-index: 4; }
 .edge-label-text {
   position: absolute;
   pointer-events: auto;
-  background: transparent;
+  border-radius: 3px;
+  background: rgba(245,245,245,.92);
   border: 0;
   padding: 2px 4px;
   margin: 0;
@@ -195,8 +200,7 @@ html, body, #root { height: 100%; margin: 0; padding: 0; overflow: hidden; }
 }
 
 .edge-label-text.is-vertical {
-  border-radius: 3px;
-  background: rgba(245,245,245,.9);
+  background: rgba(245,245,245,.96);
 }
 
 .edge-label-text.is-dimmed {

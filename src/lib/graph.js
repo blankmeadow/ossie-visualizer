@@ -389,6 +389,8 @@ function edgeSides(sourceNode, targetNode, direction) {
 const ROUTE_CLEARANCE = 20
 const ROUTE_DEPTH = 3
 const ROUTE_MAX_BENDS = 6
+// How far apart to bow two edges that run between the same pair of cards.
+const PARALLEL_SPREAD = 30
 
 /** Where a handle sits, from the side it is on and its offset along that side. */
 function handlePoint(node, side, offset) {
@@ -614,6 +616,88 @@ function attachHandles(nodes, edges, direction) {
 }
 
 /**
+ * Pull apart the edges that run between the same two cards.
+ *
+ * A model that spells out both directions of a relationship -- `has_x` on one
+ * concept and `x_belongs_to` on the other -- draws two edges over the same
+ * stretch of canvas, and their labels land on the same spot and turn into
+ * mush. Each gets bowed to its own side of the line and its label set down at
+ * its own point along it, so both stay readable and keep their own arrow.
+ */
+function quadraticPoint(from, control, to, fraction) {
+  const rest = 1 - fraction
+  return {
+    x: rest * rest * from.x + 2 * rest * fraction * control.x + fraction * fraction * to.x,
+    y: rest * rest * from.y + 2 * rest * fraction * control.y + fraction * fraction * to.y,
+  }
+}
+
+/** Does the arc `from -> control -> to` stay off every box? */
+function bowClears(from, control, to, boxes) {
+  const samples = []
+  for (let step = 0; step <= 16; step++) samples.push(quadraticPoint(from, control, to, step / 16))
+  return blockedCount(samples, boxes) === 0
+}
+
+function spreadParallel(edges, boxes) {
+  const groups = new Map()
+  for (const item of edges) {
+    if (!item.data?.from || !item.data?.to) continue
+    const key = [item.source, item.target].sort().join('\u0000')
+    groups.set(key, [...(groups.get(key) || []), item.id])
+  }
+
+  const lanes = new Map()
+  for (const [key, ids] of groups) {
+    if (ids.length < 2) continue
+    const ordered = [...ids].sort()
+    const [first] = key.split('\u0000')
+    ordered.forEach((id, index) => lanes.set(id, { index, count: ordered.length, first }))
+  }
+  if (!lanes.size) return edges
+
+  return edges.map((item) => {
+    const lane = lanes.get(item.id)
+    if (!lane) return item
+    const { from, to } = item.data
+    // Both directions of the same relationship are measured from the same end
+    // of the pair, or the two would mirror onto each other and land back on the
+    // same spot -- which is precisely what they were being pulled apart from.
+    const forward = item.source === lane.first
+    const spread = (lane.index - (lane.count - 1) / 2) * PARALLEL_SPREAD
+    const offset = forward ? spread : -spread
+    // The label walks along with the bow, so two of them never share a point.
+    const along = (lane.index + 1) / (lane.count + 1)
+    const labelFraction = forward ? along : 1 - along
+    // An edge already walking around a card keeps that route; bowing it as
+    // well would undo the detour.
+    if (item.data.points || !offset) return { ...item, data: { ...item.data, labelFraction } }
+    const span = Math.hypot(to.x - from.x, to.y - from.y) || 1
+    const normal = { x: -(to.y - from.y) / span, y: (to.x - from.x) / span }
+    // A quadratic passes at half its control offset, so aim twice as far out.
+    const control = (amount) => ({
+      x: (from.x + to.x) / 2 + normal.x * amount * 2,
+      y: (from.y + to.y) / 2 + normal.y * amount * 2,
+    })
+    // Bowing out of one card's way and into another's would trade one problem
+    // for a worse one, so the arc takes the other side, or stays flat.
+    const obstacles = boxes.filter((box) => box.id !== item.source && box.id !== item.target)
+    const bow = [offset, -offset]
+      .map((amount) => ({ amount, point: control(amount) }))
+      .find((candidate) => bowClears(from, candidate.point, to, obstacles))
+    if (!bow) return { ...item, data: { ...item.data, labelFraction } }
+    // Which side of the line the arc came out on, so its label can sit on that
+    // side too rather than on top of the one it was just pulled away from.
+    const vertical = Math.abs(to.y - from.y) >= Math.abs(to.x - from.x)
+    const drift = vertical ? normal.x * bow.amount : normal.y * bow.amount
+    return {
+      ...item,
+      data: { ...item.data, bow: bow.point, labelFraction, labelSide: Math.sign(drift) },
+    }
+  })
+}
+
+/**
  * Give every edge the bend points it needs to stay off the cards it is not
  * attached to. Runs once per layout, on the positions the layout produced.
  */
@@ -626,12 +710,19 @@ function routeAll(nodes, edges) {
     height: NODE_HEIGHT,
   }]))
   const all = [...boxes.values()]
-  return edges.map((item) => {
-    const { from, to, ...rest } = item.data || {}
-    if (!from || !to) return { ...item, data: rest }
+  const routed = edges.map((item) => {
+    const data = item.data || {}
+    if (!data.from || !data.to) return item
     const obstacles = all.filter((box) => box.id !== item.source && box.id !== item.target)
-    const points = routeEdgePoints(from, to, obstacles)
-    return { ...item, data: points.length ? { ...rest, points } : rest }
+    const points = routeEdgePoints(data.from, data.to, obstacles)
+    return points.length ? { ...item, data: { ...data, points } } : item
+  })
+
+  // The endpoints were only ever needed to work the geometry out; the edge
+  // itself is drawn from the handles React Flow reports.
+  return spreadParallel(routed, all).map((item) => {
+    const { from, to, ...rest } = item.data || {}
+    return { ...item, data: rest }
   })
 }
 
