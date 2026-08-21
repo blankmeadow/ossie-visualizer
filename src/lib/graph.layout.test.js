@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { buildOntologyGraph, buildSemanticGraph, layoutBends, markerSizeForZoom, NODE_HEIGHT, NODE_WIDTH } from './graph'
+import { elkOrthogonalPath } from './edgePath'
+import { buildMappingGraph, buildOntologyGraph, buildSemanticGraph, layoutBends, markerSizeForZoom, NODE_HEIGHT, NODE_WIDTH } from './graph'
 import { normalizeOssie } from './ossie'
 
 /**
@@ -88,6 +89,7 @@ function endpoints(graph) {
 }
 
 const ontologyGraph = buildOntologyGraph(model, { showRelationships: true })
+const elkOntologyGraph = await buildOntologyGraph(model, { showRelationships: true, layoutEngine: 'elk' })
 
 describe('graph layout conventions', () => {
   const ontology = ontologyGraph
@@ -271,6 +273,81 @@ describe('edge routing', () => {
       }
     }
     expect(checked).toBeGreaterThanOrEqual(1)
+  })
+})
+
+describe('strict ELK routing', () => {
+  const byId = new Map(elkOntologyGraph.nodes.map((item) => [item.id, item]))
+
+  const endpoint = (nodeId, handleId, role) => {
+    const node = byId.get(nodeId)
+    const handles = node.data[role === 'source' ? 'sourceHandles' : 'targetHandles']
+    const handle = handles.find((item) => item.id === handleId)
+    const { x, y } = node.position
+    if (handle.position === 'top') return { x: x + (NODE_WIDTH * handle.offset) / 100, y }
+    if (handle.position === 'bottom') return { x: x + (NODE_WIDTH * handle.offset) / 100, y: y + NODE_HEIGHT }
+    if (handle.position === 'left') return { x, y: y + (NODE_HEIGHT * handle.offset) / 100 }
+    return { x: x + NODE_WIDTH, y: y + (NODE_HEIGHT * handle.offset) / 100 }
+  }
+
+  it('ranks inheritance parent-first while keeping the arrow child-to-parent', () => {
+    const inheritance = elkOntologyGraph.edges.filter((item) => item.data.kind === 'inheritance')
+    expect(inheritance.length).toBeGreaterThan(0)
+    for (const item of inheritance) {
+      expect(byId.get(item.target).position.y).toBeLessThan(byId.get(item.source).position.y)
+      const sourceHandle = byId.get(item.source).data.sourceHandles
+        .find((handle) => handle.id === item.sourceHandle)
+      const targetHandle = byId.get(item.target).data.targetHandles
+        .find((handle) => handle.id === item.targetHandle)
+      expect(sourceHandle.position).toBe('top')
+      expect(targetHandle.position).toBe('bottom')
+    }
+  })
+
+  it('uses every ELK section as an unsmoothed orthogonal route', () => {
+    let routed = 0
+    for (const item of elkOntologyGraph.edges) {
+      expect(item.type).toBe('relationshipEdge')
+      expect(item.data.routeMode).toBe('elk-orthogonal')
+      const points = item.data.points || []
+      expect(points[0]).toEqual(endpoint(item.source, item.sourceHandle, 'source'))
+      expect(points[points.length - 1]).toEqual(endpoint(item.target, item.targetHandle, 'target'))
+      for (let index = 1; index < points.length; index++) {
+        const from = points[index - 1]
+        const to = points[index]
+        const orthogonal = Math.abs(from.x - to.x) < 1e-6 || Math.abs(from.y - to.y) < 1e-6
+        expect({ edge: item.id, segment: [from, to], orthogonal }).toEqual({
+          edge: item.id,
+          segment: [from, to],
+          orthogonal: true,
+        })
+      }
+      routed += 1
+    }
+    expect(routed).toBeGreaterThanOrEqual(3)
+  })
+
+  it('draws ELK points verbatim with hard SVG line segments', () => {
+    const points = [{ x: 0, y: 0 }, { x: 0, y: 60 }, { x: 100, y: 60 }]
+    const [path, labelX, labelY] = elkOrthogonalPath(points, 0.5)
+    expect(path).toBe('M 0,0 L 0,60 L 100,60')
+    expect(path).not.toMatch(/[CQ]/)
+    expect([labelX, labelY]).toEqual([20, 60])
+  })
+
+  it('uses the exact ELK renderer in the semantic and mapping views too', async () => {
+    const graphs = [
+      await buildSemanticGraph(model, { layoutEngine: 'elk' }),
+      await buildMappingGraph(model, model.conceptMappings[0], { layoutEngine: 'elk' }),
+    ]
+    for (const graph of graphs) {
+      expect(graph.edges.length).toBeGreaterThan(0)
+      for (const item of graph.edges) {
+        expect(item.type).toBe('relationshipEdge')
+        expect(item.data.routeMode).toBe('elk-orthogonal')
+        expect(item.data.points.length).toBeGreaterThanOrEqual(2)
+      }
+    }
   })
 })
 

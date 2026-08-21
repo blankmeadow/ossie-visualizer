@@ -184,6 +184,14 @@ function layout(nodes, edges, direction = 'LR', overrides = {}) {
 // ─── ELK layout ──────────────────────────────────────────────────────────────
 
 const ELK_DIRECTION = { TB: 'DOWN', LR: 'RIGHT' }
+const REACT_FLOW_SIDE = { NORTH: 'top', EAST: 'right', SOUTH: 'bottom', WEST: 'left' }
+
+function elkPortSides(item, direction) {
+  if (item.data?.rankReversed) {
+    return direction === 'TB' ? ['NORTH', 'SOUTH'] : ['WEST', 'EAST']
+  }
+  return direction === 'TB' ? ['SOUTH', 'NORTH'] : ['EAST', 'WEST']
+}
 
 function elkLayoutComponent(nodes, edges, direction, options) {
   const elkDir = ELK_DIRECTION[direction] || 'DOWN'
@@ -195,12 +203,7 @@ function elkLayoutComponent(nodes, edges, direction, options) {
   for (const item of edges) {
     const sourcePortId = `source:${item.id}`
     const targetPortId = `target:${item.id}`
-    const sourceSide = item.data?.rankReversed
-      ? (direction === 'TB' ? 'NORTH' : 'WEST')
-      : (direction === 'TB' ? 'SOUTH' : 'EAST')
-    const targetSide = item.data?.rankReversed
-      ? (direction === 'TB' ? 'SOUTH' : 'EAST')
-      : (direction === 'TB' ? 'NORTH' : 'WEST')
+    const [sourceSide, targetSide] = elkPortSides(item, direction)
     portMap.get(item.source)?.push({ id: sourcePortId, side: sourceSide })
     portMap.get(item.target)?.push({ id: targetPortId, side: targetSide })
     edgePorts.set(item.id, { sourcePortId, targetPortId })
@@ -211,23 +214,22 @@ function elkLayoutComponent(nodes, edges, direction, options) {
     layoutOptions: {
       'elk.algorithm': 'layered',
       'elk.direction': elkDir,
-      'org.eclipse.elk.portConstraints': 'FIXED_ORDER',
       'elk.spacing.nodeNode': String(options.nodesep),
       'elk.layered.spacing.nodeNodeBetweenLayers': String(options.ranksep),
       'elk.layered.nodePlacement.strategy': 'BRANDES_KOEPF',
-      'elk.layered.considerModelOrder.strategy': 'NODES_AND_EDGES',
       'elk.edgeRouting': 'ORTHOGONAL',
     },
     children: nodes.map((item) => ({
       id: item.id,
       width: NODE_WIDTH,
       height: NODE_HEIGHT,
-      properties: { 'org.eclipse.elk.portConstraints': 'FIXED_ORDER' },
-      ports: (portMap.get(item.id) || []).map((port, index) => ({
+      // Only the face is fixed. ELK remains free to order ports along it while
+      // minimizing crossings, because the UI has no pre-existing port order.
+      properties: { 'org.eclipse.elk.portConstraints': 'FIXED_SIDE' },
+      ports: (portMap.get(item.id) || []).map((port) => ({
         id: port.id,
         properties: {
           'org.eclipse.elk.port.side': port.side,
-          'org.eclipse.elk.port.index': String(index),
         },
       })),
     })),
@@ -235,8 +237,10 @@ function elkLayoutComponent(nodes, edges, direction, options) {
       const ports = edgePorts.get(item.id)
       return {
         id: item.id,
-        sources: [ports.sourcePortId],
-        targets: [ports.targetPortId],
+        // Inheritance is drawn child -> parent, but ranked parent -> child.
+        // Reverse it only inside ELK and turn its returned route back around.
+        sources: [item.data?.rankReversed ? ports.targetPortId : ports.sourcePortId],
+        targets: [item.data?.rankReversed ? ports.sourcePortId : ports.targetPortId],
       }
     }),
   }
@@ -244,10 +248,12 @@ function elkLayoutComponent(nodes, edges, direction, options) {
   return getElk().then((instance) => instance.layout(elkGraph)).then((layoutedGraph) => {
     // ELK is asked for orthogonal routing above, so it hands back the bends it
     // routed each edge through, in the same coordinates as the cards.
+    const edgeById = new Map(edges.map((item) => [item.id, item]))
     const routes = new Map((layoutedGraph.edges || []).map((item) => {
       const section = item.sections?.[0]
       if (!section) return [item.id, []]
-      return [item.id, finitePoints([section.startPoint, ...(section.bendPoints || []), section.endPoint])]
+      const route = finitePoints([section.startPoint, ...(section.bendPoints || []), section.endPoint])
+      return [item.id, edgeById.get(item.id)?.data?.rankReversed ? route.reverse() : route]
     }))
     let minX = Infinity
     let minY = Infinity
@@ -458,10 +464,11 @@ export function layoutBends(route) {
  * would have an edge leave by the face pointing away from where it is going.
  * Which side an edge uses stays a question of where the two cards sit.
  */
-function offsetAlong(node, side, point) {
+function offsetAlong(node, side, point, exact = false) {
   const along = side === 'top' || side === 'bottom'
     ? ((point.x - node.position.x) / NODE_WIDTH) * 100
     : ((point.y - node.position.y) / NODE_HEIGHT) * 100
+  if (exact) return along
   return Math.min(94, Math.max(6, along))
 }
 
@@ -475,8 +482,9 @@ function offsetAlong(node, side, point) {
  * a side are fanned across it in the order of the cards they reach, which at
  * least keeps them from crossing on their way out.
  */
-function attachHandles(nodes, edges, direction, routes = new Map()) {
+function attachHandles(nodes, edges, direction, routes = new Map(), engine = 'dagre') {
   const nodeById = new Map(nodes.map((item) => [item.id, item]))
+  const strictElk = engine === 'elk'
 
   // Fan whatever the engine did not route across the side it uses, in the
   // order of the cards at the other end.
@@ -495,7 +503,7 @@ function attachHandles(nodes, edges, direction, routes = new Map()) {
 
   const routed = (item) => {
     const route = routes.get(item.id)
-    return item.source !== item.target && route && route.length >= 2 ? route : null
+    return (!strictElk && item.source === item.target) || !route || route.length < 2 ? null : route
   }
 
   const fanned = new Map()
@@ -503,9 +511,11 @@ function attachHandles(nodes, edges, direction, routes = new Map()) {
     const selfLoop = item.source === item.target
     const sourceNode = nodeById.get(item.source)
     const targetNode = nodeById.get(item.target)
-    const [sourceSide, targetSide] = selfLoop
-      ? ['right', 'right']
-      : edgeSides(sourceNode, targetNode, direction)
+    const [sourceSide, targetSide] = strictElk
+      ? elkPortSides(item, direction).map((side) => REACT_FLOW_SIDE[side])
+      : selfLoop
+        ? ['right', 'right']
+        : edgeSides(sourceNode, targetNode, direction)
     fanned.set(item.id, { sourceSide, targetSide, selfLoop })
     if (selfLoop || routed(item) || !sourceNode || !targetNode) continue
     sideKey(item.source, sourceSide)?.push({ id: item.id, along: alongSide(sourceSide, targetNode) })
@@ -528,10 +538,10 @@ function attachHandles(nodes, edges, direction, routes = new Map()) {
     const route = routed(item)
     const placed = {
       sourceOffset: route
-        ? offsetAlong(nodeById.get(item.source), sourceSide, route[0])
+        ? offsetAlong(nodeById.get(item.source), sourceSide, route[0], strictElk)
         : selfLoop ? 34 : spread(item.source, sourceSide, item.id),
       targetOffset: route
-        ? offsetAlong(nodeById.get(item.target), targetSide, route[route.length - 1])
+        ? offsetAlong(nodeById.get(item.target), targetSide, route[route.length - 1], strictElk)
         : selfLoop ? 72 : spread(item.target, targetSide, item.id),
     }
     const sourceHandle = `source:${item.id}`
@@ -548,10 +558,19 @@ function attachHandles(nodes, edges, direction, routes = new Map()) {
     })
     return {
       ...item,
-      type: selfLoop ? 'default' : item.type,
+      // Every routed ELK edge uses the renderer that consumes its exact
+      // section. Built-in React Flow edge types would calculate a new route.
+      type: route && strictElk ? 'relationshipEdge' : selfLoop ? 'default' : item.type,
       sourceHandle,
       targetHandle,
-      data: { ...item.data, points: layoutBends(routes.get(item.id)) },
+      data: {
+        ...item.data,
+        // ELK routes include their exact start and end points. Keep the whole
+        // section so rendering never substitutes React Flow's measured (and
+        // sometimes fractionally different) endpoint coordinates.
+        points: strictElk && route ? route : layoutBends(routes.get(item.id)),
+        routeMode: strictElk && route ? 'elk-orthogonal' : undefined,
+      },
     }
   })
 
@@ -610,7 +629,7 @@ function spreadLabels(edges) {
  * it worked out for each edge.
  */
 function graphResult(nodes, edges, direction, positioner = layout, engine = 'dagre') {
-  const attach = (laid) => attachHandles(laid.nodes, edges, direction, laid.routes)
+  const attach = (laid) => attachHandles(laid.nodes, edges, direction, laid.routes, engine)
   if (engine === 'elk') return elkLayoutAll(nodes, edges, direction).then(attach)
   return attach(positioner(nodes, edges, direction))
 }
@@ -921,7 +940,7 @@ export function buildMappingGraph(model, conceptMapping, options = {}) {
     )
   }
   if (layoutEngine === 'elk') {
-    return elkLayoutAll(nodes, edges, 'LR').then((laid) => attachHandles(laid.nodes, edges, 'LR', laid.routes))
+    return elkLayoutAll(nodes, edges, 'LR').then((laid) => attachHandles(laid.nodes, edges, 'LR', laid.routes, 'elk'))
   }
   // The mapping canvas is three fixed columns, placed by hand; nothing routes
   // its edges, and with that little on screen nothing needs to.

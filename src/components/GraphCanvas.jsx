@@ -11,6 +11,7 @@ import {
   ReactFlowProvider,
   useReactFlow,
   useStore,
+  useUpdateNodeInternals,
 } from '@xyflow/react'
 import { Download, Lock, Maximize, Unlock, ZoomIn, ZoomOut } from 'lucide-react'
 import { toPng } from 'html-to-image'
@@ -269,6 +270,7 @@ function InnerGraphCanvas(props) {
   } = props
   const t = useT()
   const flow = useReactFlow()
+  const updateNodeInternals = useUpdateNodeInternals()
   // Subscribing through useViewport also listens to x/y and re-renders the
   // complete graph on every pan frame. Arrow sizing only needs zoom.
   const zoom = useStore(selectZoom)
@@ -295,6 +297,17 @@ function InnerGraphCanvas(props) {
       .join(',')}:${graph.edges.map((item) => item.id).sort().join(',')}`,
     [graph.edges, graph.nodes],
   )
+  const handleLayoutKey = useMemo(
+    () => graph.nodes.map((item) => [
+      item.id,
+      ...(item.data.sourceHandles || []),
+      ...(item.data.targetHandles || []),
+    ].map((part) => typeof part === 'string'
+      ? part
+      : `${part.id}@${part.position}:${part.offset}`).join('|')).sort().join(','),
+    [graph.nodes],
+  )
+  const graphNodeIds = useMemo(() => graph.nodes.map((item) => item.id), [graph.nodes])
   const manualPositions = manualLayout.key === graphLayoutKey ? manualLayout.positions : EMPTY_POSITIONS
   // Bend points are laid out for where the layout put the cards. Once a card
   // has been dragged they describe a detour around nothing, so its edges go
@@ -377,6 +390,13 @@ function InnerGraphCanvas(props) {
     return items
   }, [activeNodeIds, focusActive, graph.nodes, manualPositions, nodeSizes, selectedNodeId])
 
+  // React Flow caches handle bounds. ELK changes their offsets while keeping
+  // the same node and handle IDs, so invalidate that cache after the new
+  // handles reach the DOM or edge endpoints would remain at Dagre positions.
+  useEffect(() => {
+    if (graphNodeIds.length) updateNodeInternals(graphNodeIds)
+  }, [graphNodeIds, handleLayoutKey, updateNodeInternals])
+
   const edges = useMemo(
     () =>
       graph.edges.map((item) => {
@@ -387,6 +407,7 @@ function InnerGraphCanvas(props) {
         const label = item.data?.label || ''
         const strokeWidth = isEdgeHighlighted ? 1.55 : item.style?.strokeWidth || 1.1
         const markerSize = markerSizeForZoom(markerZoom, strokeWidth, isEdgeHighlighted)
+        const routeInvalidated = movedNodeIds.has(item.source) || movedNodeIds.has(item.target)
         return {
           ...item,
           selected: isEdgeSelected,
@@ -403,9 +424,8 @@ function InnerGraphCanvas(props) {
           },
           data: {
             ...item.data,
-            points: movedNodeIds.has(item.source) || movedNodeIds.has(item.target)
-              ? undefined
-              : item.data?.points,
+            points: routeInvalidated ? undefined : item.data?.points,
+            routeMode: routeInvalidated ? undefined : item.data?.routeMode,
             dimmed,
             showEdgeLabels,
             onSelect,

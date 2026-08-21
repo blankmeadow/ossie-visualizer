@@ -1,4 +1,5 @@
 import { BaseEdge, EdgeLabelRenderer, getBezierPath, getStraightPath } from '@xyflow/react'
+import { elkOrthogonalPath, pointAlongPath, pointDistance, stepAlong } from '../lib/edgePath'
 
 // Within this much sideways drift a curve is just a wobble, so the edge is
 // drawn as the straight line it almost is.
@@ -7,17 +8,6 @@ const STRAIGHT_TOLERANCE = 26
 const CORNER_RADIUS = 18
 
 const VERTICAL_SIDES = ['top', 'bottom']
-
-function distance(from, to) {
-  return Math.hypot(to.x - from.x, to.y - from.y)
-}
-
-/** The point `length` along the way from `from` to `to`. */
-function step(from, to, length) {
-  const span = distance(from, to) || 1
-  const ratio = Math.min(1, length / span)
-  return { x: from.x + (to.x - from.x) * ratio, y: from.y + (to.y - from.y) * ratio }
-}
 
 /**
  * A polyline with its corners rounded off, and the point `fraction` along it.
@@ -31,27 +21,18 @@ function bentPath(points, fraction = 0.5) {
     const corner = points[index]
     const radius = Math.min(
       CORNER_RADIUS,
-      distance(points[index - 1], corner) / 2,
-      distance(corner, points[index + 1]) / 2,
+      pointDistance(points[index - 1], corner) / 2,
+      pointDistance(corner, points[index + 1]) / 2,
     )
-    const enter = step(corner, points[index - 1], radius)
-    const leave = step(corner, points[index + 1], radius)
+    const enter = stepAlong(corner, points[index - 1], radius)
+    const leave = stepAlong(corner, points[index + 1], radius)
     path += ` L ${enter.x},${enter.y} Q ${corner.x},${corner.y} ${leave.x},${leave.y}`
   }
   const last = points[points.length - 1]
   path += ` L ${last.x},${last.y}`
 
-  const lengths = points.slice(1).map((point, index) => distance(points[index], point))
-  const mark = lengths.reduce((total, value) => total + value, 0) * fraction
-  let walked = 0
-  for (let index = 0; index < lengths.length; index++) {
-    if (walked + lengths[index] >= mark) {
-      const anchor = step(points[index], points[index + 1], mark - walked)
-      return [path, anchor.x, anchor.y]
-    }
-    walked += lengths[index]
-  }
-  return [path, last.x, last.y]
+  const [labelX, labelY] = pointAlongPath(points, fraction)
+  return [path, labelX, labelY]
 }
 
 export default function RelationshipEdge({
@@ -71,29 +52,35 @@ export default function RelationshipEdge({
 }) {
   const bends = data?.points || []
   const fraction = data?.labelFraction ?? 0.5
+  const elkRoute = data?.routeMode === 'elk-orthogonal' && bends.length >= 2
   const acrossFlow = VERTICAL_SIDES.includes(sourcePosition)
     ? Math.abs(targetX - sourceX)
     : Math.abs(targetY - sourceY)
 
-  const drawn = bends.length
+  const routePoints = elkRoute
+    ? bends
+    : [{ x: sourceX, y: sourceY }, ...bends, { x: targetX, y: targetY }]
+  const drawn = elkRoute
+    ? elkOrthogonalPath(routePoints, fraction)
+    : bends.length
     // The engine routed this edge from and to the same handles React Flow is
     // reporting, so its bends drop straight in between them.
-    ? bentPath([{ x: sourceX, y: sourceY }, ...bends, { x: targetX, y: targetY }], fraction)
-    : acrossFlow <= STRAIGHT_TOLERANCE
-      ? getStraightPath({ sourceX, sourceY, targetX, targetY })
-      : getBezierPath({
-        sourceX,
-        sourceY,
-        targetX,
-        targetY,
-        sourcePosition,
-        targetPosition,
-        curvature: 0.18,
-      })
+      ? bentPath(routePoints, fraction)
+      : acrossFlow <= STRAIGHT_TOLERANCE
+        ? getStraightPath({ sourceX, sourceY, targetX, targetY })
+        : getBezierPath({
+          sourceX,
+          sourceY,
+          targetX,
+          targetY,
+          sourcePosition,
+          targetPosition,
+          curvature: 0.18,
+        })
   // An edge sharing its pair of cards with another one is told where along
   // itself to put its label. On a plain curve the point on the chord is close
   // enough to the line to read as sitting on it.
-  const [path, labelX, labelY] = bends.length || fraction === 0.5
+  const [path, labelX, labelY] = elkRoute || bends.length || fraction === 0.5
     ? drawn
     : [drawn[0], sourceX + (targetX - sourceX) * fraction, sourceY + (targetY - sourceY) * fraction]
 
