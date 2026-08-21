@@ -1,0 +1,67 @@
+{
+  "version": "0.2.0.dev0",
+  "name": "sample_domain_ontology",
+  "description": "Apache Ossie 0.2.0.dev0 ontology 示例",
+  "ai_context": {
+    "instructions": "按本体中的概念、标识和关系解释业务术语",
+    "synonyms": [
+      "示例领域模型"
+    ]
+  },
+  "ontology": [
+    {
+      "concept": "sample_code",
+      "type": "ValueType",
+      "description": "具有独立业务语义的示例编码",
+      "extends": [
+        "String"
+      ]
+    },
+    {
+      "concept": "parent_entity",
+      "type": "EntityType",
+      "description": "父实体"
+    },
+    {
+      "concept": "sample_entity",
+      "type": "EntityType",
+      "description": "示例实体",
+      "extends": [
+        "parent_entity"
+      ],
+      "identify_by": [
+        "code"
+      ],
+      "relationships": [
+        {
+          "name": "code",
+          "description": "示例实体的唯一业务编码",
+          "roles": [
+            {
+              "concept": "sample_code"
+            }
+          ],
+          "multiplicity": "OneToOne",
+          "verbalizes": [
+            "{sample_entity} 的编码是 {sample_code}",
+            "{sample_code} 唯一标识 {sample_entity}"
+          ]
+        },
+        {
+          "name": "parent",
+          "description": "示例实体归属的父实体",
+          "roles": [
+            {
+              "concept": "parent_entity"
+            }
+          ],
+          "multiplicity": "ManyToOne",
+          "verbalizes": [
+            "{sample_entity} 归属于 {parent_entity}",
+            "{parent_entity} 包含 {sample_entity}"
+          ]
+        }
+      ]
+    }
+  ]
+}
