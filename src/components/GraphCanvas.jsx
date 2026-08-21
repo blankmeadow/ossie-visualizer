@@ -32,6 +32,8 @@ const edgeTypes = { relationshipEdge: RelationshipEdge }
 // Framing maths has to agree with the dimensions dagre laid the graph out with.
 const nodeWidth = NODE_WIDTH
 const nodeHeight = NODE_HEIGHT
+const MINIMAP_WIDTH = 160
+const MINIMAP_HEIGHT = 100
 const EMPTY_POSITIONS = Object.freeze({})
 const EMPTY_SIZES = Object.freeze({})
 const selectZoom = (state) => state.transform[2]
@@ -111,6 +113,20 @@ function Toggle({ checked, onChange, label }) {
       <span />
       {label}
     </button>
+  )
+}
+
+function GraphLegend({ activeTab }) {
+  const t = useT()
+  const entries = activeTab === 'ontology'
+    ? [['legend-dot legend-dot--concept', t('legend.entityType')], ['legend-line legend-line--extends', t('legend.extends')], ['legend-line legend-line--relation', t('legend.relationship')]]
+    : activeTab === 'semantic'
+      ? [['legend-dot legend-dot--dataset', t('legend.dataset')], ['legend-dot legend-dot--metric', t('legend.metric')]]
+      : [['legend-dot legend-dot--concept', t('legend.concept')], ['legend-dot legend-dot--mapping', t('legend.mapping')], ['legend-dot legend-dot--dataset', t('legend.dataset')]]
+  return (
+    <div className="graph-legend">
+      {entries.map(([className, label]) => <span key={label}><i className={className} />{label}</span>)}
+    </div>
   )
 }
 
@@ -631,41 +647,61 @@ function InnerGraphCanvas(props) {
           </div>
         </Panel>
       )}
-      <Panel position="bottom-center">
-        <GraphToolbar
-          activeTab={activeTab}
-          selection={selection}
-          focusDepth={focusDepth}
-          onFocus={onFocus}
-          showRelationships={showRelationships}
-          setShowRelationships={setShowRelationships}
-          showMetrics={showMetrics}
-          setShowMetrics={setShowMetrics}
-          showMiniMap={showMiniMap}
-          setShowMiniMap={setShowMiniMap}
-          showEdgeLabels={showEdgeLabels}
-          setShowEdgeLabels={setShowEdgeLabels}
-          layoutEngine={layoutEngine}
-          setLayoutEngine={setLayoutEngine}
-          nodesLocked={nodesLocked}
-          setNodesLocked={setNodesLocked}
-          onDownload={downloadImage}
-          exporting={exporting}
-        />
+      {/* Legend, toolbar and minimap share one rail along the bottom of the
+          canvas: three slots on a single baseline, so they read as one row
+          rather than as three cards that each found their own corner. The rail
+          spans the canvas and lets clicks through; only the cards take them. */}
+      <Panel position="bottom-left" className="canvas-rail">
+        <div className="canvas-rail__inner">
+          <div className="canvas-rail__slot canvas-rail__slot--legend">
+            <GraphLegend activeTab={activeTab} />
+          </div>
+          <div className="canvas-rail__slot canvas-rail__slot--toolbar">
+            <GraphToolbar
+              activeTab={activeTab}
+              selection={selection}
+              focusDepth={focusDepth}
+              onFocus={onFocus}
+              showRelationships={showRelationships}
+              setShowRelationships={setShowRelationships}
+              showMetrics={showMetrics}
+              setShowMetrics={setShowMetrics}
+              showMiniMap={showMiniMap}
+              setShowMiniMap={setShowMiniMap}
+              showEdgeLabels={showEdgeLabels}
+              setShowEdgeLabels={setShowEdgeLabels}
+              layoutEngine={layoutEngine}
+              setLayoutEngine={setLayoutEngine}
+              nodesLocked={nodesLocked}
+              setNodesLocked={setNodesLocked}
+              onDownload={downloadImage}
+              exporting={exporting}
+            />
+          </div>
+          {/* The slot stays whether or not the minimap is on, so turning it off
+              does not slide the toolbar off centre. */}
+          <div className="canvas-rail__slot canvas-rail__slot--map">
+            {showMiniMap !== false && nodes.length > 0 && (
+              <MiniMap
+                pannable
+                zoomable
+                // React Flow draws the overview at the size it is given and
+                // defaults to 200x150, which the 160x100 card then cropped:
+                // the corner of the graph sat outside the frame meant to show
+                // all of it. Sized here rather than in CSS so the drawing and
+                // the card it sits in are the same box.
+                style={{ width: MINIMAP_WIDTH, height: MINIMAP_HEIGHT }}
+                nodeColor={(item) => item.data?.kind === 'dataset'
+                  ? tokens['node-dataset']
+                  : item.data?.kind === 'metric'
+                    ? tokens['node-metric']
+                    : tokens['node-concept']}
+                maskColor={tokens['canvas-minimap-mask']}
+              />
+            )}
+          </div>
+        </div>
       </Panel>
-      {showMiniMap !== false && nodes.length > 0 && (
-        <MiniMap
-          pannable
-          zoomable
-          position="bottom-right"
-          nodeColor={(item) => item.data?.kind === 'dataset'
-            ? tokens['node-dataset']
-            : item.data?.kind === 'metric'
-              ? tokens['node-metric']
-              : tokens['node-concept']}
-          maskColor={tokens['canvas-minimap-mask']}
-        />
-      )}
     </ReactFlow>
   )
 }

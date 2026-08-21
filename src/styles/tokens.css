@@ -40,6 +40,12 @@
   --amber-soft: #faf1dc;
 
   --shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
+  /* Cards floating over the canvas -- legend, toolbar, minimap. One radius and
+     one shadow so the row along the bottom reads as a single piece of chrome,
+     and one inset for the margin it keeps from the canvas edges. */
+  --float-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+  --rail-radius: 7px;
+  --rail-inset: 14px;
 
   /* Graph canvas. These were hardcoded inside GraphCanvas.jsx, which meant the
      React Flow surface could not follow the rest of the theme. */

@@ -334,7 +334,6 @@ export default function App() {
               inspectorOpen={detailOpen && !!selection}
               inspectorWidth={inspector.width}
             />
-            <GraphLegend activeTab={activeTab} />
           </section>
           <Inspector
             selection={detailOpen ? selection : null}
@@ -438,22 +437,6 @@ function Sidebar({ activeTab, items, query, onQuery, selectedKind, onKind, selec
       </div>
       <ResizeHandle label={t('layout.resizeSidebar')} onResize={onResize} onReset={onResetWidth} />
     </aside>
-  )
-}
-
-
-
-function GraphLegend({ activeTab }) {
-  const t = useT()
-  const entries = activeTab === 'ontology'
-    ? [['legend-dot legend-dot--concept', t('legend.entityType')], ['legend-line legend-line--extends', t('legend.extends')], ['legend-line legend-line--relation', t('legend.relationship')]]
-    : activeTab === 'semantic'
-      ? [['legend-dot legend-dot--dataset', t('legend.dataset')], ['legend-dot legend-dot--metric', t('legend.metric')]]
-      : [['legend-dot legend-dot--concept', t('legend.concept')], ['legend-dot legend-dot--mapping', t('legend.mapping')], ['legend-dot legend-dot--dataset', t('legend.dataset')]]
-  return (
-    <div className="graph-legend">
-      {entries.map(([className, label]) => <span key={label}><i className={className} />{label}</span>)}
-    </div>
   )
 }
 
