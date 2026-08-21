@@ -19,12 +19,6 @@ function step(from, to, length) {
   return { x: from.x + (to.x - from.x) * ratio, y: from.y + (to.y - from.y) * ratio }
 }
 
-/**
- * A polyline with its corners rounded off, and the point halfway along it.
- *
- * The bends come from the layout, which knows where the other cards are; the
- * rounding is what keeps a detour from reading as a hard mechanical turn.
- */
 /** The point `fraction` of the way along a quadratic curve. */
 function quadraticPoint(from, control, to, fraction) {
   const rest = 1 - fraction
@@ -34,6 +28,12 @@ function quadraticPoint(from, control, to, fraction) {
   }
 }
 
+/**
+ * A polyline with its corners rounded off, and the point `fraction` along it.
+ *
+ * The bends come from the layout, which knows where the other cards are; the
+ * rounding is what keeps a detour from reading as a hard mechanical turn.
+ */
 function bentPath(points, fraction = 0.5) {
   let path = `M ${points[0].x},${points[0].y}`
   for (let index = 1; index < points.length - 1; index++) {
