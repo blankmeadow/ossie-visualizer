@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import { buildOntologyGraph, buildSemanticGraph, layoutBends, markerSizeForZoom, NODE_HEIGHT, NODE_WIDTH } from './graph'
+import { elkOrthogonalPath } from './edgePath'
+import {
+  buildMappingGraph,
+  buildOntologyGraph,
+  buildSemanticGraph,
+  edgeRouteAfterMove,
+  layoutBends,
+  markerSizeForZoom,
+  movedHandleOverrides,
+  NODE_HEIGHT,
+  NODE_WIDTH,
+} from './graph'
 import { normalizeOssie } from './ossie'
 
 /**
@@ -88,6 +99,40 @@ function endpoints(graph) {
 }
 
 const ontologyGraph = buildOntologyGraph(model, { showRelationships: true })
+const elkOntologyGraph = await buildOntologyGraph(model, { showRelationships: true, layoutEngine: 'elk' })
+const routingStressModel = normalizeOssie({
+  version: '0.2.0.dev0',
+  name: 'elk-routing-stress',
+  ontology: [
+    {
+      concept: 'person',
+      type: 'EntityType',
+      relationships: [{ name: 'owns', roles: [{ concept: 'car' }], verbalizes: ['{person} owns {car}'] }],
+    },
+    { concept: 'employee', type: 'EntityType', extends: ['person'] },
+    {
+      concept: 'car',
+      type: 'EntityType',
+      relationships: [{ name: 'driver', roles: [{ concept: 'person' }], verbalizes: ['{car} has driver {person}'] }],
+    },
+    {
+      concept: 'loop',
+      type: 'EntityType',
+      relationships: [{ name: 'self', roles: [{ concept: 'loop' }], verbalizes: ['{loop} links {loop}'] }],
+    },
+    {
+      concept: 'island_a',
+      type: 'EntityType',
+      relationships: [{ name: 'next', roles: [{ concept: 'island_b' }], verbalizes: ['{island_a} links {island_b}'] }],
+    },
+    { concept: 'island_b', type: 'EntityType' },
+  ],
+  ontology_mappings: [],
+})
+const elkRoutingStressGraph = await buildOntologyGraph(routingStressModel, {
+  showRelationships: true,
+  layoutEngine: 'elk',
+})
 
 describe('graph layout conventions', () => {
   const ontology = ontologyGraph
@@ -271,6 +316,169 @@ describe('edge routing', () => {
       }
     }
     expect(checked).toBeGreaterThanOrEqual(1)
+  })
+})
+
+describe('strict ELK routing', () => {
+  const byId = new Map(elkOntologyGraph.nodes.map((item) => [item.id, item]))
+  const outward = {
+    top: [0, -1],
+    right: [1, 0],
+    bottom: [0, 1],
+    left: [-1, 0],
+  }
+
+  const endpoint = (nodeId, handleId, role, outerRim = true) => {
+    const node = byId.get(nodeId)
+    const handles = node.data[role === 'source' ? 'sourceHandles' : 'targetHandles']
+    const handle = handles.find((item) => item.id === handleId)
+    const { x, y } = node.position
+    let point
+    if (handle.position === 'top') point = { x: x + (NODE_WIDTH * handle.offset) / 100, y }
+    else if (handle.position === 'bottom') point = { x: x + (NODE_WIDTH * handle.offset) / 100, y: y + NODE_HEIGHT }
+    else if (handle.position === 'left') point = { x, y: y + (NODE_HEIGHT * handle.offset) / 100 }
+    else point = { x: x + NODE_WIDTH, y: y + (NODE_HEIGHT * handle.offset) / 100 }
+    if (!outerRim) return point
+    const [dx, dy] = outward[handle.position]
+    // NodeHandle is 10px wide and straddles the card border, so React Flow's
+    // edge anchor sits one 5px radius beyond ELK's port centre.
+    return { x: point.x + dx * 5, y: point.y + dy * 5 }
+  }
+
+  it('ranks inheritance parent-first while keeping the arrow child-to-parent', () => {
+    const inheritance = elkOntologyGraph.edges.filter((item) => item.data.kind === 'inheritance')
+    expect(inheritance.length).toBeGreaterThan(0)
+    for (const item of inheritance) {
+      expect(byId.get(item.target).position.y).toBeLessThan(byId.get(item.source).position.y)
+      const sourceHandle = byId.get(item.source).data.sourceHandles
+        .find((handle) => handle.id === item.sourceHandle)
+      const targetHandle = byId.get(item.target).data.targetHandles
+        .find((handle) => handle.id === item.targetHandle)
+      expect(sourceHandle.position).toBe('top')
+      expect(targetHandle.position).toBe('bottom')
+    }
+  })
+
+  it('uses every ELK section as an unsmoothed, handle-anchored orthogonal route', () => {
+    for (const item of elkOntologyGraph.edges) {
+      expect(item.type).toBe('relationshipEdge')
+      expect(item.data.routeMode).toBe('elk-orthogonal')
+      const points = item.data.points || []
+      const source = endpoint(item.source, item.sourceHandle, 'source')
+      const target = endpoint(item.target, item.targetHandle, 'target')
+      const sourcePortCentre = endpoint(item.source, item.sourceHandle, 'source', false)
+      const targetPortCentre = endpoint(item.target, item.targetHandle, 'target', false)
+      expect(points[0].x).toBeCloseTo(source.x)
+      expect(points[0].y).toBeCloseTo(source.y)
+      expect(points[points.length - 1].x).toBeCloseTo(target.x)
+      expect(points[points.length - 1].y).toBeCloseTo(target.y)
+      expect(Math.hypot(points[0].x - sourcePortCentre.x, points[0].y - sourcePortCentre.y))
+        .toBeCloseTo(5)
+      expect(Math.hypot(
+        points[points.length - 1].x - targetPortCentre.x,
+        points[points.length - 1].y - targetPortCentre.y,
+      )).toBeCloseTo(5)
+      for (let index = 1; index < points.length; index++) {
+        const from = points[index - 1]
+        const to = points[index]
+        const orthogonal = Math.abs(from.x - to.x) < 1e-6 || Math.abs(from.y - to.y) < 1e-6
+        expect(orthogonal, `${item.id}: ${JSON.stringify([from, to])}`).toBe(true)
+      }
+    }
+  })
+
+  it('draws ELK points verbatim with hard SVG line segments', () => {
+    const points = [{ x: 0, y: 0 }, { x: 0, y: 60 }, { x: 100, y: 60 }]
+    const [path, labelX, labelY] = elkOrthogonalPath(points, 0.5)
+    expect(path).toBe('M 0,0 L 0,60 L 100,60')
+    expect(path).not.toMatch(/[CQ]/)
+    expect([labelX, labelY]).toEqual([20, 60])
+  })
+
+  it('uses the exact ELK renderer in the semantic and mapping views too', async () => {
+    const graphs = [
+      await buildSemanticGraph(model, { layoutEngine: 'elk' }),
+      await buildMappingGraph(model, model.conceptMappings[0], { layoutEngine: 'elk' }),
+    ]
+    for (const graph of graphs) {
+      expect(graph.edges.length).toBeGreaterThan(0)
+      for (const item of graph.edges) {
+        expect(item.type).toBe('relationshipEdge')
+        expect(item.data.routeMode).toBe('elk-orthogonal')
+        expect(item.data.points.length).toBeGreaterThanOrEqual(2)
+      }
+    }
+  })
+
+  it('packs back-edge and self-loop lanes inside their component bounds', () => {
+    for (const item of elkRoutingStressGraph.edges) {
+      for (const point of item.data.points || []) {
+        expect(point.x, `${item.id} has a negative x route coordinate`).toBeGreaterThanOrEqual(0)
+        expect(point.y, `${item.id} has a negative y route coordinate`).toBeGreaterThanOrEqual(0)
+      }
+    }
+
+    const boxes = elkRoutingStressGraph.nodes.map((item) => ({
+      id: item.id,
+      x: item.position.x,
+      y: item.position.y,
+      width: NODE_WIDTH,
+      height: NODE_HEIGHT,
+    }))
+    for (const item of elkRoutingStressGraph.edges) {
+      for (const box of boxes) {
+        if (box.id === item.source || box.id === item.target) continue
+        expect(
+          pathHitsBox(item.data.points || [], box),
+          `${item.id} crosses disconnected node ${box.id}`,
+        ).toBe(false)
+      }
+    }
+  })
+
+  it('falls an invalidated ELK self-loop back to a non-routing loop edge', () => {
+    const selfLoop = elkRoutingStressGraph.edges.find((item) => item.source === 'loop' && item.target === 'loop')
+    expect(selfLoop.type).toBe('relationshipEdge')
+    expect(selfLoop.data.routeMode).toBe('elk-orthogonal')
+    expect(selfLoop.data.points.length).toBeGreaterThanOrEqual(4)
+
+    const moved = new Set(['loop'])
+    expect(edgeRouteAfterMove(selfLoop, moved)).toEqual({
+      type: 'default',
+      points: undefined,
+      routeMode: undefined,
+    })
+    const overrides = movedHandleOverrides(
+      elkRoutingStressGraph.nodes,
+      elkRoutingStressGraph.edges,
+      { loop: { x: 500, y: 300 } },
+      moved,
+    )
+    expect(overrides.get(selfLoop.sourceHandle)).toEqual({ position: 'right', offset: 34 })
+    expect(overrides.get(selfLoop.targetHandle)).toEqual({ position: 'right', offset: 72 })
+  })
+
+  it('turns fallback handles toward the new relative position after a drag', () => {
+    const relation = elkRoutingStressGraph.edges.find((item) => item.id === 'relation:person:car')
+    const byStressId = new Map(elkRoutingStressGraph.nodes.map((item) => [item.id, item]))
+    const person = byStressId.get('person')
+    const manualPositions = {
+      car: { x: person.position.x, y: person.position.y - NODE_HEIGHT - 100 },
+    }
+    const moved = new Set(['car'])
+    const overrides = movedHandleOverrides(
+      elkRoutingStressGraph.nodes,
+      elkRoutingStressGraph.edges,
+      manualPositions,
+      moved,
+    )
+    expect(edgeRouteAfterMove(relation, moved)).toEqual({
+      type: 'relationshipEdge',
+      points: undefined,
+      routeMode: undefined,
+    })
+    expect(overrides.get(relation.sourceHandle)?.position).toBe('top')
+    expect(overrides.get(relation.targetHandle)?.position).toBe('bottom')
   })
 })
 
