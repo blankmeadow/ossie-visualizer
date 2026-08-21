@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { elkOrthogonalPath } from './edgePath'
-import { buildMappingGraph, buildOntologyGraph, buildSemanticGraph, layoutBends, markerSizeForZoom, NODE_HEIGHT, NODE_WIDTH } from './graph'
+import { buildMappingGraph, buildOntologyGraph, buildSemanticGraph, HANDLE_INSET, layoutBends, markerSizeForZoom, NODE_HEIGHT, NODE_WIDTH } from './graph'
 import { normalizeOssie } from './ossie'
 
 /**
@@ -279,15 +279,31 @@ describe('edge routing', () => {
 describe('strict ELK routing', () => {
   const byId = new Map(elkOntologyGraph.nodes.map((item) => [item.id, item]))
 
+  /**
+   * Where React Flow anchors this end of the edge.
+   *
+   * Not the card border: React Flow ends an edge at the far side of the handle
+   * box, half a dot clear of the card, and the arrowhead lives in that gap. An
+   * edge drawn to the border instead loses its arrowhead under the card.
+   */
   const endpoint = (nodeId, handleId, role) => {
     const node = byId.get(nodeId)
     const handles = node.data[role === 'source' ? 'sourceHandles' : 'targetHandles']
     const handle = handles.find((item) => item.id === handleId)
     const { x, y } = node.position
-    if (handle.position === 'top') return { x: x + (NODE_WIDTH * handle.offset) / 100, y }
-    if (handle.position === 'bottom') return { x: x + (NODE_WIDTH * handle.offset) / 100, y: y + NODE_HEIGHT }
-    if (handle.position === 'left') return { x, y: y + (NODE_HEIGHT * handle.offset) / 100 }
-    return { x: x + NODE_WIDTH, y: y + (NODE_HEIGHT * handle.offset) / 100 }
+    const along = handle.position === 'top' || handle.position === 'bottom'
+      ? x + (NODE_WIDTH * handle.offset) / 100
+      : y + (NODE_HEIGHT * handle.offset) / 100
+    if (handle.position === 'top') return { x: along, y: y - HANDLE_INSET }
+    if (handle.position === 'bottom') return { x: along, y: y + NODE_HEIGHT + HANDLE_INSET }
+    if (handle.position === 'left') return { x: x - HANDLE_INSET, y: along }
+    return { x: x + NODE_WIDTH + HANDLE_INSET, y: along }
+  }
+
+  /** Handle offsets are a percentage of the card, so these are float equal. */
+  const expectPoint = (actual, expected, label) => {
+    expect(actual.x, `${label} x`).toBeCloseTo(expected.x, 6)
+    expect(actual.y, `${label} y`).toBeCloseTo(expected.y, 6)
   }
 
   it('ranks inheritance parent-first while keeping the arrow child-to-parent', () => {
@@ -310,8 +326,8 @@ describe('strict ELK routing', () => {
       expect(item.type).toBe('relationshipEdge')
       expect(item.data.routeMode).toBe('elk-orthogonal')
       const points = item.data.points || []
-      expect(points[0]).toEqual(endpoint(item.source, item.sourceHandle, 'source'))
-      expect(points[points.length - 1]).toEqual(endpoint(item.target, item.targetHandle, 'target'))
+      expectPoint(points[0], endpoint(item.source, item.sourceHandle, 'source'), `${item.id} start`)
+      expectPoint(points[points.length - 1], endpoint(item.target, item.targetHandle, 'target'), `${item.id} end`)
       for (let index = 1; index < points.length; index++) {
         const from = points[index - 1]
         const to = points[index]

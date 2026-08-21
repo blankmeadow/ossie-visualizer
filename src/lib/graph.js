@@ -473,6 +473,36 @@ function offsetAlong(node, side, point, exact = false) {
 }
 
 /**
+ * Half the handle dot drawn by `OssieNode` (`size-[10px]`, centred on the card
+ * border), which is how far outside the card React Flow anchors an edge.
+ */
+export const HANDLE_INSET = 5
+
+const OUTWARD = { top: [0, -1], bottom: [0, 1], left: [-1, 0], right: [1, 0] }
+
+/**
+ * An engine route pulled out to where React Flow anchors an edge.
+ *
+ * React Flow does not end an edge on the card border: `getHandlePosition`
+ * returns the far edge of the handle box, so the line stops half a dot clear of
+ * the card. That gap is what the arrowhead sits in -- the node layer paints over
+ * the edge layer, so a marker drawn any closer disappears under the card. An ELK
+ * section ends exactly on the border, so its two ends are moved out to the same
+ * place. Only the ends move, and only along the face they meet, so a route that
+ * arrived orthogonal stays orthogonal.
+ */
+function anchorRoute(route, sourceSide, targetSide) {
+  const moved = route.slice()
+  const shift = (point, side) => {
+    const [dx, dy] = OUTWARD[side] || [0, 0]
+    return { x: point.x + dx * HANDLE_INSET, y: point.y + dy * HANDLE_INSET }
+  }
+  moved[0] = shift(moved[0], sourceSide)
+  moved[moved.length - 1] = shift(moved[moved.length - 1], targetSide)
+  return moved
+}
+
+/**
  * Give every edge a React Flow handle at each end, and the bends between them.
  *
  * Where the layout engine routed the edge, both come from that route: the edge
@@ -567,8 +597,11 @@ function attachHandles(nodes, edges, direction, routes = new Map(), engine = 'da
         ...item.data,
         // ELK routes include their exact start and end points. Keep the whole
         // section so rendering never substitutes React Flow's measured (and
-        // sometimes fractionally different) endpoint coordinates.
-        points: strictElk && route ? route : layoutBends(routes.get(item.id)),
+        // sometimes fractionally different) endpoint coordinates, with only the
+        // two ends moved out to where React Flow anchors an edge.
+        points: strictElk && route
+          ? anchorRoute(route, sourceSide, targetSide)
+          : layoutBends(routes.get(item.id)),
         routeMode: strictElk && route ? 'elk-orthogonal' : undefined,
       },
     }
