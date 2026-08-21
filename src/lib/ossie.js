@@ -6,21 +6,28 @@ import { parse as parseYaml } from 'yaml'
 // split the way the spec splits them -- `Any` is a built-in entity type, the
 // rest are built-in value types. Lumping them together classifies `-> Any` as
 // an attribute, which it is not.
+//
+// This is the ontology specification's "Built-in concepts" table, in full.
+// `Time`, `DateTimeTz`, and `Opaque` are core-spec DataTypes for semantic
+// models, not ontology concepts, so a role or `extends` naming one of them is
+// a dangling reference and has to be reported as such.
 const BUILTIN_VALUE_TYPES = new Set([
   'Boolean',
   'Date',
   'DateTime',
-  'DateTimeTz',
   'Decimal',
   'Float',
   'Integer',
   'String',
-  'Time',
 ])
 
 const BUILTIN_ENTITY_TYPES = new Set(['Any'])
 
 const BUILTIN_CONCEPTS = new Set([...BUILTIN_VALUE_TYPES, ...BUILTIN_ENTITY_TYPES])
+
+// Multiplicity constrains the last role of a relationship, so the enum has no
+// `OneToMany`: that direction is expressed by leaving multiplicity out.
+const MULTIPLICITIES = new Set(['ManyToOne', 'OneToOne'])
 
 /**
  * Read an Ossie document written as either JSON or YAML.
@@ -91,6 +98,13 @@ export function validateOssie(document) {
     if (conceptNames.has(concept?.concept)) {
       issue(errors, `${base}.concept`, 'issue.conceptDuplicate', { name: concept.concept })
     }
+    // Built-ins are resolved before the concept map, so a concept that reuses
+    // one of their names is not merely redundant: every role pointing at it
+    // silently reads as the built-in, and the graph draws the wrong kind of
+    // edge. Refuse the name rather than quietly ignore the declaration.
+    if (BUILTIN_CONCEPTS.has(concept?.concept)) {
+      issue(errors, `${base}.concept`, 'issue.builtinRedeclared', { name: concept.concept })
+    }
     conceptNames.add(concept?.concept)
 
     const relationshipNames = new Set()
@@ -104,8 +118,22 @@ export function validateOssie(document) {
       if (!Array.isArray(relationship.verbalizes) || !relationship.verbalizes.length) {
         issue(errors, `${relationBase}.verbalizes`, 'issue.verbalizesMissing')
       }
+      // `OneToMany` is the reading people reach for and the one value the
+      // enum does not have: multiplicity constrains the *last* role, so the
+      // one-to-many direction is written by omitting it.
+      if (relationship.multiplicity != null && !MULTIPLICITIES.has(relationship.multiplicity)) {
+        issue(errors, `${relationBase}.multiplicity`, 'issue.multiplicityInvalid', {
+          name: String(relationship.multiplicity),
+        })
+      }
     })
   })
+
+  // `resolveValueBase` walks `extends` through this, so the second pass needs
+  // the concepts indexed the same way the normalized model indexes them.
+  const inheritanceLookup = {
+    conceptByName: new Map(document.ontology.map((concept) => [concept?.concept, concept])),
+  }
 
   document.ontology.forEach((concept, index) => {
     const base = `$.ontology[${index}]`
@@ -114,6 +142,14 @@ export function validateOssie(document) {
         issue(errors, `${base}.extends[${parentIndex}]`, 'issue.unknownParent', { name: parent })
       }
     })
+    // The spec requires every value type to be founded on a built-in value
+    // type. Without one there is no data type underneath it, so a dangling or
+    // looping chain is a modelling error rather than a display quirk.
+    if (concept.type === 'ValueType' && !resolveValueBase(concept.concept, inheritanceLookup)) {
+      issue(errors, `${base}.extends`, 'issue.valueTypeWithoutBase', {
+        name: concept.concept,
+      })
+    }
     const relationships = new Set((concept.relationships || []).map((item) => item.name))
     ;(concept.identify_by || []).forEach((name, identityIndex) => {
       if (!relationships.has(name)) {

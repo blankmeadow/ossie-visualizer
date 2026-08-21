@@ -12,7 +12,10 @@ export const LOCALES = ['zh', 'en']
 
 const STORAGE_KEY = 'ossie-visualizer:locale'
 
-const MESSAGES = {
+// Exported so the locales can be checked against each other: `translate` falls
+// back to English and then to the raw key, so a key missing from `en` reaches
+// the screen as `concept.colRequires` rather than a word.
+export const MESSAGES = {
   zh: {
     'locale.label': '中文',
     'locale.switch': '切换语言',
@@ -243,9 +246,12 @@ const MESSAGES = {
     'issue.conceptNameMissing': 'Concept 缺少名称。',
     'issue.conceptTypeInvalid': 'Concept type 必须是 EntityType 或 ValueType。',
     'issue.conceptDuplicate': 'Concept 名称重复：{name}',
+    'issue.builtinRedeclared': '不能重新定义内置概念：{name}',
     'issue.relationshipNameMissing': 'Relationship 缺少名称。',
     'issue.relationshipDuplicate': 'Relationship 名称重复：{name}',
     'issue.verbalizesMissing': 'Relationship 必须提供 verbalizes。',
+    'issue.multiplicityInvalid': 'multiplicity 只能是 ManyToOne 或 OneToOne：{name}',
+    'issue.valueTypeWithoutBase': 'ValueType 必须直接或间接继承内置值类型：{name}',
     'issue.unknownParent': '未知父概念：{name}',
     'issue.unknownIdentity': '身份关系不存在：{name}',
     'issue.unknownRoleConcept': '未知角色概念：{name}',
@@ -356,6 +362,7 @@ const MESSAGES = {
     'concept.colName': 'Name',
     'concept.colVerbalizes': 'Verbalization',
     'concept.colType': 'Type',
+    'concept.colRequires': 'Constraints',
     'concept.colRelation': 'Relation',
     'concept.colEntity': 'Entity',
     'concept.colConstraint': 'Constraints',
@@ -484,9 +491,12 @@ const MESSAGES = {
     'issue.conceptNameMissing': 'Concept has no name.',
     'issue.conceptTypeInvalid': 'Concept type must be EntityType or ValueType.',
     'issue.conceptDuplicate': 'Duplicate concept name: {name}',
+    'issue.builtinRedeclared': 'A built-in concept cannot be redeclared: {name}',
     'issue.relationshipNameMissing': 'Relationship has no name.',
     'issue.relationshipDuplicate': 'Duplicate relationship name: {name}',
     'issue.verbalizesMissing': 'Relationship must provide `verbalizes`.',
+    'issue.multiplicityInvalid': 'Multiplicity must be ManyToOne or OneToOne: {name}',
+    'issue.valueTypeWithoutBase': 'A value type must extend a built-in value type, directly or indirectly: {name}',
     'issue.unknownParent': 'Unknown parent concept: {name}',
     'issue.unknownIdentity': 'Identity relationship does not exist: {name}',
     'issue.unknownRoleConcept': 'Unknown role concept: {name}',
