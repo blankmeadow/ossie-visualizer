@@ -185,6 +185,35 @@ function layout(nodes, edges, direction = 'LR', overrides = {}) {
 
 const ELK_DIRECTION = { TB: 'DOWN', LR: 'RIGHT' }
 const REACT_FLOW_SIDE = { NORTH: 'top', EAST: 'right', SOUTH: 'bottom', WEST: 'left' }
+const HANDLE_OUTSET = 5
+const OUTWARD = {
+  top: [0, -1],
+  right: [1, 0],
+  bottom: [0, 1],
+  left: [-1, 0],
+}
+
+/**
+ * Match an ELK section to the point where React Flow actually draws an edge.
+ *
+ * ELK ends a section at the card border, in the centre of its port. React
+ * Flow's 10px handles straddle that border and getHandlePosition anchors the
+ * edge at their outer rim. Since the node layer is painted above the edge
+ * layer, leaving an arrow tip at the ELK port centre hides it under the card.
+ * Moving both ends along their face normal preserves ELK's orthogonality while
+ * keeping the line and arrowhead outside the card, just like a native edge.
+ */
+function anchorRoute(route, sourceSide, targetSide) {
+  const anchored = route.slice()
+  if (anchored.length < 2) return anchored
+  const shift = (point, side) => {
+    const [dx, dy] = OUTWARD[side] || [0, 0]
+    return { x: point.x + dx * HANDLE_OUTSET, y: point.y + dy * HANDLE_OUTSET }
+  }
+  anchored[0] = shift(anchored[0], sourceSide)
+  anchored[anchored.length - 1] = shift(anchored[anchored.length - 1], targetSide)
+  return anchored
+}
 
 function elkPortSides(item, direction) {
   if (item.data?.rankReversed) {
@@ -254,8 +283,12 @@ function elkLayoutComponent(nodes, edges, direction, options) {
     const routes = new Map((layoutedGraph.edges || []).map((item) => {
       const section = item.sections?.[0]
       if (!section) return [item.id, []]
+      const graphEdge = edgeById.get(item.id)
       const route = finitePoints([section.startPoint, ...(section.bendPoints || []), section.endPoint])
-      return [item.id, edgeById.get(item.id)?.data?.rankReversed ? route.reverse() : route]
+      if (graphEdge?.data?.rankReversed) route.reverse()
+      const [sourceSide, targetSide] = elkPortSides(graphEdge, direction)
+        .map((side) => REACT_FLOW_SIDE[side])
+      return [item.id, anchorRoute(route, sourceSide, targetSide)]
     }))
     let minX = Infinity
     let minY = Infinity
@@ -626,16 +659,17 @@ function attachHandles(nodes, edges, direction, routes = new Map(), engine = 'da
     })
     return {
       ...item,
-      // Every routed ELK edge uses the renderer that consumes its exact
-      // section. Built-in React Flow edge types would calculate a new route.
+      // Every routed ELK edge uses the renderer that consumes its orthogonal
+      // section after the endpoint anchors are adapted above. Built-in React
+      // Flow edge types would calculate a new route.
       type: route && strictElk ? 'relationshipEdge' : selfLoop ? 'default' : item.type,
       sourceHandle,
       targetHandle,
       data: {
         ...item.data,
-        // ELK routes include their exact start and end points. Keep the whole
-        // section so rendering never substitutes React Flow's measured (and
-        // sometimes fractionally different) endpoint coordinates.
+        // Keep the whole routed section, including the React Flow-compatible
+        // endpoint anchors, so rendering never substitutes measured (and
+        // sometimes fractionally different) coordinates.
         points: strictElk && route ? route : layoutBends(routes.get(item.id)),
         routeMode: strictElk && route ? 'elk-orthogonal' : undefined,
       },

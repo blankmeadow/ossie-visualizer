@@ -321,16 +321,28 @@ describe('edge routing', () => {
 
 describe('strict ELK routing', () => {
   const byId = new Map(elkOntologyGraph.nodes.map((item) => [item.id, item]))
+  const outward = {
+    top: [0, -1],
+    right: [1, 0],
+    bottom: [0, 1],
+    left: [-1, 0],
+  }
 
-  const endpoint = (nodeId, handleId, role) => {
+  const endpoint = (nodeId, handleId, role, outerRim = true) => {
     const node = byId.get(nodeId)
     const handles = node.data[role === 'source' ? 'sourceHandles' : 'targetHandles']
     const handle = handles.find((item) => item.id === handleId)
     const { x, y } = node.position
-    if (handle.position === 'top') return { x: x + (NODE_WIDTH * handle.offset) / 100, y }
-    if (handle.position === 'bottom') return { x: x + (NODE_WIDTH * handle.offset) / 100, y: y + NODE_HEIGHT }
-    if (handle.position === 'left') return { x, y: y + (NODE_HEIGHT * handle.offset) / 100 }
-    return { x: x + NODE_WIDTH, y: y + (NODE_HEIGHT * handle.offset) / 100 }
+    let point
+    if (handle.position === 'top') point = { x: x + (NODE_WIDTH * handle.offset) / 100, y }
+    else if (handle.position === 'bottom') point = { x: x + (NODE_WIDTH * handle.offset) / 100, y: y + NODE_HEIGHT }
+    else if (handle.position === 'left') point = { x, y: y + (NODE_HEIGHT * handle.offset) / 100 }
+    else point = { x: x + NODE_WIDTH, y: y + (NODE_HEIGHT * handle.offset) / 100 }
+    if (!outerRim) return point
+    const [dx, dy] = outward[handle.position]
+    // NodeHandle is 10px wide and straddles the card border, so React Flow's
+    // edge anchor sits one 5px radius beyond ELK's port centre.
+    return { x: point.x + dx * 5, y: point.y + dy * 5 }
   }
 
   it('ranks inheritance parent-first while keeping the arrow child-to-parent', () => {
@@ -347,17 +359,25 @@ describe('strict ELK routing', () => {
     }
   })
 
-  it('uses every ELK section as an unsmoothed orthogonal route', () => {
+  it('uses every ELK section as an unsmoothed, handle-anchored orthogonal route', () => {
     for (const item of elkOntologyGraph.edges) {
       expect(item.type).toBe('relationshipEdge')
       expect(item.data.routeMode).toBe('elk-orthogonal')
       const points = item.data.points || []
       const source = endpoint(item.source, item.sourceHandle, 'source')
       const target = endpoint(item.target, item.targetHandle, 'target')
+      const sourcePortCentre = endpoint(item.source, item.sourceHandle, 'source', false)
+      const targetPortCentre = endpoint(item.target, item.targetHandle, 'target', false)
       expect(points[0].x).toBeCloseTo(source.x)
       expect(points[0].y).toBeCloseTo(source.y)
       expect(points[points.length - 1].x).toBeCloseTo(target.x)
       expect(points[points.length - 1].y).toBeCloseTo(target.y)
+      expect(Math.hypot(points[0].x - sourcePortCentre.x, points[0].y - sourcePortCentre.y))
+        .toBeCloseTo(5)
+      expect(Math.hypot(
+        points[points.length - 1].x - targetPortCentre.x,
+        points[points.length - 1].y - targetPortCentre.y,
+      )).toBeCloseTo(5)
       for (let index = 1; index < points.length; index++) {
         const from = points[index - 1]
         const to = points[index]
