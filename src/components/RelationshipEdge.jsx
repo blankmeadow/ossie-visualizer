@@ -80,7 +80,7 @@ export default function RelationshipEdge({
   // An edge sharing its pair of cards with another one is told where along
   // itself to put its label. On a plain curve the point on the chord is close
   // enough to the line to read as sitting on it.
-  const [path, labelX, labelY] = elkRoute || bends.length || fraction === 0.5
+  const [path, labelX, labelY] = bends.length || fraction === 0.5
     ? drawn
     : [drawn[0], sourceX + (targetX - sourceX) * fraction, sourceY + (targetY - sourceY) * fraction]
 

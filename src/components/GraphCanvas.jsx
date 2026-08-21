@@ -19,7 +19,13 @@ import OssieNode from './OssieNode'
 import RelationshipEdge from './RelationshipEdge'
 import { useT } from '../lib/i18n'
 import { useCssTokens } from '../lib/useCssTokens'
-import { markerSizeForZoom, NODE_HEIGHT, NODE_WIDTH } from '../lib/graph'
+import {
+  edgeRouteAfterMove,
+  markerSizeForZoom,
+  movedHandleOverrides,
+  NODE_HEIGHT,
+  NODE_WIDTH,
+} from '../lib/graph'
 
 const nodeTypes = { ossieNode: OssieNode }
 const edgeTypes = { relationshipEdge: RelationshipEdge }
@@ -298,16 +304,20 @@ function InnerGraphCanvas(props) {
     [graph.edges, graph.nodes],
   )
   const handleLayoutKey = useMemo(
-    () => graph.nodes.map((item) => [
-      item.id,
-      ...(item.data.sourceHandles || []),
-      ...(item.data.targetHandles || []),
-    ].map((part) => typeof part === 'string'
-      ? part
-      : `${part.id}@${part.position}:${part.offset}`).join('|')).sort().join(','),
+    () => graph.nodes.map((item) => {
+      const handles = [
+        ...(item.data.sourceHandles || []),
+        ...(item.data.targetHandles || []),
+      ]
+      return `${item.id}:${handles.map((handle) => `${handle.id}@${handle.position}:${handle.offset}`).join('|')}`
+    }).sort().join(','),
     [graph.nodes],
   )
-  const graphNodeIds = useMemo(() => graph.nodes.map((item) => item.id), [graph.nodes])
+  const nodeIdKey = useMemo(
+    () => JSON.stringify(graph.nodes.map((item) => item.id).sort()),
+    [graph.nodes],
+  )
+  const graphNodeIds = useMemo(() => JSON.parse(nodeIdKey), [nodeIdKey])
   const manualPositions = manualLayout.key === graphLayoutKey ? manualLayout.positions : EMPTY_POSITIONS
   // Bend points are laid out for where the layout put the cards. Once a card
   // has been dragged they describe a detour around nothing, so its edges go
@@ -315,6 +325,17 @@ function InnerGraphCanvas(props) {
   // edge on every frame -- only when the set of moved cards changes.
   const movedKey = Object.keys(manualPositions).sort().join(',')
   const movedNodeIds = useMemo(() => new Set(movedKey ? movedKey.split(',') : []), [movedKey])
+  const handleOverrides = useMemo(
+    () => movedHandleOverrides(graph.nodes, graph.edges, manualPositions, movedNodeIds),
+    [graph.edges, graph.nodes, manualPositions, movedNodeIds],
+  )
+  const movedHandleLayoutKey = useMemo(
+    () => [...handleOverrides]
+      .map(([id, handle]) => `${id}@${handle.position}:${handle.offset}`)
+      .sort()
+      .join(','),
+    [handleOverrides],
+  )
 
   const selectedNodeId = useMemo(
     () => graph.nodes.find((item) => selectionMatches(item.data?.selection, selection))?.id || '',
@@ -362,6 +383,15 @@ function InnerGraphCanvas(props) {
       const related = activeNodeIds.has(item.id) && !selected
       const dimmed = focusActive && !activeNodeIds.has(item.id)
       const measured = nodeSizes[item.id]
+      const updateHandles = (handles = []) => handles.map((handle) => ({
+        ...handle,
+        ...(handleOverrides.get(handle.id) || {}),
+      }))
+      const sourceHandles = updateHandles(item.data.sourceHandles)
+      const targetHandles = updateHandles(item.data.targetHandles)
+      const handleOverrideKey = [...sourceHandles, ...targetHandles]
+        .map((handle) => `${handle.id}@${handle.position}:${handle.offset}`)
+        .join('|')
       const cached = previous.get(item.id)
       if (
         cached
@@ -371,6 +401,7 @@ function InnerGraphCanvas(props) {
         && cached.node.selected === selected
         && cached.node.data.related === related
         && cached.node.data.dimmed === dimmed
+        && cached.handleOverrideKey === handleOverrideKey
       ) {
         cache.set(item.id, cached)
         return cached.node
@@ -381,21 +412,21 @@ function InnerGraphCanvas(props) {
         measured,
         selected,
         zIndex: selected ? 1000 : 0,
-        data: { ...item.data, related, dimmed },
+        data: { ...item.data, sourceHandles, targetHandles, related, dimmed },
       }
-      cache.set(item.id, { source: item, node })
+      cache.set(item.id, { source: item, node, handleOverrideKey })
       return node
     })
     nodeCacheRef.current = cache
     return items
-  }, [activeNodeIds, focusActive, graph.nodes, manualPositions, nodeSizes, selectedNodeId])
+  }, [activeNodeIds, focusActive, graph.nodes, handleOverrides, manualPositions, nodeSizes, selectedNodeId])
 
   // React Flow caches handle bounds. ELK changes their offsets while keeping
-  // the same node and handle IDs, so invalidate that cache after the new
-  // handles reach the DOM or edge endpoints would remain at Dagre positions.
+  // the same IDs; drag fallback can also change a handle's side. Refresh its
+  // bookkeeping only when node membership or handle geometry actually changes.
   useEffect(() => {
     if (graphNodeIds.length) updateNodeInternals(graphNodeIds)
-  }, [graphNodeIds, handleLayoutKey, updateNodeInternals])
+  }, [graphNodeIds, handleLayoutKey, movedHandleLayoutKey, updateNodeInternals])
 
   const edges = useMemo(
     () =>
@@ -407,11 +438,12 @@ function InnerGraphCanvas(props) {
         const label = item.data?.label || ''
         const strokeWidth = isEdgeHighlighted ? 1.55 : item.style?.strokeWidth || 1.1
         const markerSize = markerSizeForZoom(markerZoom, strokeWidth, isEdgeHighlighted)
-        const routeInvalidated = movedNodeIds.has(item.source) || movedNodeIds.has(item.target)
+        const route = edgeRouteAfterMove(item, movedNodeIds)
         return {
           ...item,
+          type: route.type,
           selected: isEdgeSelected,
-          label: label || undefined,
+          label: showEdgeLabels && label ? label : undefined,
           markerEnd: {
             ...item.markerEnd,
             color: isEdgeHighlighted ? tokens['graph-selection'] : tokens['edge-marker'],
@@ -424,8 +456,8 @@ function InnerGraphCanvas(props) {
           },
           data: {
             ...item.data,
-            points: routeInvalidated ? undefined : item.data?.points,
-            routeMode: routeInvalidated ? undefined : item.data?.routeMode,
+            points: route.points,
+            routeMode: route.routeMode,
             dimmed,
             showEdgeLabels,
             onSelect,

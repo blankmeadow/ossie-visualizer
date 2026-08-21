@@ -221,6 +221,8 @@ function elkLayoutComponent(nodes, edges, direction, options) {
     },
     children: nodes.map((item) => ({
       id: item.id,
+      // These dimensions must stay in sync with BaseNode's fixed 224x72 CSS
+      // box. Exact ELK route endpoints depend on that shared geometry.
       width: NODE_WIDTH,
       height: NODE_HEIGHT,
       // Only the face is fixed. ELK remains free to order ports along it while
@@ -269,6 +271,17 @@ function elkLayoutComponent(nodes, edges, direction, options) {
       maxY = Math.max(maxY, y + NODE_HEIGHT)
       return { ...item, position: { x, y }, data: { ...item.data, direction } }
     })
+    // Back edges and self-loops may leave the node-only box. Include those
+    // lanes when packing disconnected components so they cannot be shifted
+    // off-canvas or underneath a neighboring component.
+    for (const route of routes.values()) {
+      for (const point of route) {
+        minX = Math.min(minX, point.x)
+        minY = Math.min(minY, point.y)
+        maxX = Math.max(maxX, point.x)
+        maxY = Math.max(maxY, point.y)
+      }
+    }
     return {
       nodes: positioned,
       routes,
@@ -405,6 +418,61 @@ function edgeSides(sourceNode, targetNode, direction) {
   }
   const forward = targetNode.position.x >= sourceNode.position.x
   return forward ? ['right', 'left'] : ['left', 'right']
+}
+
+/**
+ * Route fields and edge type after a card moves away from engine geometry.
+ * A self-loop falls back to React Flow's loop renderer instead of becoming a
+ * straight line through its own card.
+ */
+export function edgeRouteAfterMove(item, movedNodeIds) {
+  const invalidated = movedNodeIds.has(item.source) || movedNodeIds.has(item.target)
+  const elkSelfLoop = invalidated
+    && item.source === item.target
+    && item.data?.routeMode === 'elk-orthogonal'
+  return {
+    type: elkSelfLoop ? 'default' : item.type,
+    points: invalidated ? undefined : item.data?.points,
+    routeMode: invalidated ? undefined : item.data?.routeMode,
+  }
+}
+
+/**
+ * Reattach invalidated routes to the faces that now point at their other end.
+ * The old fixed ELK sides must not make the fallback curve double back across
+ * a card after it is dragged past its neighbor.
+ */
+export function movedHandleOverrides(nodes, edges, manualPositions, movedNodeIds) {
+  const nodeById = new Map(nodes.map((item) => [item.id, {
+    ...item,
+    position: manualPositions[item.id] || item.position,
+  }]))
+  const overrides = new Map()
+
+  for (const item of edges) {
+    if (!movedNodeIds.has(item.source) && !movedNodeIds.has(item.target)) continue
+    if (item.source === item.target) {
+      overrides.set(`source:${item.id}`, { position: 'right', offset: 34 })
+      overrides.set(`target:${item.id}`, { position: 'right', offset: 72 })
+      continue
+    }
+    const source = nodeById.get(item.source)
+    const target = nodeById.get(item.target)
+    if (!source || !target) continue
+    const direction = source.data?.direction || target.data?.direction || 'TB'
+    const [sourceSide, targetSide] = edgeSides(source, target, direction)
+    const sourceHandle = source.data?.sourceHandles?.find((handle) => handle.id === `source:${item.id}`)
+    const targetHandle = target.data?.targetHandles?.find((handle) => handle.id === `target:${item.id}`)
+    overrides.set(`source:${item.id}`, {
+      position: sourceSide,
+      offset: sourceHandle?.offset ?? 50,
+    })
+    overrides.set(`target:${item.id}`, {
+      position: targetSide,
+      offset: targetHandle?.offset ?? 50,
+    })
+  }
+  return overrides
 }
 
 // ─── Edge routing ────────────────────────────────────────────────────────────
