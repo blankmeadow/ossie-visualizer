@@ -56,8 +56,17 @@ html, body, #root { height: 100%; margin: 0; padding: 0; overflow: hidden; }
 /* The inspector clips its corners, so its handle stays inside -- over the
    panel's own left padding, where there is nothing to click. */
 .inspector .resize-handle { left: 0; }
-.sidebar__title { padding: 17px 16px 11px; }
+.sidebar__title { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 17px 12px 11px 16px; }
 .sidebar h2 { margin: 0; font-size: 15px; letter-spacing: -.02em; }
+
+/* Folding the index away is the cheapest way to give a wide graph more room,
+   so the canvas keeps a way back: the same control, floating over its corner. */
+.sidebar__collapse, .sidebar-restore { width: 27px; height: 27px; flex: none; display: grid; place-items: center; padding: 0; border: 1px solid transparent; border-radius: 5px; color: #777; background: transparent; cursor: pointer; transition: color .15s ease, background .15s ease, border-color .15s ease; }
+.sidebar__collapse:hover, .sidebar-restore:hover { color: var(--green-dark); background: var(--green-soft); }
+.sidebar-restore { position: absolute; z-index: 6; left: 12px; top: 12px; border-color: var(--line); background: rgba(255,255,255,.96); box-shadow: 0 1px 4px rgba(0,0,0,.11); }
+.app-shell.is-sidebar-collapsed .workspace { grid-template-columns: minmax(0, 1fr); }
+.app-shell.is-sidebar-collapsed .brand { width: 64px; min-width: 64px; padding: 0 20px; }
+.app-shell.is-sidebar-collapsed .brand__name { display: none; }
 .search-box { min-height: 34px; display: flex; align-items: center; gap: 8px; margin: 0 12px 11px; padding: 7px 9px; border: 1px solid var(--line); background: var(--surface-2); border-radius: 5px; color: #777; }
 .search-box:focus-within { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(79,143,117,.14); background: var(--surface); }
 .search-box input { width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; font-size: 12px; }

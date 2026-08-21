@@ -61,6 +61,10 @@ export default function RelationshipEdge({
               event.stopPropagation()
               data?.onSelect?.(data.selection)
             }}
+            onDoubleClick={(event) => {
+              event.stopPropagation()
+              data?.onOpenDetail?.(data.selection)
+            }}
           >
             {label}
           </button>

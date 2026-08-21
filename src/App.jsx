@@ -9,6 +9,8 @@ import {
   GitBranch,
   Languages,
   Network,
+  PanelLeftClose,
+  PanelLeftOpen,
   Search,
   Sigma,
   SlidersHorizontal,
@@ -68,7 +70,12 @@ export default function App() {
   const [importOpen, setImportOpen] = useState(false)
   const [activeTab, setActiveTab] = useState('ontology')
   const [query, setQuery] = useState('')
+  // What the canvas highlights and what the detail panel shows are two
+  // different things: clicking a node on the canvas focuses it in place, and
+  // the panel opens only when the reader asks for it -- from the index, or
+  // from the node's own context menu.
   const [selection, setSelection] = useState(null)
+  const [detailOpen, setDetailOpen] = useState(false)
   const [showRelationships, setShowRelationships] = useState(true)
   const [showMetrics, setShowMetrics] = useState(false)
   const [showMiniMap, setShowMiniMap] = useState(true)
@@ -160,6 +167,7 @@ export default function App() {
     setImportOpen(false)
     setActiveTab('ontology')
     setSelection(null)
+    setDetailOpen(false)
     setQuery('')
     setSidebarKind('all')
   }
@@ -182,6 +190,7 @@ export default function App() {
     }
     const normalized = item.target ? item : { ...item, target: next.target }
     setSelection({ kind: normalized.kind, name: normalized.name, target: normalized.target })
+    setDetailOpen(true)
     if (['concept', 'valueType', 'relationship'].includes(normalized.kind)) setActiveTab('ontology')
     if (normalized.kind === 'relationship') {
       setShowRelationships(true)
@@ -195,14 +204,24 @@ export default function App() {
     if (normalized.kind === 'mapping') setActiveTab('mapping')
   }
 
-  const selectionMatches = (a, b) => a?.kind === b?.kind && a?.name === b?.name
-
+  // A single click on the canvas locates a node: it lights up with everything
+  // it touches and the rest of the graph fades back. Nothing opens. Clicking
+  // the empty canvas gives the whole graph back.
   const selectGraphElement = (next) => {
-    if (selectionMatches(selection, next)) {
+    if (!next) {
       setSelection(null)
+      setDetailOpen(false)
       return
     }
     setSelection(next)
+  }
+
+  // Double click is the ask for detail, the way it opens a thing everywhere
+  // else. Once the panel is open it follows what the canvas has selected.
+  const openGraphDetail = (next) => {
+    if (!next) return
+    setSelection(next)
+    setDetailOpen(true)
   }
 
   const selectTab = (tab) => {
@@ -211,17 +230,18 @@ export default function App() {
     setSidebarKind('all')
     setFocusDepth(0)
     setSelection(null)
+    setDetailOpen(false)
   }
 
   return (
     <div
-      className="app-shell"
+      className={`app-shell ${sidebar.collapsed ? 'is-sidebar-collapsed' : ''}`}
       style={{ '--sidebar-width': `${sidebar.width}px`, '--inspector-width': `${inspector.width}px` }}
     >
       <header className="topbar">
         <div className="brand">
           <div className="brand__mark"><Network size={20} /></div>
-          <div><strong>Ossie Visualizer</strong></div>
+          <div className="brand__name"><strong>Ossie Visualizer</strong></div>
         </div>
 
         <div className="topbar__main">
@@ -267,7 +287,7 @@ export default function App() {
         </Suspense>
       ) : (
         <main className="workspace">
-          <Sidebar
+          {!sidebar.collapsed && <Sidebar
             key={activeTab}
             activeTab={activeTab}
             items={sidebarItems}
@@ -279,8 +299,19 @@ export default function App() {
             onSelect={navigate}
             onResize={sidebar.resize}
             onResetWidth={sidebar.reset}
-          />
+            onCollapse={sidebar.toggle}
+          />}
           <section className="canvas-panel">
+            {sidebar.collapsed && (
+              <button
+                className="sidebar-restore"
+                onClick={sidebar.toggle}
+                title={t('sidebar.expand')}
+                aria-label={t('sidebar.expand')}
+              >
+                <PanelLeftOpen size={15} />
+              </button>
+            )}
             <GraphCanvas
               graph={graph}
               documentName={model.document.name}
@@ -298,15 +329,17 @@ export default function App() {
               setLayoutEngine={setLayoutEngine}
               focusDepth={focusDepth}
               onSelect={selectGraphElement}
+              onOpenDetail={openGraphDetail}
               onFocus={setFocusDepth}
+              inspectorOpen={detailOpen && !!selection}
               inspectorWidth={inspector.width}
             />
             <GraphLegend activeTab={activeTab} />
           </section>
           <Inspector
-            selection={selection}
+            selection={detailOpen ? selection : null}
             model={model}
-            onClose={() => setSelection(null)}
+            onClose={() => setDetailOpen(false)}
             onNavigate={navigate}
             onResize={inspector.resize}
             onResetWidth={inspector.reset}
@@ -344,7 +377,7 @@ function Welcome({ onOpen, onSample }) {
   )
 }
 
-function Sidebar({ activeTab, items, query, onQuery, selectedKind, onKind, selection, onSelect, onResize, onResetWidth }) {
+function Sidebar({ activeTab, items, query, onQuery, selectedKind, onKind, selection, onSelect, onResize, onResetWidth, onCollapse }) {
   const t = useT()
   const title = activeTab === 'ontology'
     ? t('sidebar.titleOntology')
@@ -356,7 +389,17 @@ function Sidebar({ activeTab, items, query, onQuery, selectedKind, onKind, selec
 
   return (
     <aside className="sidebar">
-      <div className="sidebar__title"><h2>{title}</h2></div>
+      <div className="sidebar__title">
+        <h2>{title}</h2>
+        <button
+          className="sidebar__collapse"
+          onClick={onCollapse}
+          title={t('sidebar.collapse')}
+          aria-label={t('sidebar.collapse')}
+        >
+          <PanelLeftClose size={15} />
+        </button>
+      </div>
       <label className="search-box">
         <Search size={15} />
         <input value={query} onChange={(event) => onQuery(event.target.value)} placeholder={t('sidebar.search')} />

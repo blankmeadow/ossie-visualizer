@@ -251,8 +251,10 @@ function InnerGraphCanvas(props) {
     showEdgeLabels,
     setShowEdgeLabels,
     onSelect,
+    onOpenDetail,
     onFocus,
     canvasRef,
+    inspectorOpen,
     inspectorWidth,
     activeTab,
     showRelationships,
@@ -283,7 +285,7 @@ function InnerGraphCanvas(props) {
   const [exporting, setExporting] = useState(false)
   const [exportZoom, setExportZoom] = useState(null)
   const [manualLayout, setManualLayout] = useState({ key: '', positions: {} })
-  const activeInspectorWidth = selection ? inspectorWidth : 0
+  const activeInspectorWidth = inspectorOpen ? inspectorWidth : 0
   const markerZoom = exportZoom || viewportMarkerZoom
 
   const graphLayoutKey = useMemo(
@@ -398,6 +400,7 @@ function InnerGraphCanvas(props) {
             dimmed,
             showEdgeLabels,
             onSelect,
+            onOpenDetail,
           },
           className: isEdgeHighlighted ? 'is-selected' : '',
           style: {
@@ -411,7 +414,7 @@ function InnerGraphCanvas(props) {
           zIndex: 0,
         }
       }),
-    [focusActive, graph.edges, markerZoom, onSelect, selectedEdgeIds, selectedNodeId, showEdgeLabels, tokens],
+    [focusActive, graph.edges, markerZoom, onOpenDetail, onSelect, selectedEdgeIds, selectedNodeId, showEdgeLabels, tokens],
   )
   graphNodesRef.current = nodes
 
@@ -428,13 +431,16 @@ function InnerGraphCanvas(props) {
   const selectedNodeKey = selectedNode
     ? `${selectedNode.id}:${graphLayoutKey}`
     : ''
+  // Locating a node leaves the viewport alone -- the fade already says where it
+  // is, and yanking the canvas under a click that only meant "this one" is
+  // disorienting. Opening the panel does move it, since the panel needs room.
   useEffect(() => {
-    if (!selectedNodeKey || !selectedNodeFrameRef.current) return undefined
+    if (!inspectorOpen || !selectedNodeKey || !selectedNodeFrameRef.current) return undefined
     const timeout = window.setTimeout(() => {
       frameNodes(flow, canvasRef, [selectedNodeFrameRef.current], activeInspectorWidth, 240)
     }, 80)
     return () => window.clearTimeout(timeout)
-  }, [activeInspectorWidth, canvasRef, flow, selectedNodeKey])
+  }, [activeInspectorWidth, canvasRef, flow, inspectorOpen, selectedNodeKey])
 
   const selectedEdgeKey = selectedEdgeIds.size ? [...selectedEdgeIds].sort().join(',') : ''
   const selectedEdges = graph.edges.filter((item) => selectedEdgeIds.has(item.id))
@@ -443,12 +449,12 @@ function InnerGraphCanvas(props) {
   edgeFrameNodesRef.current = edgeFrameNodes
   const edgeFrameKey = selectedEdgeKey ? `${selectedEdgeKey}:${graphLayoutKey}` : ''
   useEffect(() => {
-    if (!selectedEdgeKey || !edgeFrameNodesRef.current.length) return undefined
+    if (!inspectorOpen || !selectedEdgeKey || !edgeFrameNodesRef.current.length) return undefined
     const timeout = window.setTimeout(() => {
       frameNodes(flow, canvasRef, edgeFrameNodesRef.current, activeInspectorWidth)
     }, 120)
     return () => window.clearTimeout(timeout)
-  }, [activeInspectorWidth, canvasRef, edgeFrameKey, flow, selectedEdgeKey])
+  }, [activeInspectorWidth, canvasRef, edgeFrameKey, flow, inspectorOpen, selectedEdgeKey])
 
   const handleNodesChange = useCallback((changes) => {
     // The size React Flow measured for a node is reported once, here. Keeping
@@ -535,16 +541,18 @@ function InnerGraphCanvas(props) {
       edgesFocusable
       minZoom={0.08}
       maxZoom={2.2}
+      // Double click belongs to the node under the cursor: it opens the detail
+      // panel. Left on, the canvas' own double-click zoom swallows the event
+      // before React sees it, and jumps the viewport a whole step as well.
+      zoomOnDoubleClick={false}
       fitView
       fitViewOptions={{ padding: 0.16, maxZoom: 1.12 }}
       proOptions={{ hideAttribution: true }}
       onNodesChange={handleNodesChange}
       onNodeClick={(_, item) => onSelect(item.data?.selection)}
-      onNodeDoubleClick={(_, item) => {
-        onSelect(item.data?.selection)
-        onFocus(1)
-      }}
+      onNodeDoubleClick={(_, item) => onOpenDetail(item.data?.selection)}
       onEdgeClick={(_, item) => onSelect(item.data?.selection)}
+      onEdgeDoubleClick={(_, item) => onOpenDetail(item.data?.selection)}
       onPaneClick={() => onSelect(null)}
     >
       <Background
@@ -604,7 +612,7 @@ function InnerGraphCanvas(props) {
 export default function GraphCanvas(props) {
   const canvasRef = useRef(null)
   return (
-    <div ref={canvasRef} className={`graph-canvas ${props.selection ? 'has-inspector' : ''}`}>
+    <div ref={canvasRef} className={`graph-canvas ${props.inspectorOpen ? 'has-inspector' : ''}`}>
       <ReactFlowProvider>
         <InnerGraphCanvas {...props} canvasRef={canvasRef} />
       </ReactFlowProvider>
