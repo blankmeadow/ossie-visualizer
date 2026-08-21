@@ -25,6 +25,8 @@ const edgeTypes = { relationshipEdge: RelationshipEdge }
 // Framing maths has to agree with the dimensions dagre laid the graph out with.
 const nodeWidth = NODE_WIDTH
 const nodeHeight = NODE_HEIGHT
+const MINIMAP_WIDTH = 160
+const MINIMAP_HEIGHT = 100
 const EMPTY_POSITIONS = Object.freeze({})
 const EMPTY_SIZES = Object.freeze({})
 const selectZoom = (state) => state.transform[2]
@@ -631,6 +633,12 @@ function InnerGraphCanvas(props) {
               <MiniMap
                 pannable
                 zoomable
+                // React Flow draws the overview at the size it is given and
+                // defaults to 200x150, which the 160x100 card then cropped:
+                // the corner of the graph sat outside the frame meant to show
+                // all of it. Sized here rather than in CSS so the drawing and
+                // the card it sits in are the same box.
+                style={{ width: MINIMAP_WIDTH, height: MINIMAP_HEIGHT }}
                 nodeColor={(item) => item.data?.kind === 'dataset'
                   ? tokens['node-dataset']
                   : item.data?.kind === 'metric'
