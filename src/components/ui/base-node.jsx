@@ -9,21 +9,25 @@ import { cn } from '@/lib/utils'
  * Same shape: a container plus header / title / content / footer slots, so a
  * new node type composes the pieces instead of restating the class soup.
  *
- * `emphasis` carries the canvas highlight states for the selection and its
- * immediate neighbours.
+ * `emphasis` carries the canvas highlight states: the selection, its immediate
+ * neighbours, and everything else faded back behind them.
  */
 
 const baseNodeVariants = cva(
   cn(
     'h-[72px] w-[224px] overflow-visible rounded-[8px] border px-[11px] py-[9px]',
     'bg-white',
+    // Opacity alone: it composites, so fading a large graph in and out of focus
+    // stays cheap. A filter here would repaint every card on every pan frame.
+    'transition-[opacity,border-color] duration-150',
   ),
   {
     variants: {
       emphasis: {
         default: 'border-[1.5px] border-[#b9b9b9]',
         selected: 'border-[1.5px] border-[#4f8f75] shadow-[0_0_0_6px_rgba(79,143,117,.12)] z-30',
-        related: 'border-[1.5px] border-[#a9a9a9]',
+        related: 'border-[1.5px] border-[#8fae9f]',
+        dimmed: 'border-[1.5px] border-[#cdcdcd] opacity-40',
       },
     },
     defaultVariants: { emphasis: 'default' },

@@ -24,7 +24,9 @@ export default function OssieNode({ data, selected }) {
     ? 'selected'
     : data.related
       ? 'related'
-      : 'default'
+      : data.dimmed
+        ? 'dimmed'
+        : 'default'
   const tooltip = [data.name, data.subtitle, data.description].filter(Boolean).join(' — ')
   const description = data.description || data.subtitle || '—'
 

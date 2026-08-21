@@ -321,6 +321,10 @@ function InnerGraphCanvas(props) {
     }
     return nodeIds
   }, [graph.edges, selectedEdgeIds, selectedNodeId])
+  // Everything outside the selection and its immediate neighbours fades back,
+  // but only once something on the canvas is actually selected: a selection the
+  // graph does not draw (a value type, say) must not dim the whole view.
+  const focusActive = activeNodeIds.size > 0
 
   // React Flow keeps a node's measurements only for as long as it keeps seeing
   // the same node object, and it hides any node it considers unmeasured along
@@ -335,6 +339,7 @@ function InnerGraphCanvas(props) {
       const position = manualPositions[item.id] || item.position
       const selected = item.id === selectedNodeId
       const related = activeNodeIds.has(item.id) && !selected
+      const dimmed = focusActive && !activeNodeIds.has(item.id)
       const measured = nodeSizes[item.id]
       const cached = previous.get(item.id)
       if (
@@ -344,6 +349,7 @@ function InnerGraphCanvas(props) {
         && cached.node.measured === measured
         && cached.node.selected === selected
         && cached.node.data.related === related
+        && cached.node.data.dimmed === dimmed
       ) {
         cache.set(item.id, cached)
         return cached.node
@@ -354,14 +360,14 @@ function InnerGraphCanvas(props) {
         measured,
         selected,
         zIndex: selected ? 1000 : 0,
-        data: { ...item.data, related },
+        data: { ...item.data, related, dimmed },
       }
       cache.set(item.id, { source: item, node })
       return node
     })
     nodeCacheRef.current = cache
     return items
-  }, [activeNodeIds, graph.nodes, manualPositions, nodeSizes, selectedNodeId])
+  }, [activeNodeIds, focusActive, graph.nodes, manualPositions, nodeSizes, selectedNodeId])
 
   const edges = useMemo(
     () =>
@@ -369,6 +375,7 @@ function InnerGraphCanvas(props) {
         const isEdgeSelected = selectedEdgeIds.has(item.id)
         const isConnectedToSelectedNode = selectedNodeId && (item.source === selectedNodeId || item.target === selectedNodeId)
         const isEdgeHighlighted = isEdgeSelected || isConnectedToSelectedNode
+        const dimmed = focusActive && !isEdgeHighlighted
         const label = item.data?.label || ''
         const strokeWidth = isEdgeHighlighted ? 1.55 : item.style?.strokeWidth || 1.1
         const markerSize = markerSizeForZoom(markerZoom, strokeWidth, isEdgeHighlighted)
@@ -388,19 +395,23 @@ function InnerGraphCanvas(props) {
           },
           data: {
             ...item.data,
+            dimmed,
             showEdgeLabels,
             onSelect,
           },
           className: isEdgeHighlighted ? 'is-selected' : '',
           style: {
             ...item.style,
+            // Opacity on the path fades its arrowhead with it, and stays cheap
+            // enough to repaint while the canvas is being panned or dragged.
+            opacity: dimmed ? 0.3 : 1,
             stroke: isEdgeHighlighted ? tokens['graph-selection'] : tokens['edge-neutral'],
             strokeWidth,
           },
           zIndex: 0,
         }
       }),
-    [graph.edges, markerZoom, onSelect, selectedEdgeIds, selectedNodeId, showEdgeLabels, tokens],
+    [focusActive, graph.edges, markerZoom, onSelect, selectedEdgeIds, selectedNodeId, showEdgeLabels, tokens],
   )
   graphNodesRef.current = nodes
 
