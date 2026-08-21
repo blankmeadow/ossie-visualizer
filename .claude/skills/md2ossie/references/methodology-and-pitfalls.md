@@ -3,7 +3,7 @@
 本指南以固定提交 `88e0011148283302c9a04cd0287e00e0b9d87354` 的官方文件为基线：
 
 - [Ontology JSON Schema](https://github.com/apache/ossie/blob/88e0011148283302c9a04cd0287e00e0b9d87354/ontology/ontology.json)
-- [Ontology Specification](https://github.com/apache/ossie/blob/88e0011148283302c9a04cd0287e00e0b9d87354/ontology/ontology.md)
+- [Ontology Specification](https://github.com/apache/ossie/blob/88e0011148283302c9a04cd0287e00e0b9d87354/ontology/ontology.md)（已随技能固定在 `assets/vendor/apache-ossie/ontology/ontology.md`，语义 lint 的每条规则都以它为依据）
 - [Core Schema](https://github.com/apache/ossie/blob/88e0011148283302c9a04cd0287e00e0b9d87354/core-spec/osi-schema.json)
 
 ## 先区分三类规则
@@ -96,7 +96,12 @@ relationship 必填 `name`、`verbalizes`，可选 `description`、`roles`、`mu
 - EntityType：`Any`
 - ValueType：`Boolean`、`Date`、`DateTime`、`Decimal`、`Float`、`Integer`、`String`
 
-`Time`、`DateTimeTz`、`Opaque` 是 core semantic model 的 DataType，但不是当前 ontology specification 列出的内置 concept。不要在 ontology role 中把它们当作无需声明的内置概念；若确有需要，应显式定义可追溯的 ValueType 映射或记录规范缺口。
+`Time`、`DateTimeTz`、`Opaque` 是 core semantic model 的 DataType，但不是当前 ontology specification 列出的内置 concept（见 vendored `ontology.md` 的 Built-in concepts 表）。不要在 ontology role 或 `extends` 中把它们当作无需声明的内置概念。
+
+它们没有对应的 ontology 内置概念可继承，因此 `extends: ["Time"]` 之类写法会同时触发 `UNKNOWN_PARENT_CONCEPT` 和 `VALUE_TYPE_WITHOUT_BUILTIN_BASE`，没有能通过校验的写法。遇到这类值时：
+
+- 优先改挂到语义最接近的内置概念，例如时刻用 `DateTime`、带时区时间戳用 `DateTime` 并在 `description` 里记录时区约定、不透明值用 `String`。
+- 把损失的精度、时区语义或二进制特性写进 `description`，并在交付说明里列为规范缺口，不要用伪造的父概念掩盖。
 
 ### 3. 理解隐式首 role
 

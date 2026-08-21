@@ -116,11 +116,15 @@ def validate_schema(data: Any) -> List[Issue]:
         validator_class = validator_for(ontology_schema)
         validator_class.check_schema(ontology_schema)
 
+        # Register the core schema only under the raw URI the ontology schema
+        # actually references. Upstream gives both files the same "$id", so
+        # registering the core schema under that "$id" too would claim the
+        # ontology schema's own base URI -- and both files define Relationship
+        # and Expression with incompatible shapes. That currently stays
+        # harmless only because the resolver re-registers the root schema over
+        # the registry; relying on that precedence is not worth the risk.
         core_resource = Resource.from_contents(core_schema)
         registry = Registry().with_resource(CORE_SCHEMA_RAW_URI, core_resource)
-        core_schema_id = core_schema.get("$id")
-        if isinstance(core_schema_id, str) and core_schema_id:
-            registry = registry.with_resource(core_schema_id, core_resource)
 
         validator = validator_class(ontology_schema, registry=registry)
         errors = sorted(
@@ -599,12 +603,20 @@ def mapping_reference_issues(
     return result
 
 
+def semantics_can_run(data: Any) -> bool:
+    """Report whether the document is shaped well enough to lint.
+
+    Every lint walks ``ontology`` as a list of concepts. A document that fails
+    this check has already failed schema validation, and reporting the lint as
+    ``passed`` would credit checks that never ran.
+    """
+    return isinstance(data, dict) and isinstance(data.get("ontology"), list)
+
+
 def validate_semantics(data: Any) -> List[Issue]:
-    if not isinstance(data, dict):
+    if not semantics_can_run(data):
         return []
-    ontology = data.get("ontology")
-    if not isinstance(ontology, list):
-        return []
+    ontology = data["ontology"]
 
     result: List[Issue] = []
     if data.get("name") == "":
@@ -685,11 +697,29 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
+def semantic_lint_status(
+    semantic_issues: List[Issue],
+    schema_only: bool,
+    lint_ran: bool,
+) -> str:
+    """Name what the lint layer actually did.
+
+    ``skipped`` means --schema-only turned it off; ``not-run`` means the
+    document was too malformed to walk. Neither is a clean bill of health, so
+    neither may report ``passed``.
+    """
+    if schema_only:
+        return "skipped"
+    if not lint_ran:
+        return "not-run"
+    return "passed" if not semantic_issues else "needs-review"
+
+
 def print_report(
     target: Path,
     schema_issues: List[Issue],
     semantic_issues: List[Issue],
-    semantic_skipped: bool = False,
+    semantic_status: str = "passed",
 ) -> None:
     errors = [
         item
@@ -701,21 +731,12 @@ def print_report(
         for item in schema_issues + semantic_issues
         if item["severity"] == "warning"
     ]
-    semantic_errors = [
-        item for item in semantic_issues if item["severity"] == "error"
-    ]
 
     print("# Apache Ossie Validation Report\n")
     print(f"- Target File: `{target.name}`")
     print("- Standard: `apache-ossie/0.2.0.dev0`")
     print(f"- Schema Status: `{'passed' if not schema_issues else 'failed'}`")
-    if semantic_skipped:
-        print("- Semantic Lint Status: `skipped`")
-    else:
-        print(
-            "- Semantic Lint Status: "
-            f"`{'passed' if not semantic_errors and not warnings else 'needs-review'}`"
-        )
+    print(f"- Semantic Lint Status: `{semantic_status}`")
     print(f"- Total Errors: `{len(errors)}`")
     print(f"- Total Warnings: `{len(warnings)}`\n")
 
@@ -762,12 +783,15 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return 1
 
     schema_issues = validate_schema(data)
-    semantic_issues = [] if args.schema_only else validate_semantics(data)
+    lint_ran = not args.schema_only and semantics_can_run(data)
+    semantic_issues = validate_semantics(data) if lint_ran else []
     print_report(
         target,
         schema_issues,
         semantic_issues,
-        semantic_skipped=args.schema_only,
+        semantic_status=semantic_lint_status(
+            semantic_issues, args.schema_only, lint_ran
+        ),
     )
 
     errors = [

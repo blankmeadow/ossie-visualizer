@@ -1,6 +1,7 @@
 import importlib.util
 import hashlib
 import json
+import re
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -15,9 +16,13 @@ SPEC.loader.exec_module(VALIDATOR)
 
 
 def base_document():
+    # ai_context is the only property whose schema reaches the remote $ref, and
+    # jsonschema follows references lazily. Without it here, the offline tests
+    # below would pass against an empty registry and prove nothing.
     return {
         "version": "0.2.0.dev0",
         "name": "test_ontology",
+        "ai_context": {"instructions": "解释测试本体中的术语"},
         "ontology": [
             {"concept": "party", "type": "EntityType"},
             {
@@ -53,11 +58,30 @@ class ValidateOssieTests(unittest.TestCase):
 
     def test_schema_validation_does_not_fetch_remote_references(self):
         document = base_document()
+        self.assertIn("ai_context", document, "fixture must reach the remote $ref")
         with patch(
             "urllib.request.urlopen",
             side_effect=AssertionError("network access is not allowed"),
         ):
             self.assertEqual(VALIDATOR.validate_schema(document), [])
+
+    def test_remote_reference_is_live_and_answered_by_the_vendored_core_schema(self):
+        """Guard the test above: prove the $ref is really being followed.
+
+        If the fixture ever stops reaching the reference, validation would
+        succeed here too and the offline guarantee would go untested.
+        """
+        document = base_document()
+        with patch.object(
+            VALIDATOR, "CORE_SCHEMA_RAW_URI", "https://example.invalid/unregistered.json"
+        ):
+            codes = {item["code"] for item in VALIDATOR.validate_schema(document)}
+        # Which of the two the resolver raises depends on the jsonschema
+        # version; what matters is that an unanswerable $ref fails closed.
+        self.assertTrue(codes)
+        self.assertLessEqual(
+            codes, {"SCHEMA_SETUP_ERROR", "SCHEMA_VALIDATION_ERROR"}
+        )
 
     def test_vendored_official_assets_match_pinned_hashes(self):
         expected = {
@@ -66,6 +90,9 @@ class ValidateOssieTests(unittest.TestCase):
             ),
             "ontology/ontology.json": (
                 "c0ce26ff658aff52307f01bdc564061d194c1987e930d61ff498e63456b9b41d"
+            ),
+            "ontology/ontology.md": (
+                "dcfa34ac61eb86dbf5715d7f35f9c83d52898ba6880a52bc1df4b7a18d091116"
             ),
             "validation/validate.py": (
                 "dc3ef8914a283d0568f65843343ed7592377aa813230e1990c6adbb2241a2be3"
@@ -149,6 +176,35 @@ class ValidateOssieTests(unittest.TestCase):
             "UNKNOWN_IDENTITY_RELATIONSHIP",
             {item["code"] for item in VALIDATOR.validate_semantics(document)},
         )
+
+    def test_lint_status_separates_clean_from_never_ran(self):
+        self.assertTrue(VALIDATOR.semantics_can_run(base_document()))
+        self.assertEqual(
+            VALIDATOR.semantic_lint_status([], schema_only=False, lint_ran=True),
+            "passed",
+        )
+        # A document schema validation already rejected must never be able to
+        # report a clean lint, because no lint rule ever looked at it.
+        for malformed in ({"version": "0.2.0.dev0", "name": "x"}, {}, []):
+            self.assertFalse(VALIDATOR.semantics_can_run(malformed), malformed)
+            self.assertEqual(
+                VALIDATOR.semantic_lint_status([], schema_only=False, lint_ran=False),
+                "not-run",
+            )
+        self.assertEqual(
+            VALIDATOR.semantic_lint_status([], schema_only=True, lint_ran=False),
+            "skipped",
+        )
+
+    def test_builtin_concepts_match_the_vendored_specification(self):
+        """The lint's built-in set is only as good as the document it cites."""
+        spec_text = (
+            SKILL_ROOT
+            / "assets/vendor/apache-ossie/ontology/ontology.md"
+        ).read_text(encoding="utf-8")
+        table = spec_text.split("### Built-in concepts", 1)[1].split("###", 1)[0]
+        documented = set(re.findall(r"^\|\s*`(\w+)`\s*\|", table, re.MULTILINE))
+        self.assertEqual(documented, VALIDATOR.BUILTIN_CONCEPTS)
 
 
 if __name__ == "__main__":

@@ -8,7 +8,7 @@ description: >
   都应使用本技能。它区分官方 schema 硬约束、官方 specification 语义约束和项目建模约定，
   并提供固定版本的官方 schema 与离线引用校验器。
 compatibility: >
-  Python 3.9+；校验器需要 jsonschema>=4.26.0。官方 schema 已内置，安装依赖后校验过程不访问网络。
+  Python 3.9+；校验器需要 jsonschema>=4.26.0,<5。官方 schema 已内置，安装依赖后校验过程不访问网络。
 ---
 
 # Markdown 转 Apache Ossie Ontology JSON
@@ -19,7 +19,7 @@ compatibility: >
 
 1. 阅读 [`references/methodology-and-pitfalls.md`](references/methodology-and-pitfalls.md)。它说明官方语义、基数方向、ValueType 取舍和常见误区。
 2. 需要起始结构时复制 [`assets/template.ossie.json`](assets/template.ossie.json)。
-3. 官方 schema 固定在 Apache Ossie commit `88e0011148283302c9a04cd0287e00e0b9d87354`，见 [`assets/vendor/apache-ossie/README.md`](assets/vendor/apache-ossie/README.md)。
+3. 官方 schema 与 ontology specification 一起固定在 Apache Ossie commit `88e0011148283302c9a04cd0287e00e0b9d87354`，见 [`assets/vendor/apache-ossie/README.md`](assets/vendor/apache-ossie/README.md)。语义规则有疑问时，以 vendored 的 [`ontology.md`](assets/vendor/apache-ossie/ontology/ontology.md) 为准。
 
 ## 校验器边界
 
@@ -86,7 +86,7 @@ python3 .claude/skills/md2ossie/scripts/validate_ossie.py --strict path/to/model
 验收必须同时满足：
 
 - `Schema Status: passed`：官方 JSON Schema 结构校验通过。
-- `Semantic Lint Status: passed`：本技能检查的引用、继承、role、标识和 multiplicity 规则通过。
+- `Semantic Lint Status: passed`：本技能检查的引用、继承、role、标识和 multiplicity 规则通过。`skipped`（用了 `--schema-only`）和 `not-run`（文档结构损坏到无法遍历）都不算通过，必须先修好再重跑。
 - `Total Errors: 0` 与 `Total Warnings: 0`。
 - 人工复核表达式含义、建模粒度、未转换规则和输入证据。`0 errors` 不代表表达式已经被 OSSIE 执行器验证。
 

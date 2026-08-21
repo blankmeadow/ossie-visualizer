@@ -5,11 +5,17 @@ These files are unmodified snapshots from Apache Ossie commit
 
 - `core-spec/osi-schema.json`
 - `ontology/ontology.json`
+- `ontology/ontology.md`
 - `validation/validate.py`
 - `LICENSE`
 - `NOTICE`
 
 Upstream: <https://github.com/apache/ossie>
+
+`ontology.md` is the specification the semantic lint cites for every rule the JSON Schema does
+not encode -- the built-in concept list, the multiplicity definitions, the implicit first role,
+and the `{Concept:role}` verbalization placeholders. It is pinned alongside the schemas so a
+reviewer can check the lint against its source without network access.
 
 The skill's `scripts/validate_ossie.py` reads the two unmodified schemas at runtime. It uses
 the official ontology schema as the structural source of truth, resolves that schema's raw
@@ -24,6 +30,7 @@ SHA-256:
 ```text
 8ce9f82aa92080265f9ae119e31cda5bef062f489674d3c467245c2d4c5ff264  core-spec/osi-schema.json
 c0ce26ff658aff52307f01bdc564061d194c1987e930d61ff498e63456b9b41d  ontology/ontology.json
+dcfa34ac61eb86dbf5715d7f35f9c83d52898ba6880a52bc1df4b7a18d091116  ontology/ontology.md
 dc3ef8914a283d0568f65843343ed7592377aa813230e1990c6adbb2241a2be3  validation/validate.py
 ```
 
