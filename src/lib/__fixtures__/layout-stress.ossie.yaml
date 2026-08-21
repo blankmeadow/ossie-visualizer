@@ -1,0 +1,109 @@
+# A small Ossie document that exercises the layout paths the bundled Flights
+# example never reaches. Flights is one connected component of plain forward
+# relationships: no `extends`, no cycles, no self-relationships. Those are the
+# cases where Dagre and ELK disagree, so they are the ones worth looking at
+# whenever edge routing or handle placement changes.
+#
+# What it covers, and why each piece is here:
+#
+#   inheritance          Customer/Supplier extend Party, VipCustomer extends
+#                        Customer. `extends` is drawn child -> parent but ranked
+#                        parent -> child, so it is the one edge kind whose arrow
+#                        and rank disagree (`rankReversed`). Two levels deep, so
+#                        a parent is also somebody's child.
+#   back edges           Product -> Supplier and Order -> Customer point against
+#                        the rank, forcing the router to leave a node on the far
+#                        side from where it is going.
+#   self relationships   Customer.referred_by -> Customer and Bin.parent_bin ->
+#                        Bin. Both engines special-case an edge that starts and
+#                        ends on the same card.
+#   cycles               Supplier -> Product -> Supplier, and Customer -> Order
+#                        -> Customer, so ranking has to break a loop.
+#   many components      Party's tree, Warehouse/Bin and Region/Zone are three
+#                        disconnected components, which is what makes component
+#                        packing observable.
+#
+# Load it with the Import dialog, or read it straight off disk from a test.
+
+version: 0.2.0.dev0
+name: layout stress
+ontology:
+
+# --- component 1: an inheritance tree with cycles and back edges -------------
+- concept: Party
+  type: EntityType
+  description: Root of the hierarchy.
+  relationships:
+  - name: party_order
+    roles: [{ concept: Order }]
+    verbalizes: ['{Party} raises {Order}']
+
+- concept: Customer
+  type: EntityType
+  extends: [Party]
+  relationships:
+  - name: places
+    roles: [{ concept: Order }]
+    verbalizes: ['{Customer} places {Order}']
+  # Ends where it starts.
+  - name: referred_by
+    roles: [{ concept: Customer }]
+    verbalizes: ['{Customer} referred by {Customer}']
+
+- concept: Supplier
+  type: EntityType
+  extends: [Party]
+  relationships:
+  - name: supplies
+    roles: [{ concept: Product }]
+    verbalizes: ['{Supplier} supplies {Product}']
+
+# Two levels deep: a child that is nobody's parent.
+- concept: VipCustomer
+  type: EntityType
+  extends: [Customer]
+
+- concept: Order
+  type: EntityType
+  relationships:
+  - name: contains
+    roles: [{ concept: Product }]
+    verbalizes: ['{Order} contains {Product}']
+  # Closes the Customer -> Order -> Customer loop.
+  - name: ordered_by
+    roles: [{ concept: Customer }]
+    verbalizes: ['{Order} ordered by {Customer}']
+
+- concept: Product
+  type: EntityType
+  relationships:
+  # Closes the Supplier -> Product -> Supplier loop.
+  - name: made_by
+    roles: [{ concept: Supplier }]
+    verbalizes: ['{Product} made by {Supplier}']
+
+# --- component 2: reaches nothing above, and holds a self relationship -------
+- concept: Warehouse
+  type: EntityType
+  relationships:
+  - name: holds
+    roles: [{ concept: Bin }]
+    verbalizes: ['{Warehouse} holds {Bin}']
+
+- concept: Bin
+  type: EntityType
+  relationships:
+  - name: parent_bin
+    roles: [{ concept: Bin }]
+    verbalizes: ['{Bin} nested in {Bin}']
+
+# --- component 3: a pair on its own, to keep packing honest ------------------
+- concept: Region
+  type: EntityType
+  relationships:
+  - name: region_zone
+    roles: [{ concept: Zone }]
+    verbalizes: ['{Region} covers {Zone}']
+
+- concept: Zone
+  type: EntityType
