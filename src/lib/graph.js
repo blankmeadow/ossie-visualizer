@@ -59,8 +59,47 @@ function connectedComponents(nodes, edges) {
 
 // ─── Dagre layout ────────────────────────────────────────────────────────────
 
+/**
+ * Lay the separately-laid-out components out beside each other, in rows.
+ *
+ * Everything a component produced -- its cards and the routes its edges take --
+ * shifts by the same amount, so a route still lines up with the cards it was
+ * threaded between.
+ */
+function packComponents(layouts, options) {
+  const nodes = []
+  const routes = new Map()
+  let cursorX = 0
+  let cursorY = 0
+  let rowHeight = 0
+  for (const component of layouts) {
+    if (cursorX > 0 && cursorX + component.width > options.packWidth) {
+      cursorX = 0
+      cursorY += rowHeight + options.componentGap
+      rowHeight = 0
+    }
+    const shiftX = cursorX - component.minX
+    const shiftY = cursorY - component.minY
+    for (const item of component.nodes) {
+      nodes.push({
+        ...item,
+        position: { x: item.position.x + shiftX, y: item.position.y + shiftY },
+      })
+    }
+    for (const [id, route] of component.routes || []) {
+      routes.set(id, route.map((point) => ({ x: point.x + shiftX, y: point.y + shiftY })))
+    }
+    cursorX += component.width + options.componentGap
+    rowHeight = Math.max(rowHeight, component.height)
+  }
+  return { nodes, routes }
+}
+
 function layoutComponent(nodes, edges, direction, options) {
-  const graph = new dagre.graphlib.Graph().setDefaultEdgeLabel(() => ({}))
+  // A multigraph so every edge keeps its own route: two concepts can be joined
+  // by a relationship and an `extends` at once, and both directions of an
+  // inverse pair rank the same way round.
+  const graph = new dagre.graphlib.Graph({ multigraph: true }).setDefaultEdgeLabel(() => ({}))
   graph.setGraph({
     rankdir: direction,
     ranksep: options.ranksep,
@@ -76,10 +115,22 @@ function layoutComponent(nodes, edges, direction, options) {
     // edge is drawn child -> parent (the UML generalization convention), but the
     // parent has to sit on the earlier rank so inheritance reads top-down, so
     // dagre is given the reversed pair. See `rankReversed` on the edge.
-    if (item.data?.rankReversed) graph.setEdge(item.target, item.source)
-    else graph.setEdge(item.source, item.target)
+    if (item.data?.rankReversed) graph.setEdge(item.target, item.source, {}, item.id)
+    else graph.setEdge(item.source, item.target, {}, item.id)
   })
   dagre.layout(graph)
+
+  // Dagre routes each edge as it lays the ranks out, standing a dummy node in
+  // every rank an edge crosses, so its own route is already clear of the cards.
+  // A reversed edge was handed over the other way round and comes back that way.
+  const routes = new Map(edges.map((item) => {
+    const route = finitePoints(graph.edge(
+      item.data?.rankReversed ? item.target : item.source,
+      item.data?.rankReversed ? item.source : item.target,
+      item.id,
+    )?.points)
+    return [item.id, item.data?.rankReversed ? route.reverse() : route]
+  }))
 
   let minX = Infinity
   let minY = Infinity
@@ -98,6 +149,7 @@ function layoutComponent(nodes, edges, direction, options) {
 
   return {
     nodes: positioned,
+    routes,
     width: Math.max(NODE_WIDTH, maxX - minX),
     height: Math.max(NODE_HEIGHT, maxY - minY),
     minX,
@@ -106,7 +158,7 @@ function layoutComponent(nodes, edges, direction, options) {
 }
 
 function layout(nodes, edges, direction = 'LR', overrides = {}) {
-  if (!nodes.length) return []
+  if (!nodes.length) return { nodes: [], routes: new Map() }
   const options = {
     ranksep: direction === 'TB' ? 64 : 84,
     nodesep: direction === 'TB' ? 30 : 30,
@@ -126,29 +178,7 @@ function layout(nodes, edges, direction = 'LR', overrides = {}) {
     )
   })
 
-  const result = []
-  let cursorX = 0
-  let cursorY = 0
-  let rowHeight = 0
-  for (const component of layouts) {
-    if (cursorX > 0 && cursorX + component.width > options.packWidth) {
-      cursorX = 0
-      cursorY += rowHeight + options.componentGap
-      rowHeight = 0
-    }
-    for (const item of component.nodes) {
-      result.push({
-        ...item,
-        position: {
-          x: item.position.x - component.minX + cursorX,
-          y: item.position.y - component.minY + cursorY,
-        },
-      })
-    }
-    cursorX += component.width + options.componentGap
-    rowHeight = Math.max(rowHeight, component.height)
-  }
-  return result
+  return packComponents(layouts, options)
 }
 
 // ─── ELK layout ──────────────────────────────────────────────────────────────
@@ -212,6 +242,13 @@ function elkLayoutComponent(nodes, edges, direction, options) {
   }
 
   return getElk().then((instance) => instance.layout(elkGraph)).then((layoutedGraph) => {
+    // ELK is asked for orthogonal routing above, so it hands back the bends it
+    // routed each edge through, in the same coordinates as the cards.
+    const routes = new Map((layoutedGraph.edges || []).map((item) => {
+      const section = item.sections?.[0]
+      if (!section) return [item.id, []]
+      return [item.id, finitePoints([section.startPoint, ...(section.bendPoints || []), section.endPoint])]
+    }))
     let minX = Infinity
     let minY = Infinity
     let maxX = -Infinity
@@ -228,6 +265,7 @@ function elkLayoutComponent(nodes, edges, direction, options) {
     })
     return {
       nodes: positioned,
+      routes,
       width: Math.max(NODE_WIDTH, maxX - minX),
       height: Math.max(NODE_HEIGHT, maxY - minY),
       minX,
@@ -237,7 +275,7 @@ function elkLayoutComponent(nodes, edges, direction, options) {
 }
 
 async function elkLayoutAll(nodes, edges, direction = 'LR', overrides = {}) {
-  if (!nodes.length) return []
+  if (!nodes.length) return { nodes: [], routes: new Map() }
   const options = {
     ranksep: direction === 'TB' ? 72 : 92,
     nodesep: direction === 'TB' ? 34 : 32,
@@ -257,35 +295,13 @@ async function elkLayoutAll(nodes, edges, direction = 'LR', overrides = {}) {
     )
   }))
 
-  const result = []
-  let cursorX = 0
-  let cursorY = 0
-  let rowHeight = 0
-  for (const component of layouts) {
-    if (cursorX > 0 && cursorX + component.width > options.packWidth) {
-      cursorX = 0
-      cursorY += rowHeight + options.componentGap
-      rowHeight = 0
-    }
-    for (const item of component.nodes) {
-      result.push({
-        ...item,
-        position: {
-          x: item.position.x - component.minX + cursorX,
-          y: item.position.y - component.minY + cursorY,
-        },
-      })
-    }
-    cursorX += component.width + options.componentGap
-    rowHeight = Math.max(rowHeight, component.height)
-  }
-  return result
+  return packComponents(layouts, options)
 }
 
 // ─── Shared ──────────────────────────────────────────────────────────────────
 
 function layoutFocusedOntology(nodes, selectedId) {
-  if (!nodes.length) return []
+  if (!nodes.length) return { nodes: [], routes: new Map() }
   const selected = nodes.find((item) => item.id === selectedId)
   if (!selected) return layout(nodes, [], 'TB')
 
@@ -298,21 +314,24 @@ function layoutFocusedOntology(nodes, selectedId) {
   const gridWidth = columns * NODE_WIDTH + (columns - 1) * columnGap
   const firstRowY = NODE_HEIGHT + 90
 
-  return [
-    {
-      ...selected,
-      position: { x: gridWidth / 2 - NODE_WIDTH / 2, y: 0 },
-      data: { ...selected.data, direction: 'TB' },
-    },
-    ...others.map((item, index) => ({
-      ...item,
-      position: {
-        x: (index % columns) * (NODE_WIDTH + columnGap),
-        y: firstRowY + Math.floor(index / columns) * (NODE_HEIGHT + rowGap),
+  return {
+    nodes: [
+      {
+        ...selected,
+        position: { x: gridWidth / 2 - NODE_WIDTH / 2, y: 0 },
+        data: { ...selected.data, direction: 'TB' },
       },
-      data: { ...item.data, direction: 'TB' },
-    })),
-  ]
+      ...others.map((item, index) => ({
+        ...item,
+        position: {
+          x: (index % columns) * (NODE_WIDTH + columnGap),
+          y: firstRowY + Math.floor(index / columns) * (NODE_HEIGHT + rowGap),
+        },
+        data: { ...item.data, direction: 'TB' },
+      })),
+    ],
+    routes: new Map(),
+  }
 }
 
 function edge(id, source, target, label, kind, selection, extra = {}) {
@@ -384,154 +403,83 @@ function edgeSides(sourceNode, targetNode, direction) {
 
 // ─── Edge routing ────────────────────────────────────────────────────────────
 
-// How far a detour keeps off the node it is going around, and how many nodes
-// one edge is allowed to walk around before it gives up and draws straight.
-const ROUTE_CLEARANCE = 20
-const ROUTE_DEPTH = 3
-const ROUTE_MAX_BENDS = 6
-// How far apart to bow two edges that run between the same pair of cards.
-const PARALLEL_SPREAD = 30
-
-/** Where a handle sits, from the side it is on and its offset along that side. */
-function handlePoint(node, side, offset) {
-  const { x, y } = node.position
-  if (side === 'top') return { x: x + (NODE_WIDTH * offset) / 100, y }
-  if (side === 'bottom') return { x: x + (NODE_WIDTH * offset) / 100, y: y + NODE_HEIGHT }
-  if (side === 'left') return { x, y: y + (NODE_HEIGHT * offset) / 100 }
-  return { x: x + NODE_WIDTH, y: y + (NODE_HEIGHT * offset) / 100 }
-}
+// A bend the layout put less than this far off the straight line between the
+// two handles is not saying anything, so the edge is drawn without it.
+const BEND_TOLERANCE = 14
 
 /**
- * Where a segment first enters a box, as a fraction of its length, or null when
- * it misses. Slab clipping: the segment is inside the box over the parameter
- * range both axes agree on.
- */
-function boxEntry(from, to, box) {
-  let enter = 0
-  let exit = 1
-  for (const axis of ['x', 'y']) {
-    const span = to[axis] - from[axis]
-    const low = axis === 'x' ? box.x : box.y
-    const high = low + (axis === 'x' ? box.width : box.height)
-    if (Math.abs(span) < 1e-6) {
-      if (from[axis] < low || from[axis] > high) return null
-      continue
-    }
-    const first = (low - from[axis]) / span
-    const second = (high - from[axis]) / span
-    enter = Math.max(enter, Math.min(first, second))
-    exit = Math.min(exit, Math.max(first, second))
-    if (enter > exit) return null
-  }
-  return enter
-}
-
-function firstBlocking(from, to, boxes) {
-  let blocking = null
-  let nearest = Infinity
-  for (const box of boxes) {
-    const entry = boxEntry(from, to, box)
-    if (entry === null || entry >= nearest) continue
-    nearest = entry
-    blocking = box
-  }
-  return blocking
-}
-
-/** Is `value` on the stretch between `from` and `to`, clear of both ends? */
-function between(value, from, to, margin = 12) {
-  return value > Math.min(from, to) + margin && value < Math.max(from, to) - margin
-}
-
-/**
- * The corners to pass through to clear one node down one of its sides.
+ * The points of an engine route that can actually be drawn.
  *
- * Corners that would send the edge back the way it came are dropped -- half a
- * detour still clears the node -- which is why the caller gets both sides and
- * takes the first that survives.
+ * Dagre occasionally hands back a null point in the middle of a route it
+ * could not place, and one of those in a path turns the whole path into
+ * `NaN`, which SVG drops on the floor along with the rest of the edge.
  */
-function cornersAround(from, to, box, lane) {
-  const vertical = Math.abs(to.y - from.y) >= Math.abs(to.x - from.x)
-  const [axis, cross] = vertical ? ['y', 'x'] : ['x', 'y']
-  const crossSize = vertical ? box.width : box.height
-  const crossStart = vertical ? box.x : box.y
-  const side = lane === 'near'
-    ? crossStart - ROUTE_CLEARANCE
-    : crossStart + crossSize + ROUTE_CLEARANCE
-  const alongSize = vertical ? box.height : box.width
-  const alongStart = (vertical ? box.y : box.x) - ROUTE_CLEARANCE
-  const alongEnd = (vertical ? box.y : box.x) + alongSize + ROUTE_CLEARANCE
-  const forward = to[axis] >= from[axis]
-  return [forward ? alongStart : alongEnd, forward ? alongEnd : alongStart]
-    .filter((value) => between(value, from[axis], to[axis]))
-    .map((value) => (vertical ? { x: side, y: value } : { x: value, y: side }))
+function finitePoints(route) {
+  return (route || []).filter((point) => point && Number.isFinite(point.x) && Number.isFinite(point.y))
 }
 
-/** The side of `box` the straight line already runs closer to. */
-function nearestLane(from, to, box) {
-  const vertical = Math.abs(to.y - from.y) >= Math.abs(to.x - from.x)
-  const cross = vertical ? 'x' : 'y'
-  const start = vertical ? box.x : box.y
-  const end = start + (vertical ? box.width : box.height)
-  const toStart = Math.abs(start - from[cross]) + Math.abs(start - to[cross])
-  const toEnd = Math.abs(end - from[cross]) + Math.abs(end - to[cross])
-  return toStart <= toEnd ? 'near' : 'far'
-}
-
-function routeSegment(from, to, boxes, depth) {
-  if (depth <= 0) return []
-  const box = firstBlocking(from, to, boxes)
-  if (!box) return []
-  const lane = nearestLane(from, to, box)
-  const preferred = cornersAround(from, to, box, lane)
-  const corners = preferred.length
-    ? preferred
-    : cornersAround(from, to, box, lane === 'near' ? 'far' : 'near')
-  if (!corners.length) return []
-  // The node just walked around is off the list, so a detour cannot bounce
-  // between the same two nodes forever. Whether the result is really clearer
-  // than the straight line is settled once, in routeEdgePoints.
-  const rest = boxes.filter((item) => item !== box)
-  const points = []
-  let cursor = from
-  for (const corner of corners) {
-    points.push(...routeSegment(cursor, corner, rest, depth - 1), corner)
-    cursor = corner
-  }
-  points.push(...routeSegment(cursor, to, rest, depth - 1))
-  return points
-}
-
-function blockedCount(path, boxes) {
-  return boxes.filter((box) => path
-    .slice(1)
-    .some((point, index) => boxEntry(path[index], point, box) !== null)).length
+/** How far `point` sits off the line between `from` and `to`. */
+function offLine(from, to, point) {
+  const span = Math.hypot(to.x - from.x, to.y - from.y) || 1
+  return Math.abs(
+    ((point.x - from.x) * (to.y - from.y) - (point.y - from.y) * (to.x - from.x)) / span,
+  )
 }
 
 /**
- * Bend points that keep an edge off the nodes it is not attached to.
+ * The bends worth drawing out of a route the layout engine worked out.
  *
- * A long relationship drawn straight from handle to handle can run clean
- * through a card that has nothing to do with it, which reads as though the two
- * were connected. Walking around the card costs a couple of bends and says
- * exactly what is connected to what -- but only when the detour really is
- * clearer than the straight line, since a bend that dodges nothing is just a
- * kink.
+ * Both engines route their own edges -- Dagre reserves a lane for every rank an
+ * edge crosses by standing a dummy node in it, ELK is asked for orthogonal
+ * routing outright -- so the way around the cards in between is theirs to
+ * compute rather than ours to guess at. A route arrives as one point per rank,
+ * most of them in a straight run, and a run of points saying the same thing as
+ * the line through them is a heavier path for no more meaning.
  */
-export function routeEdgePoints(from, to, obstacles) {
-  if (!obstacles.length) return []
-  const points = routeSegment(from, to, obstacles, ROUTE_DEPTH).slice(0, ROUTE_MAX_BENDS)
-  if (!points.length) return []
-  return blockedCount([from, ...points, to], obstacles) < blockedCount([from, to], obstacles)
-    ? points
-    : []
+export function layoutBends(route) {
+  if (!route || route.length < 3) return []
+  const bends = []
+  let anchor = route[0]
+  for (let index = 1; index < route.length - 1; index++) {
+    const next = route[index + 1]
+    if (offLine(anchor, next, route[index]) <= BEND_TOLERANCE) continue
+    bends.push(route[index])
+    anchor = route[index]
+  }
+  return bends
 }
 
-function attachHandles(nodes, edges, direction) {
+/**
+ * How far along one side of a card the engine attached an edge, as the
+ * percentage React Flow places a handle by.
+ *
+ * Only the position along the side is taken from the engine, never the side
+ * itself: a route often meets a card at a corner, and reading a side off that
+ * would have an edge leave by the face pointing away from where it is going.
+ * Which side an edge uses stays a question of where the two cards sit.
+ */
+function offsetAlong(node, side, point) {
+  const along = side === 'top' || side === 'bottom'
+    ? ((point.x - node.position.x) / NODE_WIDTH) * 100
+    : ((point.y - node.position.y) / NODE_HEIGHT) * 100
+  return Math.min(94, Math.max(6, along))
+}
+
+/**
+ * Give every edge a React Flow handle at each end, and the bends between them.
+ *
+ * Where the layout engine routed the edge, both come from that route: the edge
+ * leaves and arrives exactly where the engine attached it, so the lane it
+ * reserved between the cards is the lane the line actually takes. Where nothing
+ * routed it -- the hand-placed mapping canvas, the focused view -- the edges on
+ * a side are fanned across it in the order of the cards they reach, which at
+ * least keeps them from crossing on their way out.
+ */
+function attachHandles(nodes, edges, direction, routes = new Map()) {
   const nodeById = new Map(nodes.map((item) => [item.id, item]))
-  // Group by the side an edge actually uses, so the fan-out offsets spread
-  // across that side only. Mixing arriving and leaving edges into one counter
-  // used to bunch them together on a single edge of the node.
+
+  // Fan whatever the engine did not route across the side it uses, in the
+  // order of the cards at the other end.
   const bySide = new Map(nodes.map((item) => [item.id, new Map()]))
   const sideKey = (nodeId, side) => {
     const sides = bySide.get(nodeId)
@@ -539,32 +487,30 @@ function attachHandles(nodes, edges, direction) {
     if (!sides.has(side)) sides.set(side, [])
     return sides.get(side)
   }
-
-  // Where the other end of an edge sits, measured along the side this end
-  // leaves from. Ordering a side's handles by it means the fan spreads out in
-  // the same order as the nodes it reaches, so the lines do not cross each
-  // other on their way out of the card.
   const alongSide = (side, other) => (
     side === 'top' || side === 'bottom'
       ? other.position.x + NODE_WIDTH / 2
       : other.position.y + NODE_HEIGHT / 2
   )
 
-  const sorted = [...edges].sort((left, right) => left.id.localeCompare(right.id))
-  const resolved = new Map()
-  for (const item of sorted) {
+  const routed = (item) => {
+    const route = routes.get(item.id)
+    return item.source !== item.target && route && route.length >= 2 ? route : null
+  }
+
+  const fanned = new Map()
+  for (const item of [...edges].sort((left, right) => left.id.localeCompare(right.id))) {
     const selfLoop = item.source === item.target
     const sourceNode = nodeById.get(item.source)
     const targetNode = nodeById.get(item.target)
     const [sourceSide, targetSide] = selfLoop
       ? ['right', 'right']
       : edgeSides(sourceNode, targetNode, direction)
-    resolved.set(item.id, { sourceSide, targetSide, selfLoop })
-    if (selfLoop || !sourceNode || !targetNode) continue
+    fanned.set(item.id, { sourceSide, targetSide, selfLoop })
+    if (selfLoop || routed(item) || !sourceNode || !targetNode) continue
     sideKey(item.source, sourceSide)?.push({ id: item.id, along: alongSide(sourceSide, targetNode) })
     sideKey(item.target, targetSide)?.push({ id: item.id, along: alongSide(targetSide, sourceNode) })
   }
-
   for (const sides of bySide.values()) {
     for (const [side, items] of sides) {
       items.sort((left, right) => left.along - right.along || left.id.localeCompare(right.id))
@@ -574,169 +520,99 @@ function attachHandles(nodes, edges, direction) {
 
   const nodeHandles = new Map(nodes.map((item) => [item.id, { sourceHandles: [], targetHandles: [] }]))
   const handledEdges = edges.map((item) => {
-    const { sourceSide, targetSide, selfLoop } = resolved.get(item.id)
-    const sourceNode = nodeById.get(item.source)
-    const targetNode = nodeById.get(item.target)
-    const drawn = !selfLoop && !!sourceNode && !!targetNode
-    const sourceItems = selfLoop ? [] : bySide.get(item.source)?.get(sourceSide) || []
-    const targetItems = selfLoop ? [] : bySide.get(item.target)?.get(targetSide) || []
-    const sourceIndex = sourceItems.indexOf(item.id)
-    const targetIndex = targetItems.indexOf(item.id)
+    const { sourceSide, targetSide, selfLoop } = fanned.get(item.id)
+    const spread = (nodeId, side, edgeId) => {
+      const items = bySide.get(nodeId)?.get(side) || []
+      return ((items.indexOf(edgeId) + 1) / (items.length + 1)) * 100
+    }
+    const route = routed(item)
+    const placed = {
+      sourceOffset: route
+        ? offsetAlong(nodeById.get(item.source), sourceSide, route[0])
+        : selfLoop ? 34 : spread(item.source, sourceSide, item.id),
+      targetOffset: route
+        ? offsetAlong(nodeById.get(item.target), targetSide, route[route.length - 1])
+        : selfLoop ? 72 : spread(item.target, targetSide, item.id),
+    }
     const sourceHandle = `source:${item.id}`
     const targetHandle = `target:${item.id}`
-    const sourceOffset = selfLoop ? 34 : ((sourceIndex + 1) / (sourceItems.length + 1)) * 100
-    const targetOffset = selfLoop ? 72 : ((targetIndex + 1) / (targetItems.length + 1)) * 100
     nodeHandles.get(item.source)?.sourceHandles.push({
       id: sourceHandle,
       position: sourceSide,
-      offset: sourceOffset,
+      offset: placed.sourceOffset,
     })
     nodeHandles.get(item.target)?.targetHandles.push({
       id: targetHandle,
       position: targetSide,
-      offset: targetOffset,
+      offset: placed.targetOffset,
     })
     return {
       ...item,
       type: selfLoop ? 'default' : item.type,
       sourceHandle,
       targetHandle,
-      data: {
-        ...item.data,
-        from: drawn ? handlePoint(sourceNode, sourceSide, sourceOffset) : null,
-        to: drawn ? handlePoint(targetNode, targetSide, targetOffset) : null,
-      },
+      data: { ...item.data, points: layoutBends(routes.get(item.id)) },
     }
   })
 
   return {
     nodes: nodes.map((item) => ({ ...item, data: { ...item.data, ...nodeHandles.get(item.id) } })),
-    edges: routeAll(nodes, handledEdges),
+    edges: spreadLabels(handledEdges),
   }
 }
 
 /**
- * Pull apart the edges that run between the same two cards.
+ * Set down the labels of edges joining the same two cards at different points
+ * along them.
  *
- * A model that spells out both directions of a relationship -- `has_x` on one
- * concept and `x_belongs_to` on the other -- draws two edges over the same
- * stretch of canvas, and their labels land on the same spot and turn into
- * mush. Each gets bowed to its own side of the line and its label set down at
- * its own point along it, so both stay readable and keep their own arrow.
+ * A model that spells both directions of a relationship out -- `has_x` on one
+ * concept, `x_belongs_to` on the other -- gives the engine two edges to route,
+ * and it does route them down their own lanes. Their labels would still both
+ * sit at the middle of a run of the same length between the same two cards,
+ * which puts two long names on top of each other. Where along the run each
+ * label sits is measured from the same end of the pair, or the two directions
+ * mirror back onto the same spot.
  */
-function quadraticPoint(from, control, to, fraction) {
-  const rest = 1 - fraction
-  return {
-    x: rest * rest * from.x + 2 * rest * fraction * control.x + fraction * fraction * to.x,
-    y: rest * rest * from.y + 2 * rest * fraction * control.y + fraction * fraction * to.y,
-  }
-}
-
-/** Does the arc `from -> control -> to` stay off every box? */
-function bowClears(from, control, to, boxes) {
-  const samples = []
-  for (let step = 0; step <= 16; step++) samples.push(quadraticPoint(from, control, to, step / 16))
-  return blockedCount(samples, boxes) === 0
-}
-
-function spreadParallel(edges, boxes) {
-  const groups = new Map()
+function spreadLabels(edges) {
+  const pairs = new Map()
   for (const item of edges) {
-    if (!item.data?.from || !item.data?.to) continue
+    if (item.source === item.target) continue
     const key = [item.source, item.target].sort().join('\u0000')
-    groups.set(key, [...(groups.get(key) || []), item.id])
+    pairs.set(key, [...(pairs.get(key) || []), item.id])
   }
 
-  const lanes = new Map()
-  for (const [key, ids] of groups) {
+  const places = new Map()
+  for (const [key, ids] of pairs) {
     if (ids.length < 2) continue
-    const ordered = [...ids].sort()
     const [first] = key.split('\u0000')
-    ordered.forEach((id, index) => lanes.set(id, { index, count: ordered.length, first }))
+    ;[...ids].sort().forEach((id, index) => places.set(id, { index, count: ids.length, first }))
   }
-  if (!lanes.size) return edges
+  if (!places.size) return edges
 
   return edges.map((item) => {
-    const lane = lanes.get(item.id)
-    if (!lane) return item
-    const { from, to } = item.data
-    // Both directions of the same relationship are measured from the same end
-    // of the pair, or the two would mirror onto each other and land back on the
-    // same spot -- which is precisely what they were being pulled apart from.
-    const forward = item.source === lane.first
-    const spread = (lane.index - (lane.count - 1) / 2) * PARALLEL_SPREAD
-    const offset = forward ? spread : -spread
-    // The label walks along with the bow, so two of them never share a point.
-    const along = (lane.index + 1) / (lane.count + 1)
-    const labelFraction = forward ? along : 1 - along
-    // An edge already walking around a card keeps that route; bowing it as
-    // well would undo the detour.
-    if (item.data.points || !offset) return { ...item, data: { ...item.data, labelFraction } }
-    const span = Math.hypot(to.x - from.x, to.y - from.y) || 1
-    const normal = { x: -(to.y - from.y) / span, y: (to.x - from.x) / span }
-    // A quadratic passes at half its control offset, so aim twice as far out.
-    const control = (amount) => ({
-      x: (from.x + to.x) / 2 + normal.x * amount * 2,
-      y: (from.y + to.y) / 2 + normal.y * amount * 2,
-    })
-    // Bowing out of one card's way and into another's would trade one problem
-    // for a worse one, so the arc takes the other side, or stays flat.
-    const obstacles = boxes.filter((box) => box.id !== item.source && box.id !== item.target)
-    const bow = [offset, -offset]
-      .map((amount) => ({ amount, point: control(amount) }))
-      .find((candidate) => bowClears(from, candidate.point, to, obstacles))
-    if (!bow) return { ...item, data: { ...item.data, labelFraction } }
-    // Which side of the line the arc came out on, so its label can sit on that
-    // side too rather than on top of the one it was just pulled away from.
-    const vertical = Math.abs(to.y - from.y) >= Math.abs(to.x - from.x)
-    const drift = vertical ? normal.x * bow.amount : normal.y * bow.amount
-    return {
-      ...item,
-      data: { ...item.data, bow: bow.point, labelFraction, labelSide: Math.sign(drift) },
-    }
-  })
-}
-
-/**
- * Give every edge the bend points it needs to stay off the cards it is not
- * attached to. Runs once per layout, on the positions the layout produced.
- */
-function routeAll(nodes, edges) {
-  const boxes = new Map(nodes.map((item) => [item.id, {
-    id: item.id,
-    x: item.position.x,
-    y: item.position.y,
-    width: NODE_WIDTH,
-    height: NODE_HEIGHT,
-  }]))
-  const all = [...boxes.values()]
-  const routed = edges.map((item) => {
-    const data = item.data || {}
-    if (!data.from || !data.to) return item
-    const obstacles = all.filter((box) => box.id !== item.source && box.id !== item.target)
-    const points = routeEdgePoints(data.from, data.to, obstacles)
-    return points.length ? { ...item, data: { ...data, points } } : item
-  })
-
-  // The endpoints were only ever needed to work the geometry out; the edge
-  // itself is drawn from the handles React Flow reports.
-  return spreadParallel(routed, all).map((item) => {
-    const { from, to, ...rest } = item.data || {}
-    return { ...item, data: rest }
+    const place = places.get(item.id)
+    if (!place) return item
+    const along = (place.index + 1) / (place.count + 1)
+    const labelFraction = item.source === place.first ? along : 1 - along
+    // Spacing them along the run is not enough on its own: relationship names
+    // are long, and two of them a third of a short run apart still overlap. One
+    // goes above the line, or left of it, and the next one the other way.
+    const labelSide = place.index % 2 === 0 ? -1 : 1
+    return { ...item, data: { ...item.data, labelFraction, labelSide } }
   })
 }
 
 /**
  * Run layout and attach handles. Supports both Dagre (sync) and ELK (async).
  * Returns a plain object when using Dagre, or a Promise when using ELK.
+ *
+ * A positioner hands back the cards it placed and, where it has one, the route
+ * it worked out for each edge.
  */
 function graphResult(nodes, edges, direction, positioner = layout, engine = 'dagre') {
-  if (engine === 'elk') {
-    return elkLayoutAll(nodes, edges, direction).then((positioned) =>
-      attachHandles(positioned, edges, direction),
-    )
-  }
-  return attachHandles(positioner(nodes, edges, direction), edges, direction)
+  const attach = (laid) => attachHandles(laid.nodes, edges, direction, laid.routes)
+  if (engine === 'elk') return elkLayoutAll(nodes, edges, direction).then(attach)
+  return attach(positioner(nodes, edges, direction))
 }
 
 /**
@@ -1045,10 +921,9 @@ export function buildMappingGraph(model, conceptMapping, options = {}) {
     )
   }
   if (layoutEngine === 'elk') {
-    return elkLayoutAll(nodes, edges, 'LR').then((positioned) =>
-      attachHandles(positioned, edges, 'LR'),
-    )
+    return elkLayoutAll(nodes, edges, 'LR').then((laid) => attachHandles(laid.nodes, edges, 'LR', laid.routes))
   }
-  const positioned = layoutMapping(nodes)
-  return attachHandles(positioned, edges, 'LR')
+  // The mapping canvas is three fixed columns, placed by hand; nothing routes
+  // its edges, and with that little on screen nothing needs to.
+  return attachHandles(layoutMapping(nodes), edges, 'LR')
 }

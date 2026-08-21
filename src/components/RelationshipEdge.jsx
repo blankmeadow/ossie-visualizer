@@ -19,15 +19,6 @@ function step(from, to, length) {
   return { x: from.x + (to.x - from.x) * ratio, y: from.y + (to.y - from.y) * ratio }
 }
 
-/** The point `fraction` of the way along a quadratic curve. */
-function quadraticPoint(from, control, to, fraction) {
-  const rest = 1 - fraction
-  return {
-    x: rest * rest * from.x + 2 * rest * fraction * control.x + fraction * fraction * to.x,
-    y: rest * rest * from.y + 2 * rest * fraction * control.y + fraction * fraction * to.y,
-  }
-}
-
 /**
  * A polyline with its corners rounded off, and the point `fraction` along it.
  *
@@ -79,44 +70,40 @@ export default function RelationshipEdge({
   selected,
 }) {
   const bends = data?.points || []
-  const bow = data?.bow
   const fraction = data?.labelFraction ?? 0.5
   const acrossFlow = VERTICAL_SIDES.includes(sourcePosition)
     ? Math.abs(targetX - sourceX)
     : Math.abs(targetY - sourceY)
 
-  const [path, labelX, labelY] = bends.length
-    // The bends are laid out for the handles this edge left the layout with, so
-    // they join the ends React Flow reports rather than replacing them.
+  const drawn = bends.length
+    // The engine routed this edge from and to the same handles React Flow is
+    // reporting, so its bends drop straight in between them.
     ? bentPath([{ x: sourceX, y: sourceY }, ...bends, { x: targetX, y: targetY }], fraction)
-    : bow
-      // One arc per edge running between the same two cards.
-      ? [
-        `M ${sourceX},${sourceY} Q ${bow.x},${bow.y} ${targetX},${targetY}`,
-        quadraticPoint({ x: sourceX, y: sourceY }, bow, { x: targetX, y: targetY }, fraction).x,
-        quadraticPoint({ x: sourceX, y: sourceY }, bow, { x: targetX, y: targetY }, fraction).y,
-      ]
-      : acrossFlow <= STRAIGHT_TOLERANCE
-        ? getStraightPath({ sourceX, sourceY, targetX, targetY })
-        : getBezierPath({
-          sourceX,
-          sourceY,
-          targetX,
-          targetY,
-          sourcePosition,
-          targetPosition,
-          curvature: 0.18,
-        })
+    : acrossFlow <= STRAIGHT_TOLERANCE
+      ? getStraightPath({ sourceX, sourceY, targetX, targetY })
+      : getBezierPath({
+        sourceX,
+        sourceY,
+        targetX,
+        targetY,
+        sourcePosition,
+        targetPosition,
+        curvature: 0.18,
+      })
+  // An edge sharing its pair of cards with another one is told where along
+  // itself to put its label. On a plain curve the point on the chord is close
+  // enough to the line to read as sitting on it.
+  const [path, labelX, labelY] = bends.length || fraction === 0.5
+    ? drawn
+    : [drawn[0], sourceX + (targetX - sourceX) * fraction, sourceY + (targetY - sourceY) * fraction]
 
   // Keep labels readable like n8n: horizontal edges place the label above the
   // line; vertical edges place it beside the line instead of rotating text.
-  // An edge bowed aside from its twin takes its label to the side it bowed to,
-  // which is what actually keeps two long relationship names apart on a short
-  // run between the same two cards.
+  // Two edges joining the same pair of cards are told to take opposite sides.
   const isVertical = Math.abs(targetY - sourceY) > Math.abs(targetX - sourceX)
   const side = data?.labelSide || 0
   const labelTransform = isVertical
-    ? `translate(${labelX}px, ${labelY}px) translate(${side < 0 ? 'calc(-100% - 12px)' : '12px'}, -50%)`
+    ? `translate(${labelX}px, ${labelY}px) translate(${side > 0 ? 'calc(-100% - 12px)' : '12px'}, -50%)`
     : `translate(${labelX}px, ${labelY}px) translate(-50%, ${side > 0 ? '5px' : 'calc(-100% - 5px)'})`
 
   const activeStyle = selected ? {

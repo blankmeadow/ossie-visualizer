@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildOntologyGraph, buildSemanticGraph, markerSizeForZoom, NODE_HEIGHT, NODE_WIDTH, routeEdgePoints } from './graph'
+import { buildOntologyGraph, buildSemanticGraph, layoutBends, markerSizeForZoom, NODE_HEIGHT, NODE_WIDTH } from './graph'
 import { normalizeOssie } from './ossie'
 
 /**
@@ -26,6 +26,9 @@ const document = {
       description: 'Root of the hierarchy.',
       relationships: [
         { name: 'party_name', roles: [{ concept: 'String' }], verbalizes: ['{party} has name {String}'] },
+        // party sits a rank above customer, which sits a rank above order, so
+        // this one has to cross a rank to get there.
+        { name: 'party_order', roles: [{ concept: 'order' }], verbalizes: ['{party} raises {order}'] },
       ],
     },
     {
@@ -174,32 +177,32 @@ function pathHitsBox(points, box) {
 }
 
 describe('edge routing', () => {
-  it('leaves an edge alone when nothing stands in its way', () => {
-    const clear = { id: 'elsewhere', x: 900, y: 900, width: NODE_WIDTH, height: NODE_HEIGHT }
-    expect(routeEdgePoints({ x: 0, y: 0 }, { x: 40, y: 400 }, [clear])).toEqual([])
+  it('takes the route the layout engine worked out for an edge that crosses a rank', () => {
+    // party -> order steps over the rank customer and supplier are on, and the
+    // engine reserves a lane for it there. Those are the bends worth drawing.
+    const crossing = ontologyGraph.edges.find((item) => item.id === 'relation:party:order')
+    expect(crossing).toBeDefined()
+    expect(crossing.data.points.length).toBeGreaterThan(0)
   })
 
-  it('walks around a card that sits in the way', () => {
-    const blocking = { id: 'blocking', x: 0, y: 180, width: NODE_WIDTH, height: NODE_HEIGHT }
-    const from = { x: 120, y: 0 }
-    const to = { x: 90, y: 460 }
-    expect(hitsBox(from, to, blocking)).toBe(true)
+  it('keeps only the bends in a route that change its direction', () => {
+    // A route arrives as one point per rank crossed, most of them in a straight
+    // run down a reserved lane. Drawing every one of them says no more than
+    // drawing the two that turn.
+    const straightRun = [{ x: 0, y: 0 }, { x: 0, y: 60 }, { x: 0, y: 120 }, { x: 0, y: 180 }]
+    expect(layoutBends(straightRun)).toEqual([])
 
-    const points = routeEdgePoints(from, to, [blocking])
-    expect(points.length).toBeGreaterThan(0)
-    expect(pathHitsBox([from, ...points, to], blocking)).toBe(false)
-  })
+    const aroundACard = [
+      { x: 0, y: 0 },
+      { x: 300, y: 60 },
+      { x: 300, y: 120 },
+      { x: 300, y: 180 },
+      { x: 0, y: 240 },
+    ]
+    expect(layoutBends(aroundACard)).toEqual([{ x: 300, y: 60 }, { x: 300, y: 180 }])
 
-  it('walks around several cards at once', () => {
-    const first = { id: 'first', x: 0, y: 160, width: NODE_WIDTH, height: NODE_HEIGHT }
-    const second = { id: 'second', x: -180, y: 320, width: NODE_WIDTH, height: NODE_HEIGHT }
-    const from = { x: 120, y: 0 }
-    const to = { x: -120, y: 560 }
-
-    const points = routeEdgePoints(from, to, [first, second])
-    const path = [from, ...points, to]
-    expect(pathHitsBox(path, first)).toBe(false)
-    expect(pathHitsBox(path, second)).toBe(false)
+    expect(layoutBends([{ x: 0, y: 0 }, { x: 10, y: 90 }])).toEqual([])
+    expect(layoutBends(undefined)).toEqual([])
   })
 
   it('keeps the drawn ontology off the cards an edge is not attached to', () => {
@@ -242,31 +245,32 @@ describe('edge routing', () => {
     expect(checked).toBeGreaterThanOrEqual(3)
   })
 
-  it('orders the handles on a side by where their edges are going', () => {
+  it('puts each handle where the engine attached the route', () => {
     const byId = new Map(ontologyGraph.nodes.map((item) => [item.id, item]))
-    for (const node of ontologyGraph.nodes) {
-      for (const side of ['top', 'bottom', 'left', 'right']) {
-        const handles = [
-          ...node.data.sourceHandles.map((handle) => ({ ...handle, role: 'source' })),
-          ...node.data.targetHandles.map((handle) => ({ ...handle, role: 'target' })),
-        ].filter((handle) => handle.position === side)
-        if (handles.length < 2) continue
-
-        // Reading along the side, the nodes at the far ends come in the same
-        // order -- which is what stops one node's edges crossing each other.
-        const reached = handles
-          .sort((left, right) => left.offset - right.offset)
-          .map((handle) => {
-            const edge = ontologyGraph.edges.find((item) =>
-              (handle.role === 'source' ? item.sourceHandle : item.targetHandle) === handle.id)
-            const other = byId.get(handle.role === 'source' ? edge.target : edge.source)
-            return side === 'top' || side === 'bottom'
-              ? other.position.x + NODE_WIDTH / 2
-              : other.position.y + NODE_HEIGHT / 2
-          })
-        expect(reached).toEqual([...reached].sort((left, right) => left - right))
+    let checked = 0
+    for (const item of ontologyGraph.edges) {
+      const bends = item.data.points || []
+      if (!bends.length) continue
+      const source = byId.get(item.source)
+      const target = byId.get(item.target)
+      const leaves = source.data.sourceHandles.find((handle) => handle.id === item.sourceHandle)
+      const arrives = target.data.targetHandles.find((handle) => handle.id === item.targetHandle)
+      // The first bend is the route's own next step after leaving the card, so
+      // the handle it leaves by has to be the end of the side nearest to it.
+      for (const [node, handle, bend] of [
+        [source, leaves, bends[0]],
+        [target, arrives, bends[bends.length - 1]],
+      ]) {
+        expect(['top', 'bottom']).toContain(handle.position)
+        const handleX = node.position.x + (NODE_WIDTH * handle.offset) / 100
+        const towards = Math.sign(bend.x - (node.position.x + NODE_WIDTH / 2))
+        // A route heading off to one side leaves from that half of the card.
+        if (Math.abs(bend.x - (node.position.x + NODE_WIDTH / 2)) < NODE_WIDTH) continue
+        expect(Math.sign(handleX - (node.position.x + NODE_WIDTH / 2)) || towards).toBe(towards)
+        checked += 1
       }
     }
+    expect(checked).toBeGreaterThanOrEqual(1)
   })
 })
 
