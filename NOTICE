@@ -8,3 +8,9 @@ public/flights.yaml is the "Flights" example model from the Apache Ossie project
 (https://github.com/apache/ossie), copied verbatim from examples/flights.yaml.
 It is licensed under the Apache License, Version 2.0 and retains the standard
 ASF header of its original.
+
+.claude/skills/md2ossie/assets/vendor/apache-ossie/ contains verbatim copies of
+the Apache Ossie specification and validation assets, pinned to commit
+88e0011148283302c9a04cd0287e00e0b9d87354. They are licensed under the Apache
+License, Version 2.0; that directory carries the upstream LICENSE and NOTICE,
+and its README.md records the provenance and SHA-256 of each file.
