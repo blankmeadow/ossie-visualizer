@@ -107,6 +107,20 @@ function Toggle({ checked, onChange, label }) {
   )
 }
 
+function GraphLegend({ activeTab }) {
+  const t = useT()
+  const entries = activeTab === 'ontology'
+    ? [['legend-dot legend-dot--concept', t('legend.entityType')], ['legend-line legend-line--extends', t('legend.extends')], ['legend-line legend-line--relation', t('legend.relationship')]]
+    : activeTab === 'semantic'
+      ? [['legend-dot legend-dot--dataset', t('legend.dataset')], ['legend-dot legend-dot--metric', t('legend.metric')]]
+      : [['legend-dot legend-dot--concept', t('legend.concept')], ['legend-dot legend-dot--mapping', t('legend.mapping')], ['legend-dot legend-dot--dataset', t('legend.dataset')]]
+  return (
+    <div className="graph-legend">
+      {entries.map(([className, label]) => <span key={label}><i className={className} />{label}</span>)}
+    </div>
+  )
+}
+
 function GraphToolbar(props) {
   const t = useT()
   const flow = useReactFlow()
@@ -579,41 +593,55 @@ function InnerGraphCanvas(props) {
           </div>
         </Panel>
       )}
-      <Panel position="bottom-center">
-        <GraphToolbar
-          activeTab={activeTab}
-          selection={selection}
-          focusDepth={focusDepth}
-          onFocus={onFocus}
-          showRelationships={showRelationships}
-          setShowRelationships={setShowRelationships}
-          showMetrics={showMetrics}
-          setShowMetrics={setShowMetrics}
-          showMiniMap={showMiniMap}
-          setShowMiniMap={setShowMiniMap}
-          showEdgeLabels={showEdgeLabels}
-          setShowEdgeLabels={setShowEdgeLabels}
-          layoutEngine={layoutEngine}
-          setLayoutEngine={setLayoutEngine}
-          nodesLocked={nodesLocked}
-          setNodesLocked={setNodesLocked}
-          onDownload={downloadImage}
-          exporting={exporting}
-        />
+      {/* Legend, toolbar and minimap share one rail along the bottom of the
+          canvas: three slots on a single baseline, so they read as one row
+          rather than as three cards that each found their own corner. The rail
+          spans the canvas and lets clicks through; only the cards take them. */}
+      <Panel position="bottom-left" className="canvas-rail">
+        <div className="canvas-rail__inner">
+          <div className="canvas-rail__slot canvas-rail__slot--legend">
+            <GraphLegend activeTab={activeTab} />
+          </div>
+          <div className="canvas-rail__slot canvas-rail__slot--toolbar">
+            <GraphToolbar
+              activeTab={activeTab}
+              selection={selection}
+              focusDepth={focusDepth}
+              onFocus={onFocus}
+              showRelationships={showRelationships}
+              setShowRelationships={setShowRelationships}
+              showMetrics={showMetrics}
+              setShowMetrics={setShowMetrics}
+              showMiniMap={showMiniMap}
+              setShowMiniMap={setShowMiniMap}
+              showEdgeLabels={showEdgeLabels}
+              setShowEdgeLabels={setShowEdgeLabels}
+              layoutEngine={layoutEngine}
+              setLayoutEngine={setLayoutEngine}
+              nodesLocked={nodesLocked}
+              setNodesLocked={setNodesLocked}
+              onDownload={downloadImage}
+              exporting={exporting}
+            />
+          </div>
+          {/* The slot stays whether or not the minimap is on, so turning it off
+              does not slide the toolbar off centre. */}
+          <div className="canvas-rail__slot canvas-rail__slot--map">
+            {showMiniMap !== false && nodes.length > 0 && (
+              <MiniMap
+                pannable
+                zoomable
+                nodeColor={(item) => item.data?.kind === 'dataset'
+                  ? tokens['node-dataset']
+                  : item.data?.kind === 'metric'
+                    ? tokens['node-metric']
+                    : tokens['node-concept']}
+                maskColor={tokens['canvas-minimap-mask']}
+              />
+            )}
+          </div>
+        </div>
       </Panel>
-      {showMiniMap !== false && nodes.length > 0 && (
-        <MiniMap
-          pannable
-          zoomable
-          position="bottom-right"
-          nodeColor={(item) => item.data?.kind === 'dataset'
-            ? tokens['node-dataset']
-            : item.data?.kind === 'metric'
-              ? tokens['node-metric']
-              : tokens['node-concept']}
-          maskColor={tokens['canvas-minimap-mask']}
-        />
-      )}
     </ReactFlow>
   )
 }
