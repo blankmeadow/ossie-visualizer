@@ -296,6 +296,12 @@ function InnerGraphCanvas(props) {
     [graph.edges, graph.nodes],
   )
   const manualPositions = manualLayout.key === graphLayoutKey ? manualLayout.positions : EMPTY_POSITIONS
+  // Bend points are laid out for where the layout put the cards. Once a card
+  // has been dragged they describe a detour around nothing, so its edges go
+  // back to a plain curve. The key is a string so a drag does not rebuild every
+  // edge on every frame -- only when the set of moved cards changes.
+  const movedKey = Object.keys(manualPositions).sort().join(',')
+  const movedNodeIds = useMemo(() => new Set(movedKey ? movedKey.split(',') : []), [movedKey])
 
   const selectedNodeId = useMemo(
     () => graph.nodes.find((item) => selectionMatches(item.data?.selection, selection))?.id || '',
@@ -397,6 +403,9 @@ function InnerGraphCanvas(props) {
           },
           data: {
             ...item.data,
+            points: movedNodeIds.has(item.source) || movedNodeIds.has(item.target)
+              ? undefined
+              : item.data?.points,
             dimmed,
             showEdgeLabels,
             onSelect,
@@ -414,7 +423,7 @@ function InnerGraphCanvas(props) {
           zIndex: 0,
         }
       }),
-    [focusActive, graph.edges, markerZoom, onOpenDetail, onSelect, selectedEdgeIds, selectedNodeId, showEdgeLabels, tokens],
+    [focusActive, graph.edges, markerZoom, movedNodeIds, onOpenDetail, onSelect, selectedEdgeIds, selectedNodeId, showEdgeLabels, tokens],
   )
   graphNodesRef.current = nodes
 

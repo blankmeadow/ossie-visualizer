@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildOntologyGraph, buildSemanticGraph, markerSizeForZoom } from './graph'
+import { buildOntologyGraph, buildSemanticGraph, markerSizeForZoom, NODE_HEIGHT, NODE_WIDTH, routeEdgePoints } from './graph'
 import { normalizeOssie } from './ossie'
 
 /**
@@ -84,8 +84,10 @@ function endpoints(graph) {
   })
 }
 
+const ontologyGraph = buildOntologyGraph(model, { showRelationships: true })
+
 describe('graph layout conventions', () => {
-  const ontology = buildOntologyGraph(model, { showRelationships: true })
+  const ontology = ontologyGraph
 
   it('ranks a parent concept above every concept that extends it', () => {
     const byId = new Map(ontology.nodes.map((item) => [item.id, item]))
@@ -152,6 +154,119 @@ describe('graph layout conventions', () => {
     expect(customers.data.description).toBe('Customer dimension.')
     // A dataset keeps its physical source, which the description no longer hides.
     expect(customers.data.subtitle).toBe('x.customers')
+  })
+})
+
+/** Does the straight run from `from` to `to` pass through `box`? */
+function hitsBox(from, to, box) {
+  const steps = 200
+  for (let index = 0; index <= steps; index++) {
+    const ratio = index / steps
+    const x = from.x + (to.x - from.x) * ratio
+    const y = from.y + (to.y - from.y) * ratio
+    if (x > box.x && x < box.x + box.width && y > box.y && y < box.y + box.height) return true
+  }
+  return false
+}
+
+function pathHitsBox(points, box) {
+  return points.slice(1).some((point, index) => hitsBox(points[index], point, box))
+}
+
+describe('edge routing', () => {
+  it('leaves an edge alone when nothing stands in its way', () => {
+    const clear = { id: 'elsewhere', x: 900, y: 900, width: NODE_WIDTH, height: NODE_HEIGHT }
+    expect(routeEdgePoints({ x: 0, y: 0 }, { x: 40, y: 400 }, [clear])).toEqual([])
+  })
+
+  it('walks around a card that sits in the way', () => {
+    const blocking = { id: 'blocking', x: 0, y: 180, width: NODE_WIDTH, height: NODE_HEIGHT }
+    const from = { x: 120, y: 0 }
+    const to = { x: 90, y: 460 }
+    expect(hitsBox(from, to, blocking)).toBe(true)
+
+    const points = routeEdgePoints(from, to, [blocking])
+    expect(points.length).toBeGreaterThan(0)
+    expect(pathHitsBox([from, ...points, to], blocking)).toBe(false)
+  })
+
+  it('walks around several cards at once', () => {
+    const first = { id: 'first', x: 0, y: 160, width: NODE_WIDTH, height: NODE_HEIGHT }
+    const second = { id: 'second', x: -180, y: 320, width: NODE_WIDTH, height: NODE_HEIGHT }
+    const from = { x: 120, y: 0 }
+    const to = { x: -120, y: 560 }
+
+    const points = routeEdgePoints(from, to, [first, second])
+    const path = [from, ...points, to]
+    expect(pathHitsBox(path, first)).toBe(false)
+    expect(pathHitsBox(path, second)).toBe(false)
+  })
+
+  it('keeps the drawn ontology off the cards an edge is not attached to', () => {
+    const byId = new Map(ontologyGraph.nodes.map((item) => [item.id, item]))
+    const boxes = new Map(ontologyGraph.nodes.map((item) => [item.id, {
+      id: item.id,
+      x: item.position.x,
+      y: item.position.y,
+      width: NODE_WIDTH,
+      height: NODE_HEIGHT,
+    }]))
+    // Where React Flow will actually draw the end of an edge: the handle's
+    // side, at its offset along it.
+    const endpoint = (nodeId, handleId, role) => {
+      const node = byId.get(nodeId)
+      const handle = node.data[role === 'source' ? 'sourceHandles' : 'targetHandles']
+        .find((item) => item.id === handleId)
+      if (!handle) return null
+      const { x, y } = node.position
+      if (handle.position === 'top') return { x: x + (NODE_WIDTH * handle.offset) / 100, y }
+      if (handle.position === 'bottom') return { x: x + (NODE_WIDTH * handle.offset) / 100, y: y + NODE_HEIGHT }
+      if (handle.position === 'left') return { x, y: y + (NODE_HEIGHT * handle.offset) / 100 }
+      return { x: x + NODE_WIDTH, y: y + (NODE_HEIGHT * handle.offset) / 100 }
+    }
+
+    let checked = 0
+    for (const item of ontologyGraph.edges) {
+      if (item.source === item.target) continue
+      const from = endpoint(item.source, item.sourceHandle, 'source')
+      const to = endpoint(item.target, item.targetHandle, 'target')
+      if (!from || !to) continue
+      checked += 1
+      const path = [from, ...(item.data.points || []), to]
+      for (const box of boxes.values()) {
+        if (box.id === item.source || box.id === item.target) continue
+        expect({ edge: item.id, node: box.id, through: pathHitsBox(path, box) })
+          .toEqual({ edge: item.id, node: box.id, through: false })
+      }
+    }
+    expect(checked).toBeGreaterThanOrEqual(3)
+  })
+
+  it('orders the handles on a side by where their edges are going', () => {
+    const byId = new Map(ontologyGraph.nodes.map((item) => [item.id, item]))
+    for (const node of ontologyGraph.nodes) {
+      for (const side of ['top', 'bottom', 'left', 'right']) {
+        const handles = [
+          ...node.data.sourceHandles.map((handle) => ({ ...handle, role: 'source' })),
+          ...node.data.targetHandles.map((handle) => ({ ...handle, role: 'target' })),
+        ].filter((handle) => handle.position === side)
+        if (handles.length < 2) continue
+
+        // Reading along the side, the nodes at the far ends come in the same
+        // order -- which is what stops one node's edges crossing each other.
+        const reached = handles
+          .sort((left, right) => left.offset - right.offset)
+          .map((handle) => {
+            const edge = ontologyGraph.edges.find((item) =>
+              (handle.role === 'source' ? item.sourceHandle : item.targetHandle) === handle.id)
+            const other = byId.get(handle.role === 'source' ? edge.target : edge.source)
+            return side === 'top' || side === 'bottom'
+              ? other.position.x + NODE_WIDTH / 2
+              : other.position.y + NODE_HEIGHT / 2
+          })
+        expect(reached).toEqual([...reached].sort((left, right) => left - right))
+      }
+    }
   })
 })
 

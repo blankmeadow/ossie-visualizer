@@ -324,7 +324,10 @@ function edge(id, source, target, label, kind, selection, extra = {}) {
     // Ontology and Mapping relationships often fan out from one node. Curved paths keep
     // them visually distinct; Mapping edges also use a narrow hit area and a dedicated
     // endpoint action so overlapping paths cannot silently select a neighboring edge.
-    type: ['relationship', 'mapping'].includes(kind) ? 'relationshipEdge' : 'smoothstep',
+    // `extends` is drawn by the same edge as the relationships it sits among -- it keeps
+    // its dashes, and it stops being the one line on the ontology canvas that turns
+    // square corners and walks through whatever card is in the way.
+    type: ['relationship', 'mapping', 'inheritance'].includes(kind) ? 'relationshipEdge' : 'smoothstep',
     interactionWidth: kind === 'mapping' ? 7 : 28,
     markerEnd: { type: MarkerType.ArrowClosed, color: neutral, width: 7, height: 7 },
     style: {
@@ -379,6 +382,149 @@ function edgeSides(sourceNode, targetNode, direction) {
   return forward ? ['right', 'left'] : ['left', 'right']
 }
 
+// ─── Edge routing ────────────────────────────────────────────────────────────
+
+// How far a detour keeps off the node it is going around, and how many nodes
+// one edge is allowed to walk around before it gives up and draws straight.
+const ROUTE_CLEARANCE = 20
+const ROUTE_DEPTH = 3
+const ROUTE_MAX_BENDS = 6
+
+/** Where a handle sits, from the side it is on and its offset along that side. */
+function handlePoint(node, side, offset) {
+  const { x, y } = node.position
+  if (side === 'top') return { x: x + (NODE_WIDTH * offset) / 100, y }
+  if (side === 'bottom') return { x: x + (NODE_WIDTH * offset) / 100, y: y + NODE_HEIGHT }
+  if (side === 'left') return { x, y: y + (NODE_HEIGHT * offset) / 100 }
+  return { x: x + NODE_WIDTH, y: y + (NODE_HEIGHT * offset) / 100 }
+}
+
+/**
+ * Where a segment first enters a box, as a fraction of its length, or null when
+ * it misses. Slab clipping: the segment is inside the box over the parameter
+ * range both axes agree on.
+ */
+function boxEntry(from, to, box) {
+  let enter = 0
+  let exit = 1
+  for (const axis of ['x', 'y']) {
+    const span = to[axis] - from[axis]
+    const low = axis === 'x' ? box.x : box.y
+    const high = low + (axis === 'x' ? box.width : box.height)
+    if (Math.abs(span) < 1e-6) {
+      if (from[axis] < low || from[axis] > high) return null
+      continue
+    }
+    const first = (low - from[axis]) / span
+    const second = (high - from[axis]) / span
+    enter = Math.max(enter, Math.min(first, second))
+    exit = Math.min(exit, Math.max(first, second))
+    if (enter > exit) return null
+  }
+  return enter
+}
+
+function firstBlocking(from, to, boxes) {
+  let blocking = null
+  let nearest = Infinity
+  for (const box of boxes) {
+    const entry = boxEntry(from, to, box)
+    if (entry === null || entry >= nearest) continue
+    nearest = entry
+    blocking = box
+  }
+  return blocking
+}
+
+/** Is `value` on the stretch between `from` and `to`, clear of both ends? */
+function between(value, from, to, margin = 12) {
+  return value > Math.min(from, to) + margin && value < Math.max(from, to) - margin
+}
+
+/**
+ * The corners to pass through to clear one node down one of its sides.
+ *
+ * Corners that would send the edge back the way it came are dropped -- half a
+ * detour still clears the node -- which is why the caller gets both sides and
+ * takes the first that survives.
+ */
+function cornersAround(from, to, box, lane) {
+  const vertical = Math.abs(to.y - from.y) >= Math.abs(to.x - from.x)
+  const [axis, cross] = vertical ? ['y', 'x'] : ['x', 'y']
+  const crossSize = vertical ? box.width : box.height
+  const crossStart = vertical ? box.x : box.y
+  const side = lane === 'near'
+    ? crossStart - ROUTE_CLEARANCE
+    : crossStart + crossSize + ROUTE_CLEARANCE
+  const alongSize = vertical ? box.height : box.width
+  const alongStart = (vertical ? box.y : box.x) - ROUTE_CLEARANCE
+  const alongEnd = (vertical ? box.y : box.x) + alongSize + ROUTE_CLEARANCE
+  const forward = to[axis] >= from[axis]
+  return [forward ? alongStart : alongEnd, forward ? alongEnd : alongStart]
+    .filter((value) => between(value, from[axis], to[axis]))
+    .map((value) => (vertical ? { x: side, y: value } : { x: value, y: side }))
+}
+
+/** The side of `box` the straight line already runs closer to. */
+function nearestLane(from, to, box) {
+  const vertical = Math.abs(to.y - from.y) >= Math.abs(to.x - from.x)
+  const cross = vertical ? 'x' : 'y'
+  const start = vertical ? box.x : box.y
+  const end = start + (vertical ? box.width : box.height)
+  const toStart = Math.abs(start - from[cross]) + Math.abs(start - to[cross])
+  const toEnd = Math.abs(end - from[cross]) + Math.abs(end - to[cross])
+  return toStart <= toEnd ? 'near' : 'far'
+}
+
+function routeSegment(from, to, boxes, depth) {
+  if (depth <= 0) return []
+  const box = firstBlocking(from, to, boxes)
+  if (!box) return []
+  const lane = nearestLane(from, to, box)
+  const preferred = cornersAround(from, to, box, lane)
+  const corners = preferred.length
+    ? preferred
+    : cornersAround(from, to, box, lane === 'near' ? 'far' : 'near')
+  if (!corners.length) return []
+  // The node just walked around is off the list, so a detour cannot bounce
+  // between the same two nodes forever. Whether the result is really clearer
+  // than the straight line is settled once, in routeEdgePoints.
+  const rest = boxes.filter((item) => item !== box)
+  const points = []
+  let cursor = from
+  for (const corner of corners) {
+    points.push(...routeSegment(cursor, corner, rest, depth - 1), corner)
+    cursor = corner
+  }
+  points.push(...routeSegment(cursor, to, rest, depth - 1))
+  return points
+}
+
+function blockedCount(path, boxes) {
+  return boxes.filter((box) => path
+    .slice(1)
+    .some((point, index) => boxEntry(path[index], point, box) !== null)).length
+}
+
+/**
+ * Bend points that keep an edge off the nodes it is not attached to.
+ *
+ * A long relationship drawn straight from handle to handle can run clean
+ * through a card that has nothing to do with it, which reads as though the two
+ * were connected. Walking around the card costs a couple of bends and says
+ * exactly what is connected to what -- but only when the detour really is
+ * clearer than the straight line, since a bend that dodges nothing is just a
+ * kink.
+ */
+export function routeEdgePoints(from, to, obstacles) {
+  if (!obstacles.length) return []
+  const points = routeSegment(from, to, obstacles, ROUTE_DEPTH).slice(0, ROUTE_MAX_BENDS)
+  if (!points.length) return []
+  return blockedCount([from, ...points, to], obstacles) < blockedCount([from, to], obstacles)
+    ? points
+    : []
+}
+
 function attachHandles(nodes, edges, direction) {
   const nodeById = new Map(nodes.map((item) => [item.id, item]))
   // Group by the side an edge actually uses, so the fan-out offsets spread
@@ -392,50 +538,101 @@ function attachHandles(nodes, edges, direction) {
     return sides.get(side)
   }
 
+  // Where the other end of an edge sits, measured along the side this end
+  // leaves from. Ordering a side's handles by it means the fan spreads out in
+  // the same order as the nodes it reaches, so the lines do not cross each
+  // other on their way out of the card.
+  const alongSide = (side, other) => (
+    side === 'top' || side === 'bottom'
+      ? other.position.x + NODE_WIDTH / 2
+      : other.position.y + NODE_HEIGHT / 2
+  )
+
   const sorted = [...edges].sort((left, right) => left.id.localeCompare(right.id))
   const resolved = new Map()
   for (const item of sorted) {
     const selfLoop = item.source === item.target
+    const sourceNode = nodeById.get(item.source)
+    const targetNode = nodeById.get(item.target)
     const [sourceSide, targetSide] = selfLoop
       ? ['right', 'right']
-      : edgeSides(nodeById.get(item.source), nodeById.get(item.target), direction)
+      : edgeSides(sourceNode, targetNode, direction)
     resolved.set(item.id, { sourceSide, targetSide, selfLoop })
-    if (selfLoop) continue
-    sideKey(item.source, sourceSide)?.push(item.id)
-    sideKey(item.target, targetSide)?.push(item.id)
+    if (selfLoop || !sourceNode || !targetNode) continue
+    sideKey(item.source, sourceSide)?.push({ id: item.id, along: alongSide(sourceSide, targetNode) })
+    sideKey(item.target, targetSide)?.push({ id: item.id, along: alongSide(targetSide, sourceNode) })
+  }
+
+  for (const sides of bySide.values()) {
+    for (const [side, items] of sides) {
+      items.sort((left, right) => left.along - right.along || left.id.localeCompare(right.id))
+      sides.set(side, items.map((item) => item.id))
+    }
   }
 
   const nodeHandles = new Map(nodes.map((item) => [item.id, { sourceHandles: [], targetHandles: [] }]))
   const handledEdges = edges.map((item) => {
     const { sourceSide, targetSide, selfLoop } = resolved.get(item.id)
+    const sourceNode = nodeById.get(item.source)
+    const targetNode = nodeById.get(item.target)
+    const drawn = !selfLoop && !!sourceNode && !!targetNode
     const sourceItems = selfLoop ? [] : bySide.get(item.source)?.get(sourceSide) || []
     const targetItems = selfLoop ? [] : bySide.get(item.target)?.get(targetSide) || []
     const sourceIndex = sourceItems.indexOf(item.id)
     const targetIndex = targetItems.indexOf(item.id)
     const sourceHandle = `source:${item.id}`
     const targetHandle = `target:${item.id}`
+    const sourceOffset = selfLoop ? 34 : ((sourceIndex + 1) / (sourceItems.length + 1)) * 100
+    const targetOffset = selfLoop ? 72 : ((targetIndex + 1) / (targetItems.length + 1)) * 100
     nodeHandles.get(item.source)?.sourceHandles.push({
       id: sourceHandle,
       position: sourceSide,
-      offset: selfLoop ? 34 : ((sourceIndex + 1) / (sourceItems.length + 1)) * 100,
+      offset: sourceOffset,
     })
     nodeHandles.get(item.target)?.targetHandles.push({
       id: targetHandle,
       position: targetSide,
-      offset: selfLoop ? 72 : ((targetIndex + 1) / (targetItems.length + 1)) * 100,
+      offset: targetOffset,
     })
     return {
       ...item,
       type: selfLoop ? 'default' : item.type,
       sourceHandle,
       targetHandle,
+      data: {
+        ...item.data,
+        from: drawn ? handlePoint(sourceNode, sourceSide, sourceOffset) : null,
+        to: drawn ? handlePoint(targetNode, targetSide, targetOffset) : null,
+      },
     }
   })
 
   return {
     nodes: nodes.map((item) => ({ ...item, data: { ...item.data, ...nodeHandles.get(item.id) } })),
-    edges: handledEdges,
+    edges: routeAll(nodes, handledEdges),
   }
+}
+
+/**
+ * Give every edge the bend points it needs to stay off the cards it is not
+ * attached to. Runs once per layout, on the positions the layout produced.
+ */
+function routeAll(nodes, edges) {
+  const boxes = new Map(nodes.map((item) => [item.id, {
+    id: item.id,
+    x: item.position.x,
+    y: item.position.y,
+    width: NODE_WIDTH,
+    height: NODE_HEIGHT,
+  }]))
+  const all = [...boxes.values()]
+  return edges.map((item) => {
+    const { from, to, ...rest } = item.data || {}
+    if (!from || !to) return { ...item, data: rest }
+    const obstacles = all.filter((box) => box.id !== item.source && box.id !== item.target)
+    const points = routeEdgePoints(from, to, obstacles)
+    return { ...item, data: points.length ? { ...rest, points } : rest }
+  })
 }
 
 /**

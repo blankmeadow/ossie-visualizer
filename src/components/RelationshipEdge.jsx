@@ -1,4 +1,58 @@
-import { BaseEdge, EdgeLabelRenderer, getBezierPath } from '@xyflow/react'
+import { BaseEdge, EdgeLabelRenderer, getBezierPath, getStraightPath } from '@xyflow/react'
+
+// Within this much sideways drift a curve is just a wobble, so the edge is
+// drawn as the straight line it almost is.
+const STRAIGHT_TOLERANCE = 26
+// How much of each bend is rounded off, capped by the shortest leg meeting it.
+const CORNER_RADIUS = 18
+
+const VERTICAL_SIDES = ['top', 'bottom']
+
+function distance(from, to) {
+  return Math.hypot(to.x - from.x, to.y - from.y)
+}
+
+/** The point `length` along the way from `from` to `to`. */
+function step(from, to, length) {
+  const span = distance(from, to) || 1
+  const ratio = Math.min(1, length / span)
+  return { x: from.x + (to.x - from.x) * ratio, y: from.y + (to.y - from.y) * ratio }
+}
+
+/**
+ * A polyline with its corners rounded off, and the point halfway along it.
+ *
+ * The bends come from the layout, which knows where the other cards are; the
+ * rounding is what keeps a detour from reading as a hard mechanical turn.
+ */
+function bentPath(points) {
+  let path = `M ${points[0].x},${points[0].y}`
+  for (let index = 1; index < points.length - 1; index++) {
+    const corner = points[index]
+    const radius = Math.min(
+      CORNER_RADIUS,
+      distance(points[index - 1], corner) / 2,
+      distance(corner, points[index + 1]) / 2,
+    )
+    const enter = step(corner, points[index - 1], radius)
+    const leave = step(corner, points[index + 1], radius)
+    path += ` L ${enter.x},${enter.y} Q ${corner.x},${corner.y} ${leave.x},${leave.y}`
+  }
+  const last = points[points.length - 1]
+  path += ` L ${last.x},${last.y}`
+
+  const lengths = points.slice(1).map((point, index) => distance(points[index], point))
+  const half = lengths.reduce((total, value) => total + value, 0) / 2
+  let walked = 0
+  for (let index = 0; index < lengths.length; index++) {
+    if (walked + lengths[index] >= half) {
+      const middle = step(points[index], points[index + 1], half - walked)
+      return [path, middle.x, middle.y]
+    }
+    walked += lengths[index]
+  }
+  return [path, last.x, last.y]
+}
 
 export default function RelationshipEdge({
   id,
@@ -15,15 +69,26 @@ export default function RelationshipEdge({
   label,
   selected,
 }) {
-  const [path, labelX, labelY] = getBezierPath({
-    sourceX,
-    sourceY,
-    targetX,
-    targetY,
-    sourcePosition,
-    targetPosition,
-    curvature: 0.18,
-  })
+  const bends = data?.points || []
+  const acrossFlow = VERTICAL_SIDES.includes(sourcePosition)
+    ? Math.abs(targetX - sourceX)
+    : Math.abs(targetY - sourceY)
+
+  const [path, labelX, labelY] = bends.length
+    // The bends are laid out for the handles this edge left the layout with, so
+    // they join the ends React Flow reports rather than replacing them.
+    ? bentPath([{ x: sourceX, y: sourceY }, ...bends, { x: targetX, y: targetY }])
+    : acrossFlow <= STRAIGHT_TOLERANCE
+      ? getStraightPath({ sourceX, sourceY, targetX, targetY })
+      : getBezierPath({
+        sourceX,
+        sourceY,
+        targetX,
+        targetY,
+        sourcePosition,
+        targetPosition,
+        curvature: 0.18,
+      })
 
   // Keep labels readable like n8n: horizontal edges place the label above the
   // line; vertical edges place it beside the line instead of rotating text.
