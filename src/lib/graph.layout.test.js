@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { elkOrthogonalPath } from './edgePath'
 import {
@@ -11,7 +12,7 @@ import {
   NODE_HEIGHT,
   NODE_WIDTH,
 } from './graph'
-import { normalizeOssie } from './ossie'
+import { normalizeOssie, parseOssie } from './ossie'
 
 /**
  * Layout conventions the graph views are expected to honour:
@@ -133,6 +134,13 @@ const elkRoutingStressGraph = await buildOntologyGraph(routingStressModel, {
   showRelationships: true,
   layoutEngine: 'elk',
 })
+const layoutStressDocument = parseOssie(
+  readFileSync(new URL('./__fixtures__/layout-stress.ossie.yaml', import.meta.url), 'utf8'),
+)
+if (layoutStressDocument.errors.length) {
+  throw new Error(`Invalid layout stress fixture: ${JSON.stringify(layoutStressDocument.errors)}`)
+}
+const layoutStressModel = normalizeOssie(layoutStressDocument.document)
 
 describe('graph layout conventions', () => {
   const ontology = ontologyGraph
@@ -203,6 +211,70 @@ describe('graph layout conventions', () => {
     // A dataset keeps its physical source, which the description no longer hides.
     expect(customers.data.subtitle).toBe('x.customers')
   })
+})
+
+describe('focused ontology layout', () => {
+  const topNodeIds = (graph) => {
+    const top = Math.min(...graph.nodes.map((item) => item.position.y))
+    return graph.nodes
+      .filter((item) => Math.abs(item.position.y - top) < 1e-6)
+      .map((item) => item.id)
+      .sort()
+  }
+
+  it.each([false, true])(
+    'keeps the selected node alone on the first layer with relationships=%s',
+    async (showRelationships) => {
+      const options = {
+        showRelationships,
+        selectedName: 'Customer',
+        depth: 1,
+      }
+      const dagre = buildOntologyGraph(layoutStressModel, options)
+      const elk = await buildOntologyGraph(layoutStressModel, { ...options, layoutEngine: 'elk' })
+
+      expect(elk.nodes.map((item) => item.id).sort())
+        .toEqual(dagre.nodes.map((item) => item.id).sort())
+      expect(elk.nodes).toHaveLength(4)
+      expect(topNodeIds(dagre)).toEqual(['Customer'])
+      expect(topNodeIds(elk)).toEqual(['Customer'])
+
+      for (const item of endpoints(elk)) {
+        const edge = elk.edges.find((candidate) => candidate.id === item.id)
+        expect(edge.data.routeMode).toBe('elk-orthogonal')
+        const points = edge.data.points || []
+        for (let index = 1; index < points.length; index++) {
+          const from = points[index - 1]
+          const to = points[index]
+          expect(
+            Math.abs(from.x - to.x) < 1e-6 || Math.abs(from.y - to.y) < 1e-6,
+            `${item.id}: ${JSON.stringify([from, to])}`,
+          ).toBe(true)
+        }
+        if (item.source.id === item.target.id) continue
+        const downward = item.target.position.y > item.source.position.y
+        expect(
+          { sourceSide: item.sourceSide, targetSide: item.targetSide },
+          item.id,
+        ).toEqual({
+          sourceSide: downward ? 'bottom' : 'top',
+          targetSide: downward ? 'top' : 'bottom',
+        })
+      }
+
+      const childToParent = endpoints(elk)
+        .find((item) => item.id === 'extends:Customer:Party')
+      expect(childToParent.sourceSide).toBe('bottom')
+      expect(childToParent.targetSide).toBe('top')
+      expect(
+        elk.edges.find((item) => item.id === childToParent.id).data.points.length,
+      ).toBeLessThanOrEqual(4)
+      const childIntoRoot = endpoints(elk)
+        .find((item) => item.id === 'extends:VipCustomer:Customer')
+      expect(childIntoRoot.sourceSide).toBe('top')
+      expect(childIntoRoot.targetSide).toBe('bottom')
+    },
+  )
 })
 
 /** Does the straight run from `from` to `to` pass through `box`? */
