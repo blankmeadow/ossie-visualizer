@@ -1,5 +1,6 @@
 import { cva } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
+import { NODE_HEIGHT, NODE_WIDTH } from '@/lib/graphGeometry'
 
 /**
  * Shared shell for every node drawn on the graph canvas.
@@ -15,7 +16,7 @@ import { cn } from '@/lib/utils'
 
 const baseNodeVariants = cva(
   cn(
-    'h-[72px] w-[224px] overflow-visible rounded-[8px] border px-[11px] py-[9px]',
+    'overflow-visible rounded-[8px] border px-[11px] py-[9px]',
     'bg-white',
     // Opacity alone: it composites, so fading a large graph in and out of focus
     // stays cheap. A filter here would repaint every card on every pan frame.
@@ -34,13 +35,14 @@ const baseNodeVariants = cva(
   },
 )
 
-function BaseNode({ className, emphasis = 'default', ...props }) {
+function BaseNode({ className, emphasis = 'default', style, ...props }) {
   return (
     <div
       className={cn(
         baseNodeVariants({ emphasis }),
         className,
       )}
+      style={{ ...style, width: NODE_WIDTH, height: NODE_HEIGHT }}
       {...props}
     />
   )

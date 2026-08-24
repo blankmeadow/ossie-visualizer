@@ -7,6 +7,7 @@ import {
   BaseNodeIcon,
   BaseNodeTitle,
 } from './ui/base-node'
+import { HANDLE_SIZE } from '../lib/graphGeometry'
 
 const ICONS = {
   concept: CircleDot,
@@ -53,15 +54,15 @@ function NodeHandle({ type, handle }) {
     left: Position.Left,
   }[handle.position]
   const style = ['top', 'bottom'].includes(handle.position)
-    ? { left: `${handle.offset}%` }
-    : { top: `${handle.offset}%` }
+    ? { left: `${handle.offset}%`, width: HANDLE_SIZE, height: HANDLE_SIZE }
+    : { top: `${handle.offset}%`, width: HANDLE_SIZE, height: HANDLE_SIZE }
   return (
     <Handle
       id={handle.id}
       type={type}
       position={position}
       style={style}
-      className="size-[10px] border-[1.5px] border-[#a5a5a5] bg-white opacity-100 shadow-[0_1px_2px_rgba(0,0,0,.08)]"
+      className="border-[1.5px] border-[#a5a5a5] bg-white opacity-100 shadow-[0_1px_2px_rgba(0,0,0,.08)]"
     />
   )
 }
