@@ -80,7 +80,7 @@ export default function App() {
   const [showMetrics, setShowMetrics] = useState(false)
   const [showMiniMap, setShowMiniMap] = useState(true)
   const [showEdgeLabels, setShowEdgeLabels] = useState(true)
-  const [layoutEngine, setLayoutEngine] = useState('dagre')
+  const [layoutEngine, setLayoutEngine] = useState('elk')
   const [focusDepth, setFocusDepth] = useState(0)
   const [sidebarKind, setSidebarKind] = useState('all')
 
