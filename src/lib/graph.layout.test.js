@@ -9,9 +9,14 @@ import {
   layoutBends,
   markerSizeForZoom,
   movedHandleOverrides,
+} from './graph'
+import {
+  declarativeHandle,
+  HANDLE_OUTSET,
+  HANDLE_SIZE,
   NODE_HEIGHT,
   NODE_WIDTH,
-} from './graph'
+} from './graphGeometry'
 import { normalizeOssie, parseOssie } from './ossie'
 
 /**
@@ -277,6 +282,34 @@ describe('focused ontology layout', () => {
   )
 })
 
+describe('declarative React Flow handles', () => {
+  it.each([
+    ['top', { x: NODE_WIDTH * 0.25, y: -HANDLE_OUTSET }],
+    ['right', { x: NODE_WIDTH + HANDLE_OUTSET, y: NODE_HEIGHT * 0.25 }],
+    ['bottom', { x: NODE_WIDTH * 0.25, y: NODE_HEIGHT + HANDLE_OUTSET }],
+    ['left', { x: -HANDLE_OUTSET, y: NODE_HEIGHT * 0.25 }],
+  ])('puts the %s anchor on the handle outer rim', (position, expected) => {
+    const handle = declarativeHandle({ id: `source:${position}`, position, offset: 25 }, 'source')
+    const anchor = position === 'top'
+      ? { x: handle.x + handle.width / 2, y: handle.y }
+      : position === 'right'
+        ? { x: handle.x + handle.width, y: handle.y + handle.height / 2 }
+        : position === 'bottom'
+          ? { x: handle.x + handle.width / 2, y: handle.y + handle.height }
+          : { x: handle.x, y: handle.y + handle.height / 2 }
+
+    expect(handle).toMatchObject({
+      id: `source:${position}`,
+      type: 'source',
+      position,
+      width: HANDLE_SIZE,
+      height: HANDLE_SIZE,
+    })
+    expect(anchor.x).toBeCloseTo(expected.x)
+    expect(anchor.y).toBeCloseTo(expected.y)
+  })
+})
+
 /** Does the straight run from `from` to `to` pass through `box`? */
 function hitsBox(from, to, box) {
   const steps = 200
@@ -412,9 +445,9 @@ describe('strict ELK routing', () => {
     else point = { x: x + NODE_WIDTH, y: y + (NODE_HEIGHT * handle.offset) / 100 }
     if (!outerRim) return point
     const [dx, dy] = outward[handle.position]
-    // NodeHandle is 10px wide and straddles the card border, so React Flow's
-    // edge anchor sits one 5px radius beyond ELK's port centre.
-    return { x: point.x + dx * 5, y: point.y + dy * 5 }
+    // NodeHandle straddles the card border, so React Flow's edge anchor sits
+    // one handle radius beyond ELK's port centre.
+    return { x: point.x + dx * HANDLE_OUTSET, y: point.y + dy * HANDLE_OUTSET }
   }
 
   it('ranks inheritance parent-first while keeping the arrow child-to-parent', () => {

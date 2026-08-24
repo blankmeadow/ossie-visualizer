@@ -1,10 +1,9 @@
 import dagre from '@dagrejs/dagre'
 import { MarkerType } from '@xyflow/react'
 import { mappingEvidenceForDataset, referencedDatasets, relationshipKind, roleKind } from './ossie'
+import { HANDLE_OUTSET, NODE_HEIGHT, NODE_WIDTH } from './graphGeometry'
 
-// Compact two-row card: name on the first row, description on the second.
-export const NODE_WIDTH = 224
-export const NODE_HEIGHT = 72
+export { NODE_HEIGHT, NODE_WIDTH } from './graphGeometry'
 
 /**
  * SVG markers use `markerUnits="strokeWidth"` and are then scaled again by
@@ -185,7 +184,6 @@ function layout(nodes, edges, direction = 'LR', overrides = {}) {
 
 const ELK_DIRECTION = { TB: 'DOWN', LR: 'RIGHT' }
 const REACT_FLOW_SIDE = { NORTH: 'top', EAST: 'right', SOUTH: 'bottom', WEST: 'left' }
-const HANDLE_OUTSET = 5
 const OUTWARD = {
   top: [0, -1],
   right: [1, 0],
@@ -197,7 +195,7 @@ const OUTWARD = {
  * Match an ELK section to the point where React Flow actually draws an edge.
  *
  * ELK ends a section at the card border, in the centre of its port. React
- * Flow's 10px handles straddle that border and getHandlePosition anchors the
+ * Flow's fixed-size handles straddle that border and getHandlePosition anchors the
  * edge at their outer rim. Since the node layer is painted above the edge
  * layer, leaving an arrow tip at the ELK port centre hides it under the card.
  * Moving both ends along their face normal preserves ELK's orthogonality while
@@ -270,8 +268,8 @@ function elkLayoutComponent(nodes, edges, direction, options, focus = null) {
     },
     children: nodes.map((item) => ({
       id: item.id,
-      // These dimensions must stay in sync with BaseNode's fixed 224x72 CSS
-      // box. Exact ELK route endpoints depend on that shared geometry.
+      // BaseNode reads the same shared dimensions. Exact ELK route endpoints
+      // depend on the layout and rendered card using identical geometry.
       width: NODE_WIDTH,
       height: NODE_HEIGHT,
       // Only the face is fixed. ELK remains free to order ports along it while

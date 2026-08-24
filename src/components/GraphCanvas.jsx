@@ -11,7 +11,6 @@ import {
   ReactFlowProvider,
   useReactFlow,
   useStore,
-  useUpdateNodeInternals,
 } from '@xyflow/react'
 import { Download, Lock, Maximize, Unlock, ZoomIn, ZoomOut } from 'lucide-react'
 import { toPng } from 'html-to-image'
@@ -23,9 +22,8 @@ import {
   edgeRouteAfterMove,
   markerSizeForZoom,
   movedHandleOverrides,
-  NODE_HEIGHT,
-  NODE_WIDTH,
 } from '../lib/graph'
+import { declarativeHandle, NODE_HEIGHT, NODE_WIDTH } from '../lib/graphGeometry'
 
 const nodeTypes = { ossieNode: OssieNode }
 const edgeTypes = { relationshipEdge: RelationshipEdge }
@@ -292,7 +290,6 @@ function InnerGraphCanvas(props) {
   } = props
   const t = useT()
   const flow = useReactFlow()
-  const updateNodeInternals = useUpdateNodeInternals()
   // Subscribing through useViewport also listens to x/y and re-renders the
   // complete graph on every pan frame. Arrow sizing only needs zoom.
   const zoom = useStore(selectZoom)
@@ -319,21 +316,6 @@ function InnerGraphCanvas(props) {
       .join(',')}:${graph.edges.map((item) => item.id).sort().join(',')}`,
     [graph.edges, graph.nodes],
   )
-  const handleLayoutKey = useMemo(
-    () => graph.nodes.map((item) => {
-      const handles = [
-        ...(item.data.sourceHandles || []),
-        ...(item.data.targetHandles || []),
-      ]
-      return `${item.id}:${handles.map((handle) => `${handle.id}@${handle.position}:${handle.offset}`).join('|')}`
-    }).sort().join(','),
-    [graph.nodes],
-  )
-  const nodeIdKey = useMemo(
-    () => JSON.stringify(graph.nodes.map((item) => item.id).sort()),
-    [graph.nodes],
-  )
-  const graphNodeIds = useMemo(() => JSON.parse(nodeIdKey), [nodeIdKey])
   const manualPositions = manualLayout.key === graphLayoutKey ? manualLayout.positions : EMPTY_POSITIONS
   // Bend points are laid out for where the layout put the cards. Once a card
   // has been dragged they describe a detour around nothing, so its edges switch
@@ -346,14 +328,6 @@ function InnerGraphCanvas(props) {
     () => movedHandleOverrides(graph.nodes, graph.edges, manualPositions, movedNodeIds),
     [graph.edges, graph.nodes, manualPositions, movedNodeIds],
   )
-  const movedHandleLayoutKey = useMemo(
-    () => [...handleOverrides]
-      .map(([id, handle]) => `${id}@${handle.position}:${handle.offset}`)
-      .sort()
-      .join(','),
-    [handleOverrides],
-  )
-
   const selectedNodeId = useMemo(
     () => graph.nodes.find((item) => selectionMatches(item.data?.selection, selection))?.id || '',
     [graph.nodes, selection],
@@ -429,6 +403,10 @@ function InnerGraphCanvas(props) {
         measured,
         selected,
         zIndex: selected ? 1000 : 0,
+        handles: [
+          ...targetHandles.map((handle) => declarativeHandle(handle, 'target')),
+          ...sourceHandles.map((handle) => declarativeHandle(handle, 'source')),
+        ],
         data: { ...item.data, sourceHandles, targetHandles, related, dimmed },
       }
       cache.set(item.id, { source: item, node, handleOverrideKey })
@@ -437,13 +415,6 @@ function InnerGraphCanvas(props) {
     nodeCacheRef.current = cache
     return items
   }, [activeNodeIds, focusActive, graph.nodes, handleOverrides, manualPositions, nodeSizes, selectedNodeId])
-
-  // React Flow caches handle bounds. ELK changes their offsets while keeping
-  // the same IDs; drag fallback can also change a handle's side. Refresh its
-  // bookkeeping only when node membership or handle geometry actually changes.
-  useEffect(() => {
-    if (graphNodeIds.length) updateNodeInternals(graphNodeIds)
-  }, [graphNodeIds, handleLayoutKey, movedHandleLayoutKey, updateNodeInternals])
 
   const edges = useMemo(
     () =>
