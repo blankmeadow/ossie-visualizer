@@ -436,7 +436,7 @@ describe('strict ELK routing', () => {
     }
   })
 
-  it('falls an invalidated ELK self-loop back to a non-routing loop edge', () => {
+  it('keeps an invalidated ELK self-loop on the live orthogonal renderer', () => {
     const selfLoop = elkRoutingStressGraph.edges.find((item) => item.source === 'loop' && item.target === 'loop')
     expect(selfLoop.type).toBe('relationshipEdge')
     expect(selfLoop.data.routeMode).toBe('elk-orthogonal')
@@ -444,9 +444,9 @@ describe('strict ELK routing', () => {
 
     const moved = new Set(['loop'])
     expect(edgeRouteAfterMove(selfLoop, moved)).toEqual({
-      type: 'default',
+      type: 'relationshipEdge',
       points: undefined,
-      routeMode: undefined,
+      routeMode: 'elk-orthogonal',
     })
     const overrides = movedHandleOverrides(
       elkRoutingStressGraph.nodes,
@@ -475,7 +475,7 @@ describe('strict ELK routing', () => {
     expect(edgeRouteAfterMove(relation, moved)).toEqual({
       type: 'relationshipEdge',
       points: undefined,
-      routeMode: undefined,
+      routeMode: 'elk-orthogonal',
     })
     expect(overrides.get(relation.sourceHandle)?.position).toBe('top')
     expect(overrides.get(relation.targetHandle)?.position).toBe('bottom')

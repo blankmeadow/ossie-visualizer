@@ -1,4 +1,10 @@
-import { BaseEdge, EdgeLabelRenderer, getBezierPath, getStraightPath } from '@xyflow/react'
+import {
+  BaseEdge,
+  EdgeLabelRenderer,
+  getBezierPath,
+  getSmoothStepPath,
+  getStraightPath,
+} from '@xyflow/react'
 import { elkOrthogonalPath, pointAlongPath, pointDistance, stepAlong } from '../lib/edgePath'
 
 // Within this much sideways drift a curve is just a wobble, so the edge is
@@ -52,31 +58,49 @@ export default function RelationshipEdge({
 }) {
   const bends = data?.points || []
   const fraction = data?.labelFraction ?? 0.5
-  const elkRoute = data?.routeMode === 'elk-orthogonal' && bends.length >= 2
+  const elkRoute = data?.routeMode === 'elk-orthogonal'
+  const staticElkRoute = elkRoute && bends.length >= 2
   const acrossFlow = VERTICAL_SIDES.includes(sourcePosition)
     ? Math.abs(targetX - sourceX)
     : Math.abs(targetY - sourceY)
 
-  const routePoints = elkRoute
+  const routePoints = staticElkRoute
     ? bends
     : [{ x: sourceX, y: sourceY }, ...bends, { x: targetX, y: targetY }]
-  const drawn = elkRoute
-    ? elkOrthogonalPath(routePoints, fraction)
-    : bends.length
+  let drawn
+  if (staticElkRoute) {
+    drawn = elkOrthogonalPath(routePoints, fraction)
+  } else if (elkRoute) {
+    // Dragging invalidates ELK's absolute bend coordinates. Rebuild a hard
+    // orthogonal route from React Flow's live handles instead of falling back
+    // to the Bezier path used by Dagre/unrouted relationship edges.
+    drawn = getSmoothStepPath({
+      sourceX,
+      sourceY,
+      targetX,
+      targetY,
+      sourcePosition,
+      targetPosition,
+      borderRadius: 0,
+      offset: 32,
+    })
+  } else if (bends.length) {
     // The engine routed this edge from and to the same handles React Flow is
     // reporting, so its bends drop straight in between them.
-      ? bentPath(routePoints, fraction)
-      : acrossFlow <= STRAIGHT_TOLERANCE
-        ? getStraightPath({ sourceX, sourceY, targetX, targetY })
-        : getBezierPath({
-          sourceX,
-          sourceY,
-          targetX,
-          targetY,
-          sourcePosition,
-          targetPosition,
-          curvature: 0.18,
-        })
+    drawn = bentPath(routePoints, fraction)
+  } else if (acrossFlow <= STRAIGHT_TOLERANCE) {
+    drawn = getStraightPath({ sourceX, sourceY, targetX, targetY })
+  } else {
+    drawn = getBezierPath({
+      sourceX,
+      sourceY,
+      targetX,
+      targetY,
+      sourcePosition,
+      targetPosition,
+      curvature: 0.18,
+    })
+  }
   // An edge sharing its pair of cards with another one is told where along
   // itself to put its label. On a plain curve the point on the chord is close
   // enough to the line to read as sitting on it.

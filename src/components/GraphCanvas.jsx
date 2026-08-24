@@ -336,9 +336,10 @@ function InnerGraphCanvas(props) {
   const graphNodeIds = useMemo(() => JSON.parse(nodeIdKey), [nodeIdKey])
   const manualPositions = manualLayout.key === graphLayoutKey ? manualLayout.positions : EMPTY_POSITIONS
   // Bend points are laid out for where the layout put the cards. Once a card
-  // has been dragged they describe a detour around nothing, so its edges go
-  // back to a plain curve. The key is a string so a drag does not rebuild every
-  // edge on every frame -- only when the set of moved cards changes.
+  // has been dragged they describe a detour around nothing, so its edges switch
+  // to routes based on their live handles (orthogonal for ELK, plain for
+  // Dagre). The key is a string so a drag does not rebuild every edge on every
+  // frame -- only when the set of moved cards changes.
   const movedKey = Object.keys(manualPositions).sort().join(',')
   const movedNodeIds = useMemo(() => new Set(movedKey ? movedKey.split(',') : []), [movedKey])
   const handleOverrides = useMemo(

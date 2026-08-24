@@ -455,25 +455,24 @@ function edgeSides(sourceNode, targetNode, direction) {
 
 /**
  * Route fields and edge type after a card moves away from engine geometry.
- * A self-loop falls back to React Flow's loop renderer instead of becoming a
- * straight line through its own card.
+ * ELK's absolute points no longer describe the moved endpoints, but the edge
+ * must remain orthogonal: the renderer will rebuild a live step route from the
+ * current handle coordinates. Dagre edges keep their existing curve fallback.
  */
 export function edgeRouteAfterMove(item, movedNodeIds) {
   const invalidated = movedNodeIds.has(item.source) || movedNodeIds.has(item.target)
-  const elkSelfLoop = invalidated
-    && item.source === item.target
-    && item.data?.routeMode === 'elk-orthogonal'
+  const dynamicElkRoute = invalidated && item.data?.routeMode === 'elk-orthogonal'
   return {
-    type: elkSelfLoop ? 'default' : item.type,
+    type: dynamicElkRoute ? 'relationshipEdge' : item.type,
     points: invalidated ? undefined : item.data?.points,
-    routeMode: invalidated ? undefined : item.data?.routeMode,
+    routeMode: invalidated && !dynamicElkRoute ? undefined : item.data?.routeMode,
   }
 }
 
 /**
  * Reattach invalidated routes to the faces that now point at their other end.
- * The old fixed ELK sides must not make the fallback curve double back across
- * a card after it is dragged past its neighbor.
+ * The old fixed ELK sides must not make the live orthogonal route double back
+ * across a card after it is dragged past its neighbor.
  */
 export function movedHandleOverrides(nodes, edges, manualPositions, movedNodeIds) {
   const nodeById = new Map(nodes.map((item) => [item.id, {
