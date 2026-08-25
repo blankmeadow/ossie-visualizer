@@ -137,10 +137,10 @@ export default function App() {
   useEffect(() => {
     if (!model) { setGraph({ nodes: [], edges: [] }); return }
     let cancelled = false
-    const opts = { layoutEngine }
+    const opts = { layoutEngine, showEdgeLabels }
     let result
     if (activeTab === 'ontology') {
-      result = buildOntologyGraph(model, { ...opts, showRelationships, showEdgeLabels, selectedName: selectedGraphName, depth: focusDepth })
+      result = buildOntologyGraph(model, { ...opts, showRelationships, selectedName: selectedGraphName, depth: focusDepth })
     } else if (activeTab === 'semantic') {
       result = buildSemanticGraph(model, { ...opts, showMetrics, selectedName: selectedGraphName, depth: focusDepth })
     } else if (activeTab === 'mapping') {

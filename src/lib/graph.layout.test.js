@@ -676,6 +676,29 @@ describe('strict ELK routing', () => {
     expect(bare.width).toBeLessThanOrEqual(named.width)
   })
 
+  it('takes the room back on every canvas that draws names, not just the ontology', async () => {
+    // The setting belongs to the reader, not to one tab: a semantic or mapping
+    // canvas holding lanes open for names nobody asked to see is the same shape
+    // stretched around nothing.
+    const canvases = [
+      ['semantic', (options) => buildSemanticGraph(model, options)],
+      ['mapping', (options) => buildMappingGraph(model, model.conceptMappings[0], options)],
+      ['focused semantic', (options) => buildSemanticGraph(model, {
+        ...options,
+        selectedName: 'customers',
+        depth: 1,
+      })],
+    ]
+    for (const [name, build] of canvases) {
+      const withNames = await build({ layoutEngine: 'elk' })
+      const withoutNames = await build({ layoutEngine: 'elk', showEdgeLabels: false })
+      expect(withNames.edges.length, `${name} drew no edges`).toBeGreaterThan(0)
+      expect(
+        { canvas: name, placed: withoutNames.edges.some((item) => item.data.labelPoint) },
+      ).toEqual({ canvas: name, placed: false })
+    }
+  })
+
   it('sets the disconnected parts of a model down clear of each other, biggest first', () => {
     // Party's tree, Warehouse/Bin and Region/Zone share no edge, so ELK is left
     // to separate and arrange them. Nothing may land on top of anything else,

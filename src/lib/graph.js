@@ -904,6 +904,18 @@ function spreadLabels(edges) {
  * A positioner hands back the cards it placed and, where it has one, the route
  * it worked out for each edge.
  */
+/**
+ * What a canvas' own settings ask of the layout engine.
+ *
+ * Room is only kept clear for the edge labels while they are being drawn.
+ * Turning them off is what a reader does to see the shape of a model, and
+ * holding their lanes open would leave that shape stretched around nothing. It
+ * belongs to every canvas that draws labels, so every builder passes it on.
+ */
+function layoutOverrides(options) {
+  return { reserveLabels: options.showEdgeLabels ?? true }
+}
+
 function graphResult(nodes, edges, direction, positioner = layout, engine = 'dagre', elkFocus = null, overrides = {}) {
   const attach = (laid) => attachHandles(laid.nodes, edges, direction, laid.routes, engine, laid.labels)
   if (engine === 'elk') return elkLayoutAll(nodes, edges, direction, overrides, elkFocus).then(attach)
@@ -1072,13 +1084,7 @@ export function buildOntologyGraph(model, options = {}) {
     ? (items) => layoutFocusedOntology(items, selectedName)
     : layout
   const elkFocus = focusActive ? { rootId: selectedName, hops: focusHops } : null
-  // Room is only kept clear for the relationship names while they are being
-  // drawn. Turning them off is what a reader does to see the shape of a model,
-  // and holding their lanes open would leave that shape stretched around
-  // nothing.
-  return graphResult(nodes, edges, 'TB', positioner, layoutEngine, elkFocus, {
-    reserveLabels: options.showEdgeLabels ?? true,
-  })
+  return graphResult(nodes, edges, 'TB', positioner, layoutEngine, elkFocus, layoutOverrides(options))
 }
 
 export function buildSemanticGraph(model, options = {}) {
@@ -1131,7 +1137,9 @@ export function buildSemanticGraph(model, options = {}) {
     }
   }
 
-  if (!selectedName || depth === 0) return graphResult(nodes, edges, 'TB', layout, layoutEngine)
+  if (!selectedName || depth === 0) {
+    return graphResult(nodes, edges, 'TB', layout, layoutEngine, null, layoutOverrides(options))
+  }
   const adjacency = new Map(nodes.map((item) => [item.id, new Set()]))
   edges.forEach((item) => {
     adjacency.get(item.source)?.add(item.target)
@@ -1151,7 +1159,7 @@ export function buildSemanticGraph(model, options = {}) {
   }
   const filteredNodes = nodes.filter((item) => visible.has(item.id))
   const filteredEdges = edges.filter((item) => visible.has(item.source) && visible.has(item.target))
-  return graphResult(filteredNodes, filteredEdges, 'TB', layout, layoutEngine)
+  return graphResult(filteredNodes, filteredEdges, 'TB', layout, layoutEngine, null, layoutOverrides(options))
 }
 
 function layoutMapping(nodes) {
@@ -1228,10 +1236,9 @@ export function buildMappingGraph(model, conceptMapping, options = {}) {
       ),
     )
   }
-  if (layoutEngine === 'elk') {
-    return elkLayoutAll(nodes, edges, 'LR').then((laid) => attachHandles(laid.nodes, edges, 'LR', laid.routes, 'elk'))
-  }
   // The mapping canvas is three fixed columns, placed by hand; nothing routes
-  // its edges, and with that little on screen nothing needs to.
-  return attachHandles(layoutMapping(nodes), edges, 'LR')
+  // its edges, and with that little on screen nothing needs to. ELK lays the
+  // same canvas out itself when it is the chosen engine.
+  const columns = (items) => ({ nodes: layoutMapping(items), routes: new Map() })
+  return graphResult(nodes, edges, 'LR', columns, layoutEngine, null, layoutOverrides(options))
 }
