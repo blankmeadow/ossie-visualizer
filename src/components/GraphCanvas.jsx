@@ -9,6 +9,7 @@ import {
   Panel,
   ReactFlow,
   ReactFlowProvider,
+  useNodesInitialized,
   useReactFlow,
   useStore,
 } from '@xyflow/react'
@@ -316,6 +317,28 @@ function InnerGraphCanvas(props) {
       .join(',')}:${graph.edges.map((item) => item.id).sort().join(',')}`,
     [graph.edges, graph.nodes],
   )
+  // React Flow's `fitView` prop fits the first graph it is handed and nothing
+  // after it, so opening a second document left the viewport where the previous
+  // one had been read -- which on a larger model puts most of it off screen.
+  // Every arrangement the engine hands back is a different picture and gets
+  // fitted once: another document, another tab, the names going on or off, a
+  // focus drawn around somewhere else. A drag is not one of those -- it moves
+  // cards without relaying the graph out -- so the reader's own panning,
+  // zooming and dragging are left alone.
+  const nodesInitialized = useNodesInitialized()
+  const fittedRef = useRef(null)
+  useEffect(() => {
+    if (!nodesInitialized || !graph.nodes.length || fittedRef.current === graphLayoutKey) return
+    fittedRef.current = graphLayoutKey
+    let cancelled = false
+    // The cards are in the store but the browser has not laid them out yet, and
+    // fitting on unmeasured cards lands on the wrong bounds.
+    nextPaint().then(() => {
+      if (!cancelled) flow.fitView({ padding: 0.16, maxZoom: 1.12 })
+    })
+    return () => { cancelled = true }
+  }, [flow, graph.nodes.length, graphLayoutKey, nodesInitialized])
+
   const manualPositions = manualLayout.key === graphLayoutKey ? manualLayout.positions : EMPTY_POSITIONS
   // Bend points are laid out for where the layout put the cards. Once a card
   // has been dragged they describe a detour around nothing, so its edges switch
