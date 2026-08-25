@@ -613,6 +613,45 @@ describe('strict ELK routing', () => {
     expect(overrides.get(selfLoop.targetHandle)).toEqual({ position: 'right', offset: 72 })
   })
 
+  it('keeps a clear lane for every relationship name', () => {
+    // Names used to be dropped at the middle of their line, where the layout had
+    // not kept any room for them, so on a model with more than a few edges they
+    // landed on cards and on each other. ELK is given the box each name needs
+    // and hands back where it put it.
+    const boxes = elkLayoutStressGraph.edges
+      .filter((item) => item.data.label)
+      .map((item) => {
+        const point = item.data.labelPoint
+        expect(point, `${item.id} was drawn without a place for its name`).toBeDefined()
+        return {
+          id: item.id,
+          x: point.x - point.width / 2,
+          y: point.y - point.height / 2,
+          width: point.width,
+          height: point.height,
+        }
+      })
+    expect(boxes.length).toBeGreaterThanOrEqual(8)
+
+    const overlaps = (left, right) => (
+      Math.min(left.x + left.width, right.x + right.width) - Math.max(left.x, right.x) > 1
+      && Math.min(left.y + left.height, right.y + right.height) - Math.max(left.y, right.y) > 1
+    )
+    for (let left = 0; left < boxes.length; left++) {
+      for (let right = left + 1; right < boxes.length; right++) {
+        expect(
+          { pair: [boxes[left].id, boxes[right].id], overlapping: overlaps(boxes[left], boxes[right]) },
+        ).toEqual({ pair: [boxes[left].id, boxes[right].id], overlapping: false })
+      }
+      for (const node of elkLayoutStressGraph.nodes) {
+        const card = { x: node.position.x, y: node.position.y, width: NODE_WIDTH, height: NODE_HEIGHT }
+        expect(
+          { name: boxes[left].id, card: node.id, overlapping: overlaps(boxes[left], card) },
+        ).toEqual({ name: boxes[left].id, card: node.id, overlapping: false })
+      }
+    }
+  })
+
   it('sets the disconnected parts of a model down clear of each other, biggest first', () => {
     // Party's tree, Warehouse/Bin and Region/Zone share no edge, so ELK is left
     // to separate and arrange them. Nothing may land on top of anything else,

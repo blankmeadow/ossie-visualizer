@@ -71,6 +71,7 @@ function packComponents(layouts, options) {
   const packWidth = options.packWidth ?? Infinity
   const nodes = []
   const routes = new Map()
+  const labels = new Map()
   let cursorX = 0
   let cursorY = 0
   let rowHeight = 0
@@ -91,10 +92,13 @@ function packComponents(layouts, options) {
     for (const [id, route] of component.routes || []) {
       routes.set(id, route.map((point) => ({ x: point.x + shiftX, y: point.y + shiftY })))
     }
+    for (const [id, label] of component.labels || []) {
+      labels.set(id, { ...label, x: label.x + shiftX, y: label.y + shiftY })
+    }
     cursorX += component.width + options.componentGap
     rowHeight = Math.max(rowHeight, component.height)
   }
-  return { nodes, routes }
+  return { nodes, routes, labels }
 }
 
 function layoutComponent(nodes, edges, direction, options) {
@@ -230,6 +234,32 @@ function elkPortSides(item, direction) {
   return direction === 'TB' ? ['SOUTH', 'NORTH'] : ['EAST', 'WEST']
 }
 
+// The rendered edge label is a chip of monospace text: 10.5px on a 1.2 line
+// height, with 4px of padding either side and 2px above and below. Monospace is
+// what makes the box predictable enough to hand to a layout engine without
+// measuring it in the DOM; a full-width character takes a whole em.
+const LABEL_FONT_SIZE = 10.5
+const FULL_WIDTH = /[ᄀ-ᇿ⺀-鿿가-힯＀-｠￠-￦]/
+// A relationship name like `reports_collateral_to_settlement_member` is wider
+// than the card it hangs off, and a layout that keeps that much room clear for
+// every name spreads the model out until nothing is near anything. Past this
+// the chip is clipped with an ellipsis and the whole name is a hover away, so
+// what the layout reserves is what the canvas actually draws. Kept in sync with
+// `--edge-label-max-width`.
+export const LABEL_MAX_WIDTH = 134
+
+/** The box the canvas will draw an edge label in. */
+function labelSize(text) {
+  let width = 0
+  for (const character of text) {
+    width += FULL_WIDTH.test(character) ? LABEL_FONT_SIZE : LABEL_FONT_SIZE * 0.6
+  }
+  return {
+    width: Math.min(LABEL_MAX_WIDTH, Math.ceil(width) + 8),
+    height: Math.ceil(LABEL_FONT_SIZE * 1.2) + 4,
+  }
+}
+
 /**
  * The face of a card an ELK route attached to.
  *
@@ -309,6 +339,12 @@ function elkLayoutGraph(nodes, edges, direction, options, focus = null) {
       'elk.layered.spacing.nodeNodeBetweenLayers': String(options.ranksep),
       'elk.layered.nodePlacement.strategy': 'BRANDES_KOEPF',
       'elk.edgeRouting': 'ORTHOGONAL',
+      // Edge labels are placed by ELK, which reserves the room they need
+      // between the layers rather than dropping them on what is already there.
+      'elk.spacing.edgeLabel': '5',
+      'elk.spacing.labelLabel': '8',
+      'elk.spacing.labelNode': '10',
+      'elk.layered.edgeLabels.sideSelection': 'SMART_DOWN',
       // An ontology is usually several disconnected trees, and ELK both
       // separates and arranges them: componentComponent is the gap it leaves
       // between them, aspectRatio how wide it lets the arrangement run before
@@ -344,12 +380,18 @@ function elkLayoutGraph(nodes, edges, direction, options, focus = null) {
     })),
     edges: edges.map((item) => {
       const ports = edgePorts.get(item.id)
+      const text = item.data?.label || ''
       return {
         id: item.id,
         // Full layouts reverse inheritance; focused layouts reverse whichever
         // edges point toward the selected root. The drawn arrow is unchanged.
         sources: [edgeReversed.get(item.id) ? ports.targetPortId : ports.sourcePortId],
         targets: [edgeReversed.get(item.id) ? ports.sourcePortId : ports.targetPortId],
+        // A relationship name is drawn beside its edge whether or not the
+        // layout knows about it, and one the layout does not know about lands
+        // on whatever card or other name happens to be there. Handing the box
+        // over lets ELK keep a lane clear for it.
+        ...(text ? { labels: [{ id: `label:${item.id}`, text, ...labelSize(text) }] } : {}),
       }
     }),
   }
@@ -373,6 +415,18 @@ function elkLayoutGraph(nodes, edges, direction, options, focus = null) {
       const targetSide = elkAttachedSide(childById.get(graphEdge.target), route[route.length - 1], fallback[1])
       return [item.id, anchorRoute(route, REACT_FLOW_SIDE[sourceSide], REACT_FLOW_SIDE[targetSide])]
     }))
+    // Where ELK put each name, as the centre the canvas draws the chip around.
+    const labels = new Map()
+    for (const item of layoutedGraph.edges || []) {
+      const placed = item.labels?.[0]
+      if (!placed || !Number.isFinite(placed.x) || !Number.isFinite(placed.y)) continue
+      labels.set(item.id, {
+        x: placed.x + (placed.width || 0) / 2,
+        y: placed.y + (placed.height || 0) / 2,
+        width: placed.width || 0,
+        height: placed.height || 0,
+      })
+    }
     let minX = Infinity
     let minY = Infinity
     let maxX = -Infinity
@@ -398,9 +452,16 @@ function elkLayoutGraph(nodes, edges, direction, options, focus = null) {
         maxY = Math.max(maxY, point.y)
       }
     }
+    for (const label of labels.values()) {
+      minX = Math.min(minX, label.x - label.width / 2)
+      minY = Math.min(minY, label.y - label.height / 2)
+      maxX = Math.max(maxX, label.x + label.width / 2)
+      maxY = Math.max(maxY, label.y + label.height / 2)
+    }
     return {
       nodes: positioned,
       routes,
+      labels,
       width: Math.max(NODE_WIDTH, maxX - minX),
       height: Math.max(NODE_HEIGHT, maxY - minY),
       minX,
@@ -678,7 +739,7 @@ function anchoredRouteSide(node, point, fallback) {
  * edges on a side are fanned across it in the order of the cards they reach,
  * which at least keeps them from crossing on their way out.
  */
-function attachHandles(nodes, edges, direction, routes = new Map(), engine = 'dagre') {
+function attachHandles(nodes, edges, direction, routes = new Map(), engine = 'dagre', labels = new Map()) {
   const nodeById = new Map(nodes.map((item) => [item.id, item]))
   const strictElk = engine === 'elk'
 
@@ -782,6 +843,9 @@ function attachHandles(nodes, edges, direction, routes = new Map(), engine = 'da
         // sometimes fractionally different) coordinates.
         points: strictElk && route ? route : layoutBends(routes.get(item.id)),
         routeMode: strictElk && route ? 'elk-orthogonal' : undefined,
+        // The lane ELK kept clear for this name. Drawn there rather than at the
+        // middle of the line, which is where it would land on its neighbours.
+        labelPoint: strictElk ? labels.get(item.id) : undefined,
       },
     }
   })
@@ -841,7 +905,7 @@ function spreadLabels(edges) {
  * it worked out for each edge.
  */
 function graphResult(nodes, edges, direction, positioner = layout, engine = 'dagre', elkFocus = null) {
-  const attach = (laid) => attachHandles(laid.nodes, edges, direction, laid.routes, engine)
+  const attach = (laid) => attachHandles(laid.nodes, edges, direction, laid.routes, engine, laid.labels)
   if (engine === 'elk') return elkLayoutAll(nodes, edges, direction, {}, elkFocus).then(attach)
   return attach(positioner(nodes, edges, direction))
 }
