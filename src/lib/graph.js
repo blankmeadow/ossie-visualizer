@@ -213,11 +213,37 @@ function anchorRoute(route, sourceSide, targetSide) {
   return anchored
 }
 
-function elkPortSides(item, direction, layoutReversed = !!item?.data?.rankReversed) {
-  if (layoutReversed) {
+/**
+ * The faces an edge would use if nothing routed it.
+ *
+ * Only for an edge ELK handed back without a section. A routed edge reports the
+ * faces it actually attached to, which is the one answer that matches the cards
+ * where they ended up.
+ */
+function elkPortSides(item, direction) {
+  if (item?.data?.rankReversed) {
     return direction === 'TB' ? ['NORTH', 'SOUTH'] : ['WEST', 'EAST']
   }
   return direction === 'TB' ? ['SOUTH', 'NORTH'] : ['EAST', 'WEST']
+}
+
+/**
+ * The face of a card an ELK route attached to.
+ *
+ * ELK ends a section in the centre of a port, which sits exactly on the card
+ * border, so the face is whichever one the point lies on. Reading it back is
+ * what keeps a React Flow handle on the side ELK actually used, rather than the
+ * side we would have guessed for it before the cards were placed.
+ */
+function elkAttachedSide(child, point, fallback) {
+  if (!child || !point) return fallback
+  const gaps = {
+    NORTH: Math.abs(point.y - child.y),
+    SOUTH: Math.abs(point.y - (child.y + NODE_HEIGHT)),
+    WEST: Math.abs(point.x - child.x),
+    EAST: Math.abs(point.x - (child.x + NODE_WIDTH)),
+  }
+  return Object.keys(gaps).reduce((best, side) => (gaps[side] < gaps[best] ? side : best), 'NORTH')
 }
 
 /**
@@ -243,15 +269,14 @@ function elkLayoutComponent(nodes, edges, direction, options, focus = null) {
   const edgeReversed = new Map(edges.map((item) => [item.id, elkEdgeReversed(item, focus?.hops)]))
 
   // Build port lists per node from edges, so ELK knows how many connections
-  // each side of a node carries and can space them properly.
+  // each node carries and can space them properly.
   const portMap = new Map(nodes.map((item) => [item.id, []]))
   const edgePorts = new Map()
   for (const item of edges) {
     const sourcePortId = `source:${item.id}`
     const targetPortId = `target:${item.id}`
-    const [sourceSide, targetSide] = elkPortSides(item, direction, edgeReversed.get(item.id))
-    portMap.get(item.source)?.push({ id: sourcePortId, side: sourceSide })
-    portMap.get(item.target)?.push({ id: targetPortId, side: targetSide })
+    portMap.get(item.source)?.push(sourcePortId)
+    portMap.get(item.target)?.push(targetPortId)
     edgePorts.set(item.id, { sourcePortId, targetPortId })
   }
 
@@ -272,20 +297,18 @@ function elkLayoutComponent(nodes, edges, direction, options, focus = null) {
       // depend on the layout and rendered card using identical geometry.
       width: NODE_WIDTH,
       height: NODE_HEIGHT,
-      // Only the face is fixed. ELK remains free to order ports along it while
-      // minimizing crossings, because the UI has no pre-existing port order.
+      // Which face an edge leaves by follows from where ELK ends up putting the
+      // cards, which it only knows once it has laid them out. Fixing the sides
+      // beforehand made a back edge leave by the face pointing away from its
+      // other end, and ELK could then only route it the long way around the
+      // card. Left free, ELK attaches each edge to the face it routes towards.
       properties: {
-        'org.eclipse.elk.portConstraints': 'FIXED_SIDE',
+        'org.eclipse.elk.portConstraints': 'FREE',
         ...(item.id === focus?.rootId
           ? { 'org.eclipse.elk.layered.layering.layerConstraint': 'FIRST_SEPARATE' }
           : {}),
       },
-      ports: (portMap.get(item.id) || []).map((port) => ({
-        id: port.id,
-        properties: {
-          'org.eclipse.elk.port.side': port.side,
-        },
-      })),
+      ports: (portMap.get(item.id) || []).map((id) => ({ id })),
     })),
     edges: edges.map((item) => {
       const ports = edgePorts.get(item.id)
@@ -303,16 +326,20 @@ function elkLayoutComponent(nodes, edges, direction, options, focus = null) {
     // ELK is asked for orthogonal routing above, so it hands back the bends it
     // routed each edge through, in the same coordinates as the cards.
     const edgeById = new Map(edges.map((item) => [item.id, item]))
+    const childById = new Map((layoutedGraph.children || []).map((child) => [child.id, child]))
     const routes = new Map((layoutedGraph.edges || []).map((item) => {
       const section = item.sections?.[0]
       if (!section) return [item.id, []]
       const graphEdge = edgeById.get(item.id)
       const route = finitePoints([section.startPoint, ...(section.bendPoints || []), section.endPoint])
-      const layoutReversed = edgeReversed.get(item.id)
-      if (layoutReversed) route.reverse()
-      const [sourceSide, targetSide] = elkPortSides(graphEdge, direction, layoutReversed)
-        .map((side) => REACT_FLOW_SIDE[side])
-      return [item.id, anchorRoute(route, sourceSide, targetSide)]
+      // A reversed edge was laid out the other way round, so its section starts
+      // at the drawn arrow's target. Turning it back first means both ends are
+      // read against the card React Flow will draw them on.
+      if (edgeReversed.get(item.id)) route.reverse()
+      const fallback = elkPortSides(graphEdge, direction)
+      const sourceSide = elkAttachedSide(childById.get(graphEdge.source), route[0], fallback[0])
+      const targetSide = elkAttachedSide(childById.get(graphEdge.target), route[route.length - 1], fallback[1])
+      return [item.id, anchorRoute(route, REACT_FLOW_SIDE[sourceSide], REACT_FLOW_SIDE[targetSide])]
     }))
     let minX = Infinity
     let minY = Infinity

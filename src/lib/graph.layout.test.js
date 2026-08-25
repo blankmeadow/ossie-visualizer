@@ -563,6 +563,58 @@ describe('strict ELK routing', () => {
     expect(overrides.get(selfLoop.targetHandle)).toEqual({ position: 'right', offset: 72 })
   })
 
+  it('leaves each card by the face pointing at the other end, across full and focused layouts', async () => {
+    // Port sides used to be worked out before ELK placed the cards, from the
+    // rank an edge was given. A back edge in a cycle -- Customer -> Order,
+    // Product -> Supplier -- then left by the face pointing away from its own
+    // other end, and ELK, forbidden to move the port, could only route it the
+    // long way around the card. Sides now come from where ELK attached the
+    // route, so this sweep covers the layouts where that used to show.
+    const roots = layoutStressModel.concepts
+      .filter((item) => item.type !== 'ValueType')
+      .map((item) => item.concept)
+    const configs = [
+      { label: 'full', options: { showRelationships: true } },
+      ...roots.flatMap((selectedName) => [1, 2].map((depth) => ({
+        label: `focus ${selectedName} at depth ${depth}`,
+        options: { showRelationships: true, selectedName, depth },
+      }))),
+    ]
+
+    let checked = 0
+    for (const config of configs) {
+      const graph = await buildOntologyGraph(layoutStressModel, {
+        ...config.options,
+        layoutEngine: 'elk',
+      })
+      for (const item of endpoints(graph)) {
+        const edge = graph.edges.find((candidate) => candidate.id === item.id)
+        const points = edge.data.points || []
+        for (let index = 1; index < points.length; index++) {
+          const from = points[index - 1]
+          const to = points[index]
+          expect(
+            Math.abs(from.x - to.x) < 1e-6 || Math.abs(from.y - to.y) < 1e-6,
+            `${config.label}: ${item.id} bends off the orthogonal grid`,
+          ).toBe(true)
+        }
+        if (item.source.id === item.target.id) continue
+        if (item.source.position.y === item.target.position.y) continue
+        const downward = item.target.position.y > item.source.position.y
+        expect(
+          { sourceSide: item.sourceSide, targetSide: item.targetSide },
+          `${config.label}: ${item.id}`,
+        ).toEqual({
+          sourceSide: downward ? 'bottom' : 'top',
+          targetSide: downward ? 'top' : 'bottom',
+        })
+        checked += 1
+      }
+    }
+    // Guard against a change to the fixture quietly emptying the sweep.
+    expect(checked).toBeGreaterThanOrEqual(50)
+  })
+
   it('turns fallback handles toward the new relative position after a drag', () => {
     const relation = elkRoutingStressGraph.edges.find((item) => item.id === 'relation:person:car')
     const byStressId = new Map(elkRoutingStressGraph.nodes.map((item) => [item.id, item]))
