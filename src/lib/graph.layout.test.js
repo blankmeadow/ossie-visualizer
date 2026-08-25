@@ -652,6 +652,30 @@ describe('strict ELK routing', () => {
     }
   })
 
+  it('takes the room back when the names are not being drawn', async () => {
+    // Turning the names off is what a reader does to see the shape of a model.
+    // Holding their lanes open would leave that shape stretched around nothing.
+    const withoutNames = await buildOntologyGraph(layoutStressModel, {
+      showRelationships: true,
+      layoutEngine: 'elk',
+      showEdgeLabels: false,
+    })
+    expect(withoutNames.edges.some((item) => item.data.labelPoint)).toBe(false)
+
+    const spread = (graph) => {
+      const xs = graph.nodes.map((item) => item.position.x)
+      const ys = graph.nodes.map((item) => item.position.y)
+      return {
+        width: Math.max(...xs) - Math.min(...xs),
+        height: Math.max(...ys) - Math.min(...ys),
+      }
+    }
+    const named = spread(elkLayoutStressGraph)
+    const bare = spread(withoutNames)
+    expect(bare.height).toBeLessThan(named.height)
+    expect(bare.width).toBeLessThanOrEqual(named.width)
+  })
+
   it('sets the disconnected parts of a model down clear of each other, biggest first', () => {
     // Party's tree, Warehouse/Bin and Region/Zone share no edge, so ELK is left
     // to separate and arrange them. Nothing may land on top of anything else,

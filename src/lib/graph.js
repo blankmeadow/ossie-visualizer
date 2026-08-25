@@ -380,7 +380,7 @@ function elkLayoutGraph(nodes, edges, direction, options, focus = null) {
     })),
     edges: edges.map((item) => {
       const ports = edgePorts.get(item.id)
-      const text = item.data?.label || ''
+      const text = options.reserveLabels === false ? '' : item.data?.label || ''
       return {
         id: item.id,
         // Full layouts reverse inheritance; focused layouts reverse whichever
@@ -904,9 +904,9 @@ function spreadLabels(edges) {
  * A positioner hands back the cards it placed and, where it has one, the route
  * it worked out for each edge.
  */
-function graphResult(nodes, edges, direction, positioner = layout, engine = 'dagre', elkFocus = null) {
+function graphResult(nodes, edges, direction, positioner = layout, engine = 'dagre', elkFocus = null, overrides = {}) {
   const attach = (laid) => attachHandles(laid.nodes, edges, direction, laid.routes, engine, laid.labels)
-  if (engine === 'elk') return elkLayoutAll(nodes, edges, direction, {}, elkFocus).then(attach)
+  if (engine === 'elk') return elkLayoutAll(nodes, edges, direction, overrides, elkFocus).then(attach)
   return attach(positioner(nodes, edges, direction))
 }
 
@@ -1072,7 +1072,13 @@ export function buildOntologyGraph(model, options = {}) {
     ? (items) => layoutFocusedOntology(items, selectedName)
     : layout
   const elkFocus = focusActive ? { rootId: selectedName, hops: focusHops } : null
-  return graphResult(nodes, edges, 'TB', positioner, layoutEngine, elkFocus)
+  // Room is only kept clear for the relationship names while they are being
+  // drawn. Turning them off is what a reader does to see the shape of a model,
+  // and holding their lanes open would leave that shape stretched around
+  // nothing.
+  return graphResult(nodes, edges, 'TB', positioner, layoutEngine, elkFocus, {
+    reserveLabels: options.showEdgeLabels ?? true,
+  })
 }
 
 export function buildSemanticGraph(model, options = {}) {

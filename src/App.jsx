@@ -136,7 +136,7 @@ export default function App() {
     const opts = { layoutEngine }
     let result
     if (activeTab === 'ontology') {
-      result = buildOntologyGraph(model, { ...opts, showRelationships, selectedName: selectedGraphName, depth: focusDepth })
+      result = buildOntologyGraph(model, { ...opts, showRelationships, showEdgeLabels, selectedName: selectedGraphName, depth: focusDepth })
     } else if (activeTab === 'semantic') {
       result = buildSemanticGraph(model, { ...opts, showMetrics, selectedName: selectedGraphName, depth: focusDepth })
     } else if (activeTab === 'mapping') {
@@ -152,7 +152,7 @@ export default function App() {
       setGraph(result)
     }
     return () => { cancelled = true }
-  }, [model, activeTab, showRelationships, showMetrics, focusDepth, selectedGraphName, selectedMapping, layoutEngine])
+  }, [model, activeTab, showRelationships, showMetrics, showEdgeLabels, focusDepth, selectedGraphName, selectedMapping, layoutEngine])
 
   const handleImport = (text) => {
     const result = parseOssie(text)
