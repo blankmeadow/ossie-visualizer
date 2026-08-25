@@ -63,16 +63,20 @@ function connectedComponents(nodes, edges) {
  *
  * Everything a component produced -- its cards and the routes its edges take --
  * shifts by the same amount, so a route still lines up with the cards it was
- * threaded between.
+ * threaded between. ELK arranges its own components and hands back one layout,
+ * which leaves this with moving that layout onto the origin: no row to wrap, so
+ * no width to wrap it at.
  */
 function packComponents(layouts, options) {
+  const packWidth = options.packWidth ?? Infinity
   const nodes = []
   const routes = new Map()
+  const labels = new Map()
   let cursorX = 0
   let cursorY = 0
   let rowHeight = 0
   for (const component of layouts) {
-    if (cursorX > 0 && cursorX + component.width > options.packWidth) {
+    if (cursorX > 0 && cursorX + component.width > packWidth) {
       cursorX = 0
       cursorY += rowHeight + options.componentGap
       rowHeight = 0
@@ -88,10 +92,13 @@ function packComponents(layouts, options) {
     for (const [id, route] of component.routes || []) {
       routes.set(id, route.map((point) => ({ x: point.x + shiftX, y: point.y + shiftY })))
     }
+    for (const [id, label] of component.labels || []) {
+      labels.set(id, { ...label, x: label.x + shiftX, y: label.y + shiftY })
+    }
     cursorX += component.width + options.componentGap
     rowHeight = Math.max(rowHeight, component.height)
   }
-  return { nodes, routes }
+  return { nodes, routes, labels }
 }
 
 function layoutComponent(nodes, edges, direction, options) {
@@ -213,11 +220,63 @@ function anchorRoute(route, sourceSide, targetSide) {
   return anchored
 }
 
-function elkPortSides(item, direction, layoutReversed = !!item?.data?.rankReversed) {
-  if (layoutReversed) {
+/**
+ * The faces an edge would use if nothing routed it.
+ *
+ * Only for an edge ELK handed back without a section. A routed edge reports the
+ * faces it actually attached to, which is the one answer that matches the cards
+ * where they ended up.
+ */
+function elkPortSides(item, direction) {
+  if (item?.data?.rankReversed) {
     return direction === 'TB' ? ['NORTH', 'SOUTH'] : ['WEST', 'EAST']
   }
   return direction === 'TB' ? ['SOUTH', 'NORTH'] : ['EAST', 'WEST']
+}
+
+// The rendered edge label is a chip of monospace text: 10.5px on a 1.2 line
+// height, with 4px of padding either side and 2px above and below. Monospace is
+// what makes the box predictable enough to hand to a layout engine without
+// measuring it in the DOM; a full-width character takes a whole em.
+const LABEL_FONT_SIZE = 10.5
+const FULL_WIDTH = /[ᄀ-ᇿ⺀-鿿가-힯＀-｠￠-￦]/
+// A relationship name like `reports_collateral_to_settlement_member` is wider
+// than the card it hangs off, and a layout that keeps that much room clear for
+// every name spreads the model out until nothing is near anything. Past this
+// the chip is clipped with an ellipsis and the whole name is a hover away, so
+// what the layout reserves is what the canvas actually draws. Kept in sync with
+// `--edge-label-max-width`.
+export const LABEL_MAX_WIDTH = 134
+
+/** The box the canvas will draw an edge label in. */
+function labelSize(text) {
+  let width = 0
+  for (const character of text) {
+    width += FULL_WIDTH.test(character) ? LABEL_FONT_SIZE : LABEL_FONT_SIZE * 0.6
+  }
+  return {
+    width: Math.min(LABEL_MAX_WIDTH, Math.ceil(width) + 8),
+    height: Math.ceil(LABEL_FONT_SIZE * 1.2) + 4,
+  }
+}
+
+/**
+ * The face of a card an ELK route attached to.
+ *
+ * ELK ends a section in the centre of a port, which sits exactly on the card
+ * border, so the face is whichever one the point lies on. Reading it back is
+ * what keeps a React Flow handle on the side ELK actually used, rather than the
+ * side we would have guessed for it before the cards were placed.
+ */
+function elkAttachedSide(child, point, fallback) {
+  if (!child || !point) return fallback
+  const gaps = {
+    NORTH: Math.abs(point.y - child.y),
+    SOUTH: Math.abs(point.y - (child.y + NODE_HEIGHT)),
+    WEST: Math.abs(point.x - child.x),
+    EAST: Math.abs(point.x - (child.x + NODE_WIDTH)),
+  }
+  return Object.keys(gaps).reduce((best, side) => (gaps[side] < gaps[best] ? side : best), 'NORTH')
 }
 
 /**
@@ -238,21 +297,37 @@ function elkEdgeReversed(item, focusHops) {
   return sourceHop > targetHop
 }
 
-function elkLayoutComponent(nodes, edges, direction, options, focus = null) {
+function elkLayoutGraph(nodes, edges, direction, options, focus = null) {
   const elkDir = ELK_DIRECTION[direction] || 'DOWN'
   const edgeReversed = new Map(edges.map((item) => [item.id, elkEdgeReversed(item, focus?.hops)]))
 
   // Build port lists per node from edges, so ELK knows how many connections
-  // each side of a node carries and can space them properly.
+  // each node carries and can space them properly.
   const portMap = new Map(nodes.map((item) => [item.id, []]))
   const edgePorts = new Map()
   for (const item of edges) {
     const sourcePortId = `source:${item.id}`
     const targetPortId = `target:${item.id}`
-    const [sourceSide, targetSide] = elkPortSides(item, direction, edgeReversed.get(item.id))
-    portMap.get(item.source)?.push({ id: sourcePortId, side: sourceSide })
-    portMap.get(item.target)?.push({ id: targetPortId, side: targetSide })
+    portMap.get(item.source)?.push(sourcePortId)
+    portMap.get(item.target)?.push(targetPortId)
     edgePorts.set(item.id, { sourcePortId, targetPortId })
+  }
+
+  // ELK arranges the disconnected parts of a graph in the order it packs them,
+  // and priority is what it sorts them by. Sizing it by how many concepts a part
+  // holds keeps the main one where a reader already looks for it: first.
+  //
+  // Handing the cards over grouped by part matters as well: ELK breaks ties in
+  // layering and crossing reduction by the order it was given them, so a card
+  // arriving between two parts of the model reads as unrelated to both.
+  const componentPriority = new Map()
+  let ordered = nodes
+  if (!focus) {
+    const nodeById = new Map(nodes.map((item) => [item.id, item]))
+    ordered = connectedComponents(nodes, edges).flatMap((ids) => {
+      for (const id of ids) componentPriority.set(id, ids.length)
+      return ids.map((id) => nodeById.get(id))
+    })
   }
 
   const elkGraph = {
@@ -264,37 +339,59 @@ function elkLayoutComponent(nodes, edges, direction, options, focus = null) {
       'elk.layered.spacing.nodeNodeBetweenLayers': String(options.ranksep),
       'elk.layered.nodePlacement.strategy': 'BRANDES_KOEPF',
       'elk.edgeRouting': 'ORTHOGONAL',
-      ...(focus ? { 'elk.separateConnectedComponents': 'false' } : {}),
+      // Edge labels are placed by ELK, which reserves the room they need
+      // between the layers rather than dropping them on what is already there.
+      'elk.spacing.edgeLabel': '5',
+      'elk.spacing.labelLabel': '8',
+      'elk.spacing.labelNode': '10',
+      'elk.layered.edgeLabels.sideSelection': 'SMART_DOWN',
+      // An ontology is usually several disconnected trees, and ELK both
+      // separates and arranges them: componentComponent is the gap it leaves
+      // between them, aspectRatio how wide it lets the arrangement run before
+      // starting another row. A focused layout is one neighbourhood and is kept
+      // whole, so its root can hold the first layer on its own.
+      ...(focus ? { 'elk.separateConnectedComponents': 'false' } : {
+        'elk.separateConnectedComponents': 'true',
+        'elk.spacing.componentComponent': String(options.componentGap),
+        'elk.aspectRatio': String(options.aspectRatio),
+      }),
     },
-    children: nodes.map((item) => ({
+    children: ordered.map((item) => ({
       id: item.id,
       // BaseNode reads the same shared dimensions. Exact ELK route endpoints
       // depend on the layout and rendered card using identical geometry.
       width: NODE_WIDTH,
       height: NODE_HEIGHT,
-      // Only the face is fixed. ELK remains free to order ports along it while
-      // minimizing crossings, because the UI has no pre-existing port order.
+      // Which face an edge leaves by follows from where ELK ends up putting the
+      // cards, which it only knows once it has laid them out. Fixing the sides
+      // beforehand made a back edge leave by the face pointing away from its
+      // other end, and ELK could then only route it the long way around the
+      // card. Left free, ELK attaches each edge to the face it routes towards.
       properties: {
-        'org.eclipse.elk.portConstraints': 'FIXED_SIDE',
+        'org.eclipse.elk.portConstraints': 'FREE',
+        ...(componentPriority.has(item.id)
+          ? { 'org.eclipse.elk.priority': String(componentPriority.get(item.id)) }
+          : {}),
         ...(item.id === focus?.rootId
           ? { 'org.eclipse.elk.layered.layering.layerConstraint': 'FIRST_SEPARATE' }
           : {}),
       },
-      ports: (portMap.get(item.id) || []).map((port) => ({
-        id: port.id,
-        properties: {
-          'org.eclipse.elk.port.side': port.side,
-        },
-      })),
+      ports: (portMap.get(item.id) || []).map((id) => ({ id })),
     })),
     edges: edges.map((item) => {
       const ports = edgePorts.get(item.id)
+      const text = options.reserveLabels === false ? '' : item.data?.label || ''
       return {
         id: item.id,
         // Full layouts reverse inheritance; focused layouts reverse whichever
         // edges point toward the selected root. The drawn arrow is unchanged.
         sources: [edgeReversed.get(item.id) ? ports.targetPortId : ports.sourcePortId],
         targets: [edgeReversed.get(item.id) ? ports.sourcePortId : ports.targetPortId],
+        // A relationship name is drawn beside its edge whether or not the
+        // layout knows about it, and one the layout does not know about lands
+        // on whatever card or other name happens to be there. Handing the box
+        // over lets ELK keep a lane clear for it.
+        ...(text ? { labels: [{ id: `label:${item.id}`, text, ...labelSize(text) }] } : {}),
       }
     }),
   }
@@ -303,17 +400,33 @@ function elkLayoutComponent(nodes, edges, direction, options, focus = null) {
     // ELK is asked for orthogonal routing above, so it hands back the bends it
     // routed each edge through, in the same coordinates as the cards.
     const edgeById = new Map(edges.map((item) => [item.id, item]))
+    const childById = new Map((layoutedGraph.children || []).map((child) => [child.id, child]))
     const routes = new Map((layoutedGraph.edges || []).map((item) => {
       const section = item.sections?.[0]
       if (!section) return [item.id, []]
       const graphEdge = edgeById.get(item.id)
       const route = finitePoints([section.startPoint, ...(section.bendPoints || []), section.endPoint])
-      const layoutReversed = edgeReversed.get(item.id)
-      if (layoutReversed) route.reverse()
-      const [sourceSide, targetSide] = elkPortSides(graphEdge, direction, layoutReversed)
-        .map((side) => REACT_FLOW_SIDE[side])
-      return [item.id, anchorRoute(route, sourceSide, targetSide)]
+      // A reversed edge was laid out the other way round, so its section starts
+      // at the drawn arrow's target. Turning it back first means both ends are
+      // read against the card React Flow will draw them on.
+      if (edgeReversed.get(item.id)) route.reverse()
+      const fallback = elkPortSides(graphEdge, direction)
+      const sourceSide = elkAttachedSide(childById.get(graphEdge.source), route[0], fallback[0])
+      const targetSide = elkAttachedSide(childById.get(graphEdge.target), route[route.length - 1], fallback[1])
+      return [item.id, anchorRoute(route, REACT_FLOW_SIDE[sourceSide], REACT_FLOW_SIDE[targetSide])]
     }))
+    // Where ELK put each name, as the centre the canvas draws the chip around.
+    const labels = new Map()
+    for (const item of layoutedGraph.edges || []) {
+      const placed = item.labels?.[0]
+      if (!placed || !Number.isFinite(placed.x) || !Number.isFinite(placed.y)) continue
+      labels.set(item.id, {
+        x: placed.x + (placed.width || 0) / 2,
+        y: placed.y + (placed.height || 0) / 2,
+        width: placed.width || 0,
+        height: placed.height || 0,
+      })
+    }
     let minX = Infinity
     let minY = Infinity
     let maxX = -Infinity
@@ -339,9 +452,16 @@ function elkLayoutComponent(nodes, edges, direction, options, focus = null) {
         maxY = Math.max(maxY, point.y)
       }
     }
+    for (const label of labels.values()) {
+      minX = Math.min(minX, label.x - label.width / 2)
+      minY = Math.min(minY, label.y - label.height / 2)
+      maxX = Math.max(maxX, label.x + label.width / 2)
+      maxY = Math.max(maxY, label.y + label.height / 2)
+    }
     return {
       nodes: positioned,
       routes,
+      labels,
       width: Math.max(NODE_WIDTH, maxX - minX),
       height: Math.max(NODE_HEIGHT, maxY - minY),
       minX,
@@ -356,26 +476,17 @@ async function elkLayoutAll(nodes, edges, direction = 'LR', overrides = {}, focu
     ranksep: direction === 'TB' ? 72 : 92,
     nodesep: direction === 'TB' ? 34 : 32,
     componentGap: 64,
-    packWidth: direction === 'TB' ? 1780 : 1960,
+    // How wide ELK lets the parts of a model run before it starts another row,
+    // as a ratio of the arrangement's width to its height.
+    aspectRatio: 2.2,
     ...overrides,
   }
-  if (focus) {
-    const focused = await elkLayoutComponent(nodes, edges, direction, options, focus)
-    return packComponents([focused], options)
-  }
-  const nodeById = new Map(nodes.map((item) => [item.id, item]))
-  const components = connectedComponents(nodes, edges)
-  const layouts = await Promise.all(components.map((ids) => {
-    const idSet = new Set(ids)
-    return elkLayoutComponent(
-      ids.map((id) => nodeById.get(id)),
-      edges.filter((item) => idSet.has(item.source) && idSet.has(item.target)),
-      direction,
-      options,
-    )
-  }))
-
-  return packComponents(layouts, options)
+  // The whole graph goes over in one call, disconnected parts included: ELK
+  // separates them and arranges the results itself, which is the same work this
+  // module used to do around N calls. Packing here is left with the one thing
+  // ELK does not do, moving the result onto the origin.
+  const laid = await elkLayoutGraph(nodes, edges, direction, options, focus)
+  return packComponents([laid], options)
 }
 
 // ─── Shared ──────────────────────────────────────────────────────────────────
@@ -628,7 +739,7 @@ function anchoredRouteSide(node, point, fallback) {
  * edges on a side are fanned across it in the order of the cards they reach,
  * which at least keeps them from crossing on their way out.
  */
-function attachHandles(nodes, edges, direction, routes = new Map(), engine = 'dagre') {
+function attachHandles(nodes, edges, direction, routes = new Map(), engine = 'dagre', labels = new Map()) {
   const nodeById = new Map(nodes.map((item) => [item.id, item]))
   const strictElk = engine === 'elk'
 
@@ -732,6 +843,9 @@ function attachHandles(nodes, edges, direction, routes = new Map(), engine = 'da
         // sometimes fractionally different) coordinates.
         points: strictElk && route ? route : layoutBends(routes.get(item.id)),
         routeMode: strictElk && route ? 'elk-orthogonal' : undefined,
+        // The lane ELK kept clear for this name. Drawn there rather than at the
+        // middle of the line, which is where it would land on its neighbours.
+        labelPoint: strictElk ? labels.get(item.id) : undefined,
       },
     }
   })
@@ -790,9 +904,21 @@ function spreadLabels(edges) {
  * A positioner hands back the cards it placed and, where it has one, the route
  * it worked out for each edge.
  */
-function graphResult(nodes, edges, direction, positioner = layout, engine = 'dagre', elkFocus = null) {
-  const attach = (laid) => attachHandles(laid.nodes, edges, direction, laid.routes, engine)
-  if (engine === 'elk') return elkLayoutAll(nodes, edges, direction, {}, elkFocus).then(attach)
+/**
+ * What a canvas' own settings ask of the layout engine.
+ *
+ * Room is only kept clear for the edge labels while they are being drawn.
+ * Turning them off is what a reader does to see the shape of a model, and
+ * holding their lanes open would leave that shape stretched around nothing. It
+ * belongs to every canvas that draws labels, so every builder passes it on.
+ */
+function layoutOverrides(options) {
+  return { reserveLabels: options.showEdgeLabels ?? true }
+}
+
+function graphResult(nodes, edges, direction, positioner = layout, engine = 'dagre', elkFocus = null, overrides = {}) {
+  const attach = (laid) => attachHandles(laid.nodes, edges, direction, laid.routes, engine, laid.labels)
+  if (engine === 'elk') return elkLayoutAll(nodes, edges, direction, overrides, elkFocus).then(attach)
   return attach(positioner(nodes, edges, direction))
 }
 
@@ -958,7 +1084,7 @@ export function buildOntologyGraph(model, options = {}) {
     ? (items) => layoutFocusedOntology(items, selectedName)
     : layout
   const elkFocus = focusActive ? { rootId: selectedName, hops: focusHops } : null
-  return graphResult(nodes, edges, 'TB', positioner, layoutEngine, elkFocus)
+  return graphResult(nodes, edges, 'TB', positioner, layoutEngine, elkFocus, layoutOverrides(options))
 }
 
 export function buildSemanticGraph(model, options = {}) {
@@ -1011,7 +1137,9 @@ export function buildSemanticGraph(model, options = {}) {
     }
   }
 
-  if (!selectedName || depth === 0) return graphResult(nodes, edges, 'TB', layout, layoutEngine)
+  if (!selectedName || depth === 0) {
+    return graphResult(nodes, edges, 'TB', layout, layoutEngine, null, layoutOverrides(options))
+  }
   const adjacency = new Map(nodes.map((item) => [item.id, new Set()]))
   edges.forEach((item) => {
     adjacency.get(item.source)?.add(item.target)
@@ -1031,7 +1159,7 @@ export function buildSemanticGraph(model, options = {}) {
   }
   const filteredNodes = nodes.filter((item) => visible.has(item.id))
   const filteredEdges = edges.filter((item) => visible.has(item.source) && visible.has(item.target))
-  return graphResult(filteredNodes, filteredEdges, 'TB', layout, layoutEngine)
+  return graphResult(filteredNodes, filteredEdges, 'TB', layout, layoutEngine, null, layoutOverrides(options))
 }
 
 function layoutMapping(nodes) {
@@ -1108,10 +1236,9 @@ export function buildMappingGraph(model, conceptMapping, options = {}) {
       ),
     )
   }
-  if (layoutEngine === 'elk') {
-    return elkLayoutAll(nodes, edges, 'LR').then((laid) => attachHandles(laid.nodes, edges, 'LR', laid.routes, 'elk'))
-  }
   // The mapping canvas is three fixed columns, placed by hand; nothing routes
-  // its edges, and with that little on screen nothing needs to.
-  return attachHandles(layoutMapping(nodes), edges, 'LR')
+  // its edges, and with that little on screen nothing needs to. ELK lays the
+  // same canvas out itself when it is the chosen engine.
+  const columns = (items) => ({ nodes: layoutMapping(items), routes: new Map() })
+  return graphResult(nodes, edges, 'LR', columns, layoutEngine, null, layoutOverrides(options))
 }

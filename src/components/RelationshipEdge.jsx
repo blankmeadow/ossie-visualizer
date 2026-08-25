@@ -113,9 +113,15 @@ export default function RelationshipEdge({
   // Two edges joining the same pair of cards are told to take opposite sides.
   const isVertical = Math.abs(targetY - sourceY) > Math.abs(targetX - sourceX)
   const side = data?.labelSide || 0
-  const labelTransform = isVertical
-    ? `translate(${labelX}px, ${labelY}px) translate(${side > 0 ? 'calc(-100% - 12px)' : '12px'}, -50%)`
-    : `translate(${labelX}px, ${labelY}px) translate(-50%, ${side > 0 ? '5px' : 'calc(-100% - 5px)'})`
+  // A route the engine laid out comes with the spot it kept clear for the name,
+  // which is the one place on the canvas known to be free of cards and of other
+  // names. Only an edge nothing routed falls back to a point along its line.
+  const placed = staticElkRoute ? data?.labelPoint : null
+  const labelTransform = placed
+    ? `translate(${placed.x}px, ${placed.y}px) translate(-50%, -50%)`
+    : isVertical
+      ? `translate(${labelX}px, ${labelY}px) translate(${side > 0 ? 'calc(-100% - 12px)' : '12px'}, -50%)`
+      : `translate(${labelX}px, ${labelY}px) translate(-50%, ${side > 0 ? '5px' : 'calc(-100% - 5px)'})`
 
   const activeStyle = selected ? {
     ...style,
@@ -139,6 +145,9 @@ export default function RelationshipEdge({
           <button
             type="button"
             className={`edge-label-text nodrag nopan ${isVertical ? 'is-vertical' : ''} ${selected ? 'is-active' : ''} ${data?.dimmed ? 'is-dimmed' : ''}`}
+            // A name too long for the room the layout kept clear is clipped, so
+            // the whole one has to be readable some other way.
+            title={label}
             style={{
               transform: labelTransform,
             }}

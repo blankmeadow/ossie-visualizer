@@ -146,6 +146,56 @@ if (layoutStressDocument.errors.length) {
   throw new Error(`Invalid layout stress fixture: ${JSON.stringify(layoutStressDocument.errors)}`)
 }
 const layoutStressModel = normalizeOssie(layoutStressDocument.document)
+const elkLayoutStressGraph = await buildOntologyGraph(layoutStressModel, {
+  showRelationships: true,
+  layoutEngine: 'elk',
+})
+
+/** The groups of cards with nothing joining one group to the next. */
+function disconnectedParts(graph) {
+  const adjacency = new Map(graph.nodes.map((item) => [item.id, new Set()]))
+  for (const item of graph.edges) {
+    adjacency.get(item.source)?.add(item.target)
+    adjacency.get(item.target)?.add(item.source)
+  }
+  const seen = new Set()
+  const parts = []
+  for (const item of graph.nodes) {
+    if (seen.has(item.id)) continue
+    const ids = [item.id]
+    seen.add(item.id)
+    for (let index = 0; index < ids.length; index++) {
+      for (const neighbor of adjacency.get(ids[index]) || []) {
+        if (seen.has(neighbor)) continue
+        seen.add(neighbor)
+        ids.push(neighbor)
+      }
+    }
+    parts.push(ids)
+  }
+  return parts
+}
+
+/** What a group of cards takes up on the canvas, routes included. */
+function partBounds(graph, ids) {
+  const held = new Set(ids)
+  const byId = new Map(graph.nodes.map((item) => [item.id, item]))
+  const points = [
+    ...ids.flatMap((id) => {
+      const { x, y } = byId.get(id).position
+      return [{ x, y }, { x: x + NODE_WIDTH, y: y + NODE_HEIGHT }]
+    }),
+    ...graph.edges
+      .filter((item) => held.has(item.source))
+      .flatMap((item) => item.data.points || []),
+  ]
+  return {
+    minX: Math.min(...points.map((point) => point.x)),
+    minY: Math.min(...points.map((point) => point.y)),
+    maxX: Math.max(...points.map((point) => point.x)),
+    maxY: Math.max(...points.map((point) => point.y)),
+  }
+}
 
 describe('graph layout conventions', () => {
   const ontology = ontologyGraph
@@ -561,6 +611,173 @@ describe('strict ELK routing', () => {
     )
     expect(overrides.get(selfLoop.sourceHandle)).toEqual({ position: 'right', offset: 34 })
     expect(overrides.get(selfLoop.targetHandle)).toEqual({ position: 'right', offset: 72 })
+  })
+
+  it('keeps a clear lane for every relationship name', () => {
+    // Names used to be dropped at the middle of their line, where the layout had
+    // not kept any room for them, so on a model with more than a few edges they
+    // landed on cards and on each other. ELK is given the box each name needs
+    // and hands back where it put it.
+    const boxes = elkLayoutStressGraph.edges
+      .filter((item) => item.data.label)
+      .map((item) => {
+        const point = item.data.labelPoint
+        expect(point, `${item.id} was drawn without a place for its name`).toBeDefined()
+        return {
+          id: item.id,
+          x: point.x - point.width / 2,
+          y: point.y - point.height / 2,
+          width: point.width,
+          height: point.height,
+        }
+      })
+    expect(boxes.length).toBeGreaterThanOrEqual(8)
+
+    const overlaps = (left, right) => (
+      Math.min(left.x + left.width, right.x + right.width) - Math.max(left.x, right.x) > 1
+      && Math.min(left.y + left.height, right.y + right.height) - Math.max(left.y, right.y) > 1
+    )
+    for (let left = 0; left < boxes.length; left++) {
+      for (let right = left + 1; right < boxes.length; right++) {
+        expect(
+          { pair: [boxes[left].id, boxes[right].id], overlapping: overlaps(boxes[left], boxes[right]) },
+        ).toEqual({ pair: [boxes[left].id, boxes[right].id], overlapping: false })
+      }
+      for (const node of elkLayoutStressGraph.nodes) {
+        const card = { x: node.position.x, y: node.position.y, width: NODE_WIDTH, height: NODE_HEIGHT }
+        expect(
+          { name: boxes[left].id, card: node.id, overlapping: overlaps(boxes[left], card) },
+        ).toEqual({ name: boxes[left].id, card: node.id, overlapping: false })
+      }
+    }
+  })
+
+  it('takes the room back when the names are not being drawn', async () => {
+    // Turning the names off is what a reader does to see the shape of a model.
+    // Holding their lanes open would leave that shape stretched around nothing.
+    const withoutNames = await buildOntologyGraph(layoutStressModel, {
+      showRelationships: true,
+      layoutEngine: 'elk',
+      showEdgeLabels: false,
+    })
+    expect(withoutNames.edges.some((item) => item.data.labelPoint)).toBe(false)
+
+    const spread = (graph) => {
+      const xs = graph.nodes.map((item) => item.position.x)
+      const ys = graph.nodes.map((item) => item.position.y)
+      return {
+        width: Math.max(...xs) - Math.min(...xs),
+        height: Math.max(...ys) - Math.min(...ys),
+      }
+    }
+    const named = spread(elkLayoutStressGraph)
+    const bare = spread(withoutNames)
+    expect(bare.height).toBeLessThan(named.height)
+    expect(bare.width).toBeLessThanOrEqual(named.width)
+  })
+
+  it('takes the room back on every canvas that draws names, not just the ontology', async () => {
+    // The setting belongs to the reader, not to one tab: a semantic or mapping
+    // canvas holding lanes open for names nobody asked to see is the same shape
+    // stretched around nothing.
+    const canvases = [
+      ['semantic', (options) => buildSemanticGraph(model, options)],
+      ['mapping', (options) => buildMappingGraph(model, model.conceptMappings[0], options)],
+      ['focused semantic', (options) => buildSemanticGraph(model, {
+        ...options,
+        selectedName: 'customers',
+        depth: 1,
+      })],
+    ]
+    for (const [name, build] of canvases) {
+      const withNames = await build({ layoutEngine: 'elk' })
+      const withoutNames = await build({ layoutEngine: 'elk', showEdgeLabels: false })
+      expect(withNames.edges.length, `${name} drew no edges`).toBeGreaterThan(0)
+      expect(
+        { canvas: name, placed: withoutNames.edges.some((item) => item.data.labelPoint) },
+      ).toEqual({ canvas: name, placed: false })
+    }
+  })
+
+  it('sets the disconnected parts of a model down clear of each other, biggest first', () => {
+    // Party's tree, Warehouse/Bin and Region/Zone share no edge, so ELK is left
+    // to separate and arrange them. Nothing may land on top of anything else,
+    // and the part the reader came for stays the one they meet first.
+    const parts = disconnectedParts(elkLayoutStressGraph)
+      .sort((left, right) => right.length - left.length)
+    expect(parts).toHaveLength(3)
+
+    const bounds = parts.map((ids) => partBounds(elkLayoutStressGraph, ids))
+    for (const box of bounds) {
+      expect(box.minX).toBeGreaterThanOrEqual(-1)
+      expect(box.minY).toBeGreaterThanOrEqual(-1)
+    }
+    for (let left = 0; left < bounds.length; left++) {
+      for (let right = left + 1; right < bounds.length; right++) {
+        const overlapX = Math.min(bounds[left].maxX, bounds[right].maxX)
+          - Math.max(bounds[left].minX, bounds[right].minX)
+        const overlapY = Math.min(bounds[left].maxY, bounds[right].maxY)
+          - Math.max(bounds[left].minY, bounds[right].minY)
+        expect(
+          { parts: [parts[left][0], parts[right][0]], overlapping: overlapX > 1 && overlapY > 1 },
+        ).toEqual({ parts: [parts[left][0], parts[right][0]], overlapping: false })
+      }
+    }
+    for (const box of bounds.slice(1)) {
+      expect(bounds[0].minX).toBeLessThanOrEqual(box.minX)
+    }
+  })
+
+  it('leaves each card by the face pointing at the other end, across full and focused layouts', async () => {
+    // Port sides used to be worked out before ELK placed the cards, from the
+    // rank an edge was given. A back edge in a cycle -- Customer -> Order,
+    // Product -> Supplier -- then left by the face pointing away from its own
+    // other end, and ELK, forbidden to move the port, could only route it the
+    // long way around the card. Sides now come from where ELK attached the
+    // route, so this sweep covers the layouts where that used to show.
+    const roots = layoutStressModel.concepts
+      .filter((item) => item.type !== 'ValueType')
+      .map((item) => item.concept)
+    const configs = [
+      { label: 'full', options: { showRelationships: true } },
+      ...roots.flatMap((selectedName) => [1, 2].map((depth) => ({
+        label: `focus ${selectedName} at depth ${depth}`,
+        options: { showRelationships: true, selectedName, depth },
+      }))),
+    ]
+
+    let checked = 0
+    for (const config of configs) {
+      const graph = await buildOntologyGraph(layoutStressModel, {
+        ...config.options,
+        layoutEngine: 'elk',
+      })
+      for (const item of endpoints(graph)) {
+        const edge = graph.edges.find((candidate) => candidate.id === item.id)
+        const points = edge.data.points || []
+        for (let index = 1; index < points.length; index++) {
+          const from = points[index - 1]
+          const to = points[index]
+          expect(
+            Math.abs(from.x - to.x) < 1e-6 || Math.abs(from.y - to.y) < 1e-6,
+            `${config.label}: ${item.id} bends off the orthogonal grid`,
+          ).toBe(true)
+        }
+        if (item.source.id === item.target.id) continue
+        if (item.source.position.y === item.target.position.y) continue
+        const downward = item.target.position.y > item.source.position.y
+        expect(
+          { sourceSide: item.sourceSide, targetSide: item.targetSide },
+          `${config.label}: ${item.id}`,
+        ).toEqual({
+          sourceSide: downward ? 'bottom' : 'top',
+          targetSide: downward ? 'top' : 'bottom',
+        })
+        checked += 1
+      }
+    }
+    // Guard against a change to the fixture quietly emptying the sweep.
+    expect(checked).toBeGreaterThanOrEqual(50)
   })
 
   it('turns fallback handles toward the new relative position after a drag', () => {

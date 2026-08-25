@@ -79,7 +79,11 @@ export default function App() {
   const [showRelationships, setShowRelationships] = useState(true)
   const [showMetrics, setShowMetrics] = useState(false)
   const [showMiniMap, setShowMiniMap] = useState(true)
-  const [showEdgeLabels, setShowEdgeLabels] = useState(true)
+  // A canvas opens on the shape of a model: which concepts there are and what
+  // links them. Keeping room clear for every relationship name spreads a large
+  // model out until the concept names themselves stop being readable at the
+  // zoom that fits it, so the names come on when a reader asks for them.
+  const [showEdgeLabels, setShowEdgeLabels] = useState(false)
   const [layoutEngine, setLayoutEngine] = useState('elk')
   const [focusDepth, setFocusDepth] = useState(0)
   const [sidebarKind, setSidebarKind] = useState('all')
@@ -133,7 +137,7 @@ export default function App() {
   useEffect(() => {
     if (!model) { setGraph({ nodes: [], edges: [] }); return }
     let cancelled = false
-    const opts = { layoutEngine }
+    const opts = { layoutEngine, showEdgeLabels }
     let result
     if (activeTab === 'ontology') {
       result = buildOntologyGraph(model, { ...opts, showRelationships, selectedName: selectedGraphName, depth: focusDepth })
@@ -152,7 +156,7 @@ export default function App() {
       setGraph(result)
     }
     return () => { cancelled = true }
-  }, [model, activeTab, showRelationships, showMetrics, focusDepth, selectedGraphName, selectedMapping, layoutEngine])
+  }, [model, activeTab, showRelationships, showMetrics, showEdgeLabels, focusDepth, selectedGraphName, selectedMapping, layoutEngine])
 
   const handleImport = (text) => {
     const result = parseOssie(text)

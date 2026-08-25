@@ -9,6 +9,7 @@ import {
   Panel,
   ReactFlow,
   ReactFlowProvider,
+  useNodesInitialized,
   useReactFlow,
   useStore,
 } from '@xyflow/react'
@@ -34,6 +35,9 @@ const MINIMAP_WIDTH = 160
 const MINIMAP_HEIGHT = 100
 const EMPTY_POSITIONS = Object.freeze({})
 const EMPTY_SIZES = Object.freeze({})
+// How far the canvas is allowed to zoom out, shared by React Flow's own limit
+// and the framing that has to stay inside it.
+const MIN_CANVAS_ZOOM = 0.08
 const selectZoom = (state) => state.transform[2]
 
 // Fallbacks match the light-theme values in styles/tokens.css; the live values
@@ -60,7 +64,7 @@ function edgeMatchesSelection(edge, selection) {
   return selection.kind === 'relationship' && edge.data?.relationPaths?.includes(selection.name)
 }
 
-function frameNodes(flow, canvasRef, items, inspectorWidth, duration = 340) {
+function frameNodes(flow, canvasRef, items, inspectorWidth, duration = 340, minimumZoom = null) {
   const canvas = canvasRef.current?.getBoundingClientRect()
   if (!canvas || !items.length) return false
 
@@ -77,11 +81,11 @@ function frameNodes(flow, canvasRef, items, inspectorWidth, duration = 340) {
   const availableWidth = Math.max(260, canvas.width - inspectorReserve - 72)
   const availableHeight = Math.max(220, canvas.height - 96)
   const fitZoom = Math.min(1.06, availableWidth / boundsWidth, availableHeight / boundsHeight)
-  // A mathematically complete fit can make metadata unreadable on a dense
-  // ontology. Keep the initial overview legible (the toolbar still offers a
-  // true fit-to-screen action) and bring a focused node close to native size.
-  const minimumReadableZoom = items.length === 1 ? 0.92 : 0.56
-  const zoom = Math.max(minimumReadableZoom, fitZoom)
+  // Framing a selection brings it close to native size rather than fitting it
+  // exactly, since a card or a pair of them would otherwise fill the screen.
+  // A whole arrangement is shown whole: it is what the reader just opened, and
+  // a floor under the zoom would leave part of it off the canvas.
+  const zoom = Math.max(minimumZoom ?? (items.length === 1 ? 0.92 : 0.56), fitZoom)
   const contentCenterX = minX + boundsWidth / 2
   const contentCenterY = minY + boundsHeight / 2
 
@@ -467,13 +471,33 @@ function InnerGraphCanvas(props) {
   )
   graphNodesRef.current = nodes
 
+  // The one place the viewport is set for a graph the reader did not move
+  // themselves. React Flow's own `fitView` prop only fits the first graph it is
+  // handed, so every arrangement after it -- a second document, another tab,
+  // the edge labels going on or off, a focus drawn somewhere else -- is framed
+  // here instead, once, and shown whole. A drag moves cards without relaying
+  // the graph out, and selecting a card in whole-graph mode produces the same
+  // positions again, so neither disturbs the viewport.
+  const nodesInitialized = useNodesInitialized()
+  const framedRef = useRef(null)
+  const frameKey = `${graphLayoutKey}::${activeInspectorWidth}`
   useEffect(() => {
-    if (!graphNodesRef.current.length) return undefined
-    const timeout = window.setTimeout(() => {
-      frameNodes(flow, canvasRef, graphNodesRef.current, activeInspectorWidth)
-    }, 60)
-    return () => window.clearTimeout(timeout)
-  }, [activeInspectorWidth, canvasRef, flow, graphLayoutKey])
+    if (!nodesInitialized || !graphNodesRef.current.length) return undefined
+    if (framedRef.current === frameKey) return undefined
+    let cancelled = false
+    // The cards are in the store but the browser has not laid them out yet, and
+    // framing on unmeasured cards lands on the wrong bounds. The arrangement
+    // counts as framed once it actually has been: recording it up front loses
+    // the framing entirely when a re-render cancels the one in flight.
+    nextPaint().then(() => {
+      if (cancelled) return
+      const framed = frameNodes(
+        flow, canvasRef, graphNodesRef.current, activeInspectorWidth, 340, MIN_CANVAS_ZOOM,
+      )
+      if (framed) framedRef.current = frameKey
+    })
+    return () => { cancelled = true }
+  }, [activeInspectorWidth, canvasRef, flow, frameKey, nodesInitialized])
 
   const selectedNode = nodes.find((item) => item.id === selectedNodeId)
   selectedNodeFrameRef.current = selectedNode || null
@@ -588,14 +612,15 @@ function InnerGraphCanvas(props) {
       nodesConnectable={false}
       elementsSelectable
       edgesFocusable
-      minZoom={0.08}
+      minZoom={MIN_CANVAS_ZOOM}
       maxZoom={2.2}
       // Double click belongs to the node under the cursor: it opens the detail
       // panel. Left on, the canvas' own double-click zoom swallows the event
       // before React sees it, and jumps the viewport a whole step as well.
       zoomOnDoubleClick={false}
-      fitView
-      fitViewOptions={{ padding: 0.16, maxZoom: 1.12 }}
+      // No `fitView` prop: it frames the first graph on its own terms, ignoring
+      // the inspector and racing the framing effect above, which covers that
+      // first graph and every arrangement after it.
       proOptions={{ hideAttribution: true }}
       onNodesChange={handleNodesChange}
       onNodeClick={(_, item) => onSelect(item.data?.selection)}
