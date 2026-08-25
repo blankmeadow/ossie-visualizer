@@ -63,16 +63,19 @@ function connectedComponents(nodes, edges) {
  *
  * Everything a component produced -- its cards and the routes its edges take --
  * shifts by the same amount, so a route still lines up with the cards it was
- * threaded between.
+ * threaded between. ELK arranges its own components and hands back one layout,
+ * which leaves this with moving that layout onto the origin: no row to wrap, so
+ * no width to wrap it at.
  */
 function packComponents(layouts, options) {
+  const packWidth = options.packWidth ?? Infinity
   const nodes = []
   const routes = new Map()
   let cursorX = 0
   let cursorY = 0
   let rowHeight = 0
   for (const component of layouts) {
-    if (cursorX > 0 && cursorX + component.width > options.packWidth) {
+    if (cursorX > 0 && cursorX + component.width > packWidth) {
       cursorX = 0
       cursorY += rowHeight + options.componentGap
       rowHeight = 0
@@ -264,7 +267,7 @@ function elkEdgeReversed(item, focusHops) {
   return sourceHop > targetHop
 }
 
-function elkLayoutComponent(nodes, edges, direction, options, focus = null) {
+function elkLayoutGraph(nodes, edges, direction, options, focus = null) {
   const elkDir = ELK_DIRECTION[direction] || 'DOWN'
   const edgeReversed = new Map(edges.map((item) => [item.id, elkEdgeReversed(item, focus?.hops)]))
 
@@ -280,6 +283,23 @@ function elkLayoutComponent(nodes, edges, direction, options, focus = null) {
     edgePorts.set(item.id, { sourcePortId, targetPortId })
   }
 
+  // ELK arranges the disconnected parts of a graph in the order it packs them,
+  // and priority is what it sorts them by. Sizing it by how many concepts a part
+  // holds keeps the main one where a reader already looks for it: first.
+  //
+  // Handing the cards over grouped by part matters as well: ELK breaks ties in
+  // layering and crossing reduction by the order it was given them, so a card
+  // arriving between two parts of the model reads as unrelated to both.
+  const componentPriority = new Map()
+  let ordered = nodes
+  if (!focus) {
+    const nodeById = new Map(nodes.map((item) => [item.id, item]))
+    ordered = connectedComponents(nodes, edges).flatMap((ids) => {
+      for (const id of ids) componentPriority.set(id, ids.length)
+      return ids.map((id) => nodeById.get(id))
+    })
+  }
+
   const elkGraph = {
     id: 'root',
     layoutOptions: {
@@ -289,9 +309,18 @@ function elkLayoutComponent(nodes, edges, direction, options, focus = null) {
       'elk.layered.spacing.nodeNodeBetweenLayers': String(options.ranksep),
       'elk.layered.nodePlacement.strategy': 'BRANDES_KOEPF',
       'elk.edgeRouting': 'ORTHOGONAL',
-      ...(focus ? { 'elk.separateConnectedComponents': 'false' } : {}),
+      // An ontology is usually several disconnected trees, and ELK both
+      // separates and arranges them: componentComponent is the gap it leaves
+      // between them, aspectRatio how wide it lets the arrangement run before
+      // starting another row. A focused layout is one neighbourhood and is kept
+      // whole, so its root can hold the first layer on its own.
+      ...(focus ? { 'elk.separateConnectedComponents': 'false' } : {
+        'elk.separateConnectedComponents': 'true',
+        'elk.spacing.componentComponent': String(options.componentGap),
+        'elk.aspectRatio': String(options.aspectRatio),
+      }),
     },
-    children: nodes.map((item) => ({
+    children: ordered.map((item) => ({
       id: item.id,
       // BaseNode reads the same shared dimensions. Exact ELK route endpoints
       // depend on the layout and rendered card using identical geometry.
@@ -304,6 +333,9 @@ function elkLayoutComponent(nodes, edges, direction, options, focus = null) {
       // card. Left free, ELK attaches each edge to the face it routes towards.
       properties: {
         'org.eclipse.elk.portConstraints': 'FREE',
+        ...(componentPriority.has(item.id)
+          ? { 'org.eclipse.elk.priority': String(componentPriority.get(item.id)) }
+          : {}),
         ...(item.id === focus?.rootId
           ? { 'org.eclipse.elk.layered.layering.layerConstraint': 'FIRST_SEPARATE' }
           : {}),
@@ -383,26 +415,17 @@ async function elkLayoutAll(nodes, edges, direction = 'LR', overrides = {}, focu
     ranksep: direction === 'TB' ? 72 : 92,
     nodesep: direction === 'TB' ? 34 : 32,
     componentGap: 64,
-    packWidth: direction === 'TB' ? 1780 : 1960,
+    // How wide ELK lets the parts of a model run before it starts another row,
+    // as a ratio of the arrangement's width to its height.
+    aspectRatio: 2.2,
     ...overrides,
   }
-  if (focus) {
-    const focused = await elkLayoutComponent(nodes, edges, direction, options, focus)
-    return packComponents([focused], options)
-  }
-  const nodeById = new Map(nodes.map((item) => [item.id, item]))
-  const components = connectedComponents(nodes, edges)
-  const layouts = await Promise.all(components.map((ids) => {
-    const idSet = new Set(ids)
-    return elkLayoutComponent(
-      ids.map((id) => nodeById.get(id)),
-      edges.filter((item) => idSet.has(item.source) && idSet.has(item.target)),
-      direction,
-      options,
-    )
-  }))
-
-  return packComponents(layouts, options)
+  // The whole graph goes over in one call, disconnected parts included: ELK
+  // separates them and arranges the results itself, which is the same work this
+  // module used to do around N calls. Packing here is left with the one thing
+  // ELK does not do, moving the result onto the origin.
+  const laid = await elkLayoutGraph(nodes, edges, direction, options, focus)
+  return packComponents([laid], options)
 }
 
 // ─── Shared ──────────────────────────────────────────────────────────────────

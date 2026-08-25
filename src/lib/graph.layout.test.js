@@ -146,6 +146,56 @@ if (layoutStressDocument.errors.length) {
   throw new Error(`Invalid layout stress fixture: ${JSON.stringify(layoutStressDocument.errors)}`)
 }
 const layoutStressModel = normalizeOssie(layoutStressDocument.document)
+const elkLayoutStressGraph = await buildOntologyGraph(layoutStressModel, {
+  showRelationships: true,
+  layoutEngine: 'elk',
+})
+
+/** The groups of cards with nothing joining one group to the next. */
+function disconnectedParts(graph) {
+  const adjacency = new Map(graph.nodes.map((item) => [item.id, new Set()]))
+  for (const item of graph.edges) {
+    adjacency.get(item.source)?.add(item.target)
+    adjacency.get(item.target)?.add(item.source)
+  }
+  const seen = new Set()
+  const parts = []
+  for (const item of graph.nodes) {
+    if (seen.has(item.id)) continue
+    const ids = [item.id]
+    seen.add(item.id)
+    for (let index = 0; index < ids.length; index++) {
+      for (const neighbor of adjacency.get(ids[index]) || []) {
+        if (seen.has(neighbor)) continue
+        seen.add(neighbor)
+        ids.push(neighbor)
+      }
+    }
+    parts.push(ids)
+  }
+  return parts
+}
+
+/** What a group of cards takes up on the canvas, routes included. */
+function partBounds(graph, ids) {
+  const held = new Set(ids)
+  const byId = new Map(graph.nodes.map((item) => [item.id, item]))
+  const points = [
+    ...ids.flatMap((id) => {
+      const { x, y } = byId.get(id).position
+      return [{ x, y }, { x: x + NODE_WIDTH, y: y + NODE_HEIGHT }]
+    }),
+    ...graph.edges
+      .filter((item) => held.has(item.source))
+      .flatMap((item) => item.data.points || []),
+  ]
+  return {
+    minX: Math.min(...points.map((point) => point.x)),
+    minY: Math.min(...points.map((point) => point.y)),
+    maxX: Math.max(...points.map((point) => point.x)),
+    maxY: Math.max(...points.map((point) => point.y)),
+  }
+}
 
 describe('graph layout conventions', () => {
   const ontology = ontologyGraph
@@ -561,6 +611,35 @@ describe('strict ELK routing', () => {
     )
     expect(overrides.get(selfLoop.sourceHandle)).toEqual({ position: 'right', offset: 34 })
     expect(overrides.get(selfLoop.targetHandle)).toEqual({ position: 'right', offset: 72 })
+  })
+
+  it('sets the disconnected parts of a model down clear of each other, biggest first', () => {
+    // Party's tree, Warehouse/Bin and Region/Zone share no edge, so ELK is left
+    // to separate and arrange them. Nothing may land on top of anything else,
+    // and the part the reader came for stays the one they meet first.
+    const parts = disconnectedParts(elkLayoutStressGraph)
+      .sort((left, right) => right.length - left.length)
+    expect(parts).toHaveLength(3)
+
+    const bounds = parts.map((ids) => partBounds(elkLayoutStressGraph, ids))
+    for (const box of bounds) {
+      expect(box.minX).toBeGreaterThanOrEqual(-1)
+      expect(box.minY).toBeGreaterThanOrEqual(-1)
+    }
+    for (let left = 0; left < bounds.length; left++) {
+      for (let right = left + 1; right < bounds.length; right++) {
+        const overlapX = Math.min(bounds[left].maxX, bounds[right].maxX)
+          - Math.max(bounds[left].minX, bounds[right].minX)
+        const overlapY = Math.min(bounds[left].maxY, bounds[right].maxY)
+          - Math.max(bounds[left].minY, bounds[right].minY)
+        expect(
+          { parts: [parts[left][0], parts[right][0]], overlapping: overlapX > 1 && overlapY > 1 },
+        ).toEqual({ parts: [parts[left][0], parts[right][0]], overlapping: false })
+      }
+    }
+    for (const box of bounds.slice(1)) {
+      expect(bounds[0].minX).toBeLessThanOrEqual(box.minX)
+    }
   })
 
   it('leaves each card by the face pointing at the other end, across full and focused layouts', async () => {
