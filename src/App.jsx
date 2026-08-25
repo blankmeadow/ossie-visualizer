@@ -79,7 +79,11 @@ export default function App() {
   const [showRelationships, setShowRelationships] = useState(true)
   const [showMetrics, setShowMetrics] = useState(false)
   const [showMiniMap, setShowMiniMap] = useState(true)
-  const [showEdgeLabels, setShowEdgeLabels] = useState(true)
+  // A canvas opens on the shape of a model: which concepts there are and what
+  // links them. Keeping room clear for every relationship name spreads a large
+  // model out until the concept names themselves stop being readable at the
+  // zoom that fits it, so the names come on when a reader asks for them.
+  const [showEdgeLabels, setShowEdgeLabels] = useState(false)
   const [layoutEngine, setLayoutEngine] = useState('elk')
   const [focusDepth, setFocusDepth] = useState(0)
   const [sidebarKind, setSidebarKind] = useState('all')
