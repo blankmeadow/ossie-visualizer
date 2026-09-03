@@ -83,6 +83,8 @@ export const MESSAGES = {
     'canvas.bundleCount': '{count} 条关系',
     'canvas.viewRelationship': '查看关系',
     'canvas.viewMapping': '查看映射证据',
+    'canvas.collapseDescendants': '收起 {count} 个下游节点',
+    'canvas.expandDescendants': '展开 {count} 个下游节点',
 
     'inspector.emptyTitle': '选择一个语义元素',
     'inspector.emptyBody': '从索引、搜索结果或关系图选择 Concept、Dataset、Metric 或 Mapping。',
@@ -328,6 +330,8 @@ export const MESSAGES = {
     'canvas.bundleCount': '{count} relationships',
     'canvas.viewRelationship': 'View relationship',
     'canvas.viewMapping': 'View mapping evidence',
+    'canvas.collapseDescendants': 'Collapse {count} downstream nodes',
+    'canvas.expandDescendants': 'Expand {count} downstream nodes',
 
     'inspector.emptyTitle': 'Select an element',
     'inspector.emptyBody': 'Pick a Concept, Dataset, Metric or Mapping from the index, the search results or the graph.',
