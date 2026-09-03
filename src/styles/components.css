@@ -204,6 +204,35 @@ html, body, #root { height: 100%; margin: 0; padding: 0; overflow: hidden; }
   opacity: 1;
   box-shadow: 0 1px 2px rgba(0,0,0,.08);
 }
+.graph-canvas .react-flow__handle.node-collapse-handle {
+  z-index: 6;
+  padding: 0;
+  border-color: #8fae9f;
+  color: var(--green-dark);
+  background: white;
+  cursor: pointer;
+  pointer-events: auto;
+  line-height: 0;
+  transition: color .15s ease, border-color .15s ease, background .15s ease;
+}
+.graph-canvas .react-flow__handle.node-collapse-handle::before,
+.graph-canvas .react-flow__handle.node-collapse-handle::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: block;
+  width: 5px;
+  height: 1.25px;
+  border-radius: 1px;
+  background: currentColor;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.graph-canvas .react-flow__handle.node-collapse-handle::after { display: none; width: 1.25px; height: 5px; }
+.graph-canvas .react-flow__handle.node-collapse-handle.is-collapsed::after { display: block; }
+.graph-canvas .react-flow__handle.node-collapse-handle:hover,
+.graph-canvas .react-flow__handle.node-collapse-handle:focus-visible { border-color: var(--graph-selection); color: white; background: var(--graph-selection); outline: 0; }
 .graph-canvas .react-flow.is-unlocked .react-flow__node { cursor: grab; }
 .graph-canvas .react-flow.is-unlocked .react-flow__node.dragging { cursor: grabbing; }
 .react-flow__edge { cursor: pointer; }.react-flow__edge-path { transition: opacity .16s, stroke .16s, stroke-width .16s; }.react-flow__edge-text { font-family: 'SFMono-Regular', Consolas, monospace; }

@@ -25,6 +25,7 @@ import {
   movedHandleOverrides,
 } from '../lib/graph'
 import { declarativeHandle, NODE_HEIGHT, NODE_WIDTH } from '../lib/graphGeometry'
+import { collapsedGraphVisibility } from '../lib/graphCollapse'
 
 const nodeTypes = { ossieNode: OssieNode }
 const edgeTypes = { relationshipEdge: RelationshipEdge }
@@ -66,12 +67,13 @@ function edgeMatchesSelection(edge, selection) {
 
 function frameNodes(flow, canvasRef, items, inspectorWidth, duration = 340, minimumZoom = null) {
   const canvas = canvasRef.current?.getBoundingClientRect()
-  if (!canvas || !items.length) return false
+  const visibleItems = items.filter((item) => !item.hidden)
+  if (!canvas || !visibleItems.length) return false
 
-  const minX = Math.min(...items.map((item) => item.position.x))
-  const minY = Math.min(...items.map((item) => item.position.y))
-  const maxX = Math.max(...items.map((item) => item.position.x + nodeWidth))
-  const maxY = Math.max(...items.map((item) => item.position.y + nodeHeight))
+  const minX = Math.min(...visibleItems.map((item) => item.position.x))
+  const minY = Math.min(...visibleItems.map((item) => item.position.y))
+  const maxX = Math.max(...visibleItems.map((item) => item.position.x + nodeWidth))
+  const maxY = Math.max(...visibleItems.map((item) => item.position.y + nodeHeight))
   const boundsWidth = Math.max(nodeWidth, maxX - minX)
   const boundsHeight = Math.max(nodeHeight, maxY - minY)
   // Keep the framed graph clear of the inspector floating over the canvas.
@@ -85,7 +87,7 @@ function frameNodes(flow, canvasRef, items, inspectorWidth, duration = 340, mini
   // exactly, since a card or a pair of them would otherwise fill the screen.
   // A whole arrangement is shown whole: it is what the reader just opened, and
   // a floor under the zoom would leave part of it off the canvas.
-  const zoom = Math.max(minimumZoom ?? (items.length === 1 ? 0.92 : 0.56), fitZoom)
+  const zoom = Math.max(minimumZoom ?? (visibleItems.length === 1 ? 0.92 : 0.56), fitZoom)
   const contentCenterX = minX + boundsWidth / 2
   const contentCenterY = minY + boundsHeight / 2
 
@@ -310,8 +312,26 @@ function InnerGraphCanvas(props) {
   const [exporting, setExporting] = useState(false)
   const [exportZoom, setExportZoom] = useState(null)
   const [manualLayout, setManualLayout] = useState({ key: '', positions: {} })
+  const [collapsedHandleIds, setCollapsedHandleIds] = useState(() => new Set())
   const activeInspectorWidth = inspectorOpen ? inspectorWidth : 0
   const markerZoom = exportZoom || viewportMarkerZoom
+
+  const collapseVisibility = useMemo(
+    () => collapsedGraphVisibility(graph.nodes, graph.edges, collapsedHandleIds),
+    [collapsedHandleIds, graph.edges, graph.nodes],
+  )
+  const toggleBranchCollapse = useCallback((handleId) => {
+    setCollapsedHandleIds((current) => {
+      const next = new Set(current)
+      if (next.has(handleId)) next.delete(handleId)
+      else next.add(handleId)
+      return next
+    })
+  }, [])
+
+  // Tabs describe unrelated directed graphs. A collapse in one must not be
+  // carried into a same-named node in another one.
+  useEffect(() => setCollapsedHandleIds(new Set()), [activeTab, documentName])
 
   const graphLayoutKey = useMemo(
     () => `${graph.nodes
@@ -333,31 +353,39 @@ function InnerGraphCanvas(props) {
     [graph.edges, graph.nodes, manualPositions, movedNodeIds],
   )
   const selectedNodeId = useMemo(
-    () => graph.nodes.find((item) => selectionMatches(item.data?.selection, selection))?.id || '',
-    [graph.nodes, selection],
+    () => graph.nodes.find((item) => (
+      !collapseVisibility.hiddenNodeIds.has(item.id)
+      && selectionMatches(item.data?.selection, selection)
+    ))?.id || '',
+    [collapseVisibility.hiddenNodeIds, graph.nodes, selection],
   )
   const selectedEdgeIds = useMemo(
-    () => new Set(graph.edges.filter((item) => edgeMatchesSelection(item, selection)).map((item) => item.id)),
-    [graph.edges, selection],
+    () => new Set(graph.edges.filter((item) => (
+      !collapseVisibility.hiddenEdgeIds.has(item.id)
+      && edgeMatchesSelection(item, selection)
+    )).map((item) => item.id)),
+    [collapseVisibility.hiddenEdgeIds, graph.edges, selection],
   )
   const activeNodeIds = useMemo(() => {
     const nodeIds = new Set()
     if (selectedNodeId) {
       nodeIds.add(selectedNodeId)
       for (const item of graph.edges) {
+        if (collapseVisibility.hiddenEdgeIds.has(item.id)) continue
         if (item.source !== selectedNodeId && item.target !== selectedNodeId) continue
         nodeIds.add(item.source)
         nodeIds.add(item.target)
       }
     } else if (selectedEdgeIds.size) {
       for (const item of graph.edges) {
+        if (collapseVisibility.hiddenEdgeIds.has(item.id)) continue
         if (!selectedEdgeIds.has(item.id)) continue
         nodeIds.add(item.source)
         nodeIds.add(item.target)
       }
     }
     return nodeIds
-  }, [graph.edges, selectedEdgeIds, selectedNodeId])
+  }, [collapseVisibility.hiddenEdgeIds, graph.edges, selectedEdgeIds, selectedNodeId])
   // Everything outside the selection and its immediate neighbours fades back,
   // but only once something on the canvas is actually selected: a selection the
   // graph does not draw (a value type, say) must not dim the whole view.
@@ -374,6 +402,7 @@ function InnerGraphCanvas(props) {
     const cache = new Map()
     const items = graph.nodes.map((item) => {
       const position = manualPositions[item.id] || item.position
+      const hidden = collapseVisibility.hiddenNodeIds.has(item.id)
       const selected = item.id === selectedNodeId
       const related = activeNodeIds.has(item.id) && !selected
       const dimmed = focusActive && !activeNodeIds.has(item.id)
@@ -384,6 +413,17 @@ function InnerGraphCanvas(props) {
       }))
       const sourceHandles = updateHandles(item.data.sourceHandles)
       const targetHandles = updateHandles(item.data.targetHandles)
+      const collapseHandles = new Map(
+        [...sourceHandles, ...targetHandles]
+          .filter((handle) => collapseVisibility.branchNodeIds.has(handle.id))
+          .map((handle) => [handle.id, {
+            collapsed: collapsedHandleIds.has(handle.id),
+            count: collapseVisibility.branchNodeIds.get(handle.id).size,
+          }]),
+      )
+      const collapseHandleKey = [...collapseHandles]
+        .map(([handleId, state]) => `${handleId}:${state.collapsed}:${state.count}`)
+        .join('|')
       const handleOverrideKey = [...sourceHandles, ...targetHandles]
         .map((handle) => `${handle.id}@${handle.position}:${handle.offset}`)
         .join('|')
@@ -392,10 +432,12 @@ function InnerGraphCanvas(props) {
         cached
         && cached.source === item
         && cached.node.position === position
+        && cached.node.hidden === hidden
         && cached.node.measured === measured
         && cached.node.selected === selected
         && cached.node.data.related === related
         && cached.node.data.dimmed === dimmed
+        && cached.collapseHandleKey === collapseHandleKey
         && cached.handleOverrideKey === handleOverrideKey
       ) {
         cache.set(item.id, cached)
@@ -404,6 +446,7 @@ function InnerGraphCanvas(props) {
       const node = {
         ...item,
         position,
+        hidden,
         measured,
         selected,
         zIndex: selected ? 1000 : 0,
@@ -411,18 +454,27 @@ function InnerGraphCanvas(props) {
           ...targetHandles.map((handle) => declarativeHandle(handle, 'target')),
           ...sourceHandles.map((handle) => declarativeHandle(handle, 'source')),
         ],
-        data: { ...item.data, sourceHandles, targetHandles, related, dimmed },
+        data: {
+          ...item.data,
+          sourceHandles,
+          targetHandles,
+          related,
+          dimmed,
+          collapseHandles,
+          onToggleCollapse: toggleBranchCollapse,
+        },
       }
-      cache.set(item.id, { source: item, node, handleOverrideKey })
+      cache.set(item.id, { source: item, node, collapseHandleKey, handleOverrideKey })
       return node
     })
     nodeCacheRef.current = cache
     return items
-  }, [activeNodeIds, focusActive, graph.nodes, handleOverrides, manualPositions, nodeSizes, selectedNodeId])
+  }, [activeNodeIds, collapseVisibility, collapsedHandleIds, focusActive, graph.nodes, handleOverrides, manualPositions, nodeSizes, selectedNodeId, toggleBranchCollapse])
 
   const edges = useMemo(
     () =>
       graph.edges.map((item) => {
+        const hidden = collapseVisibility.hiddenEdgeIds.has(item.id)
         const isEdgeSelected = selectedEdgeIds.has(item.id)
         const isConnectedToSelectedNode = selectedNodeId && (item.source === selectedNodeId || item.target === selectedNodeId)
         const isEdgeHighlighted = isEdgeSelected || isConnectedToSelectedNode
@@ -433,6 +485,7 @@ function InnerGraphCanvas(props) {
         const route = edgeRouteAfterMove(item, movedNodeIds)
         return {
           ...item,
+          hidden,
           type: route.type,
           selected: isEdgeSelected,
           label: showEdgeLabels && label ? label : undefined,
@@ -467,7 +520,7 @@ function InnerGraphCanvas(props) {
           zIndex: 0,
         }
       }),
-    [focusActive, graph.edges, markerZoom, movedNodeIds, onOpenDetail, onSelect, selectedEdgeIds, selectedNodeId, showEdgeLabels, tokens],
+    [collapseVisibility.hiddenEdgeIds, focusActive, graph.edges, markerZoom, movedNodeIds, onOpenDetail, onSelect, selectedEdgeIds, selectedNodeId, showEdgeLabels, tokens],
   )
   graphNodesRef.current = nodes
 
@@ -480,6 +533,9 @@ function InnerGraphCanvas(props) {
   // positions again, so neither disturbs the viewport.
   const nodesInitialized = useNodesInitialized()
   const framedRef = useRef(null)
+  // Collapsing only changes React Flow's native visibility flags. It must not
+  // be treated as a new layout: the reader may have deliberately zoomed and
+  // panned to the branch they are operating on, so keep that viewport intact.
   const frameKey = `${graphLayoutKey}::${activeInspectorWidth}`
   useEffect(() => {
     if (!nodesInitialized || !graphNodesRef.current.length) return undefined
@@ -561,7 +617,7 @@ function InnerGraphCanvas(props) {
     setExporting(true)
     try {
       const viewport = canvasRef.current?.querySelector('.react-flow__viewport')
-      const exportNodes = flow.getNodes()
+      const exportNodes = flow.getNodes().filter((item) => !item.hidden)
       if (!viewport || !exportNodes.length) return
 
       const bounds = getNodesBounds(exportNodes)
