@@ -416,3 +416,33 @@ def test_a_stuck_item_stops_extending_the_round(client):
         raise AssertionError("the item never stopped coming back")
 
     assert requeues <= 2
+
+
+def test_completion_celebrates_the_promise_not_the_repeats(client):
+    """The child was told "今天 N 个" -- finishing shows that N, even though a
+    wrong answer made them answer more than N times (section 14 / 29)."""
+    headers = stocked(client)
+    session = client.get("/today/session", headers=headers).json()
+
+    answered = 0
+    queue = list(session["questions"])
+    while queue:
+        question = queue.pop(0)
+        result = client.post(
+            "/reviews",
+            json={
+                "child_vocabulary_id": question["child_vocabulary_id"],
+                "question_type": question["question_type"],
+                "answer": "___wrong___",
+                "question_payload": question["prompt"],
+            },
+            headers=headers,
+        ).json()
+        answered += 1
+        if result["requeue"] and result["requeue_question"]:
+            queue.append(result["requeue_question"])
+
+    done = client.post("/today/complete", headers=headers).json()
+    assert answered > session["total"]  # repeats really did happen
+    assert done["completed_count"] == session["total"]
+    assert done["answered_count"] == answered

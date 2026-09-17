@@ -164,7 +164,10 @@ class ReviewOut(BaseModel):
 
 
 class CompleteOut(BaseModel):
+    #: The promise that was made this morning ("今天 20 个"), so the celebration
+    #: matches it. Re-queued repeats are counted separately.
     completed_count: int
+    answered_count: int
     correct_count: int
     accuracy: int
     duration_minutes: int

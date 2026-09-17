@@ -246,7 +246,8 @@ def complete_today(
         accuracy=accuracy,
     )
     return CompleteOut(
-        completed_count=day.answered_count,
+        completed_count=day.planned_count or day.answered_count,
+        answered_count=day.answered_count,
         correct_count=day.correct_count,
         accuracy=accuracy,
         duration_minutes=max(1, round(day.duration_ms / 60000)) if day.duration_ms else 0,
