@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,7 +15,20 @@ from .routers import learning, profile, sources, vocabulary
 
 logging.basicConfig(level=logging.INFO if not settings.debug else logging.DEBUG)
 
+@asynccontextmanager
+async def lifespan(application: FastAPI) -> AsyncIterator[None]:
+    init_db()
+    os.makedirs(settings.media_root, exist_ok=True)
+    # Mounted here rather than at import time so the directory is guaranteed
+    # to exist even on a first run with no media yet.
+    application.mount(
+        settings.media_base_url, StaticFiles(directory=settings.media_root), name="media"
+    )
+    yield
+
+
 app = FastAPI(
+    lifespan=lifespan,
     title=settings.app_name,
     version="1.0.0",
     description=(
@@ -34,13 +49,6 @@ app.include_router(profile.router)
 app.include_router(sources.router)
 app.include_router(learning.router)
 app.include_router(vocabulary.router)
-
-
-@app.on_event("startup")
-def on_startup() -> None:
-    init_db()
-    os.makedirs(settings.media_root, exist_ok=True)
-    app.mount(settings.media_base_url, StaticFiles(directory=settings.media_root), name="media")
 
 
 @app.get("/health", tags=["meta"])
