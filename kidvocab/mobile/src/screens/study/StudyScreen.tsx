@@ -14,7 +14,7 @@ import type { Question, ReviewResult } from '../../api/types';
 import { speak } from '../../components/speech';
 import { Body, EmptyState, Loading, ProgressBar, Button } from '../../components/ui';
 import { useNav } from '../../nav/router';
-import { colors, font, radius, spacing } from '../../theme';
+import { colors, font, latin, radius, spacing } from '../../theme';
 import {
   FirstLearnView,
   Highlighted,
@@ -272,7 +272,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing(5),
   },
   exit: { fontSize: 20, color: colors.textFaint },
-  counter: { fontSize: font.small, color: colors.textMuted, fontWeight: '600', minWidth: 54, textAlign: 'right' },
+  counter: {
+    fontSize: font.small,
+    color: colors.textMuted,
+    minWidth: 54,
+    textAlign: 'right',
+    ...latin('bold'),
+  },
   body: { flex: 1, padding: spacing(5) },
 
   overlay: {
@@ -294,7 +300,7 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
   },
   wrongTitle: { fontSize: font.heading, fontWeight: '700', color: colors.text },
-  wrongLemma: { fontSize: 34, fontWeight: '800', color: colors.primary, marginTop: spacing(5) },
+  wrongLemma: { fontSize: 34, color: colors.primary, marginTop: spacing(5), ...latin('bold') },
   wrongMeaning: { fontSize: font.heading, color: colors.text, marginTop: spacing(2) },
   wrongExample: {
     marginTop: spacing(6),

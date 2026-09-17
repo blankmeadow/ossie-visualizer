@@ -10,7 +10,7 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import type { Question } from '../../api/types';
 import { speak } from '../../components/speech';
 import { Body, Button, Speaker } from '../../components/ui';
-import { colors, font, radius, spacing } from '../../theme';
+import { colors, font, latin, radius, spacing } from '../../theme';
 
 export interface AnswerHandlers {
   /** Choice types submit the moment an option is tapped (section 24A.1). */
@@ -25,11 +25,15 @@ export function OptionList({
   onChoose,
   locked,
   large,
+  english,
 }: {
   options: string[];
   onChoose: (value: string) => void;
   locked: boolean;
   large?: boolean;
+  /** T2 and T5 answer in English; T1 answers in Chinese and must stay on the
+   *  system font. */
+  english?: boolean;
 }) {
   const labels = ['A', 'B', 'C', 'D', 'E', 'F'];
   return (
@@ -47,7 +51,15 @@ export function OptionList({
           ]}
         >
           <Text style={styles.optionLabel}>{labels[index]}</Text>
-          <Text style={[styles.optionText, large && { fontSize: font.heading }]}>{option}</Text>
+          <Text
+            style={[
+              styles.optionText,
+              english && latin(),
+              large && { fontSize: font.heading },
+            ]}
+          >
+            {option}
+          </Text>
         </Pressable>
       ))}
     </View>
@@ -121,6 +133,7 @@ export function T2View({ question, handlers }: { question: Question; handlers: A
         onChoose={handlers.submit}
         locked={handlers.locked}
         large
+        english
       />
     </View>
   );
@@ -308,7 +321,12 @@ export function T5View({ question, handlers }: { question: Question; handlers: A
           {question.prompt.meaning as string}
         </Body>
       </View>
-      <OptionList options={question.options} onChoose={handlers.submit} locked={handlers.locked} />
+      <OptionList
+        options={question.options}
+        onChoose={handlers.submit}
+        locked={handlers.locked}
+        english
+      />
     </View>
   );
 }
@@ -374,8 +392,8 @@ const styles = StyleSheet.create({
     marginBottom: spacing(5),
   },
   lemmaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing(3) },
-  bigLemma: { fontSize: 38, fontWeight: '800', color: colors.text },
-  phonetic: { fontSize: font.small, color: colors.textMuted, marginTop: spacing(2) },
+  bigLemma: { fontSize: 38, color: colors.text, ...latin('bold') },
+  phonetic: { fontSize: font.small, color: colors.textMuted, marginTop: spacing(2), ...latin() },
   bigMeaning: { fontSize: font.title, color: colors.text, marginTop: spacing(4) },
   exampleBox: {
     flexDirection: 'row',
@@ -386,20 +404,20 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     backgroundColor: colors.primarySoft,
   },
-  exampleText: { flex: 1, fontSize: font.body, color: colors.text, lineHeight: 24 },
-  exampleStrong: { fontWeight: '800', color: colors.primary },
+  exampleText: { flex: 1, fontSize: font.body, color: colors.text, lineHeight: 24, ...latin() },
+  exampleStrong: { color: colors.primary, ...latin('bold') },
   cta: { marginTop: spacing(10), alignSelf: 'stretch' },
 
   promptBlock: { alignItems: 'center', paddingVertical: spacing(8) },
-  promptLemma: { fontSize: 36, fontWeight: '800', color: colors.text },
+  promptLemma: { fontSize: 36, color: colors.text, ...latin('bold') },
   promptMeaning: { fontSize: font.title + 2, fontWeight: '700', color: colors.text },
-  sentence: { fontSize: font.heading, color: colors.text, lineHeight: 30, textAlign: 'center' },
+  sentence: { fontSize: font.heading, color: colors.text, lineHeight: 30, textAlign: 'center', ...latin() },
   template: {
     fontSize: font.title,
-    fontWeight: '700',
     color: colors.primary,
     marginTop: spacing(5),
     letterSpacing: 2,
+    ...latin('bold'),
   },
 
   option: {
@@ -430,7 +448,7 @@ const styles = StyleSheet.create({
   },
   slotGiven: { backgroundColor: 'transparent', borderBottomColor: 'transparent' },
   slotFilled: { backgroundColor: colors.primarySoft, borderBottomColor: colors.primary },
-  slotText: { fontSize: font.title, fontWeight: '700', color: colors.text },
+  slotText: { fontSize: font.title, color: colors.text, ...latin('bold') },
 
   bank: {
     flexDirection: 'row',
@@ -449,7 +467,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  tileText: { fontSize: font.heading, fontWeight: '700', color: colors.text },
+  tileText: { fontSize: font.heading, color: colors.text, ...latin('bold') },
 
   answerInput: {
     height: 58,
@@ -461,6 +479,7 @@ const styles = StyleSheet.create({
     fontSize: font.heading,
     color: colors.text,
     textAlign: 'center',
+    ...latin(),
   },
   hintText: {
     marginTop: spacing(4),
@@ -468,6 +487,7 @@ const styles = StyleSheet.create({
     letterSpacing: 4,
     textAlign: 'center',
     color: colors.textMuted,
+    ...latin(),
   },
   inputFooter: { marginTop: 'auto', gap: spacing(3), paddingTop: spacing(6) },
   hint: { alignSelf: 'center', paddingVertical: spacing(2), paddingHorizontal: spacing(5) },

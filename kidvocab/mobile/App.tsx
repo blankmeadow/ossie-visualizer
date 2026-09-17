@@ -9,6 +9,12 @@
 import React, { useEffect, useState } from 'react';
 import { SafeAreaView, StyleSheet, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+// Imported by exact face rather than from the package root: the root index
+// re-exports all four cuts, which makes Metro bundle the italics too (+1.3MB
+// of font nobody renders).
+import { Andika_400Regular } from '@expo-google-fonts/andika/400Regular';
+import { Andika_700Bold } from '@expo-google-fonts/andika/700Bold';
+import { useFonts } from 'expo-font';
 
 import { ensureChild } from './src/api/client';
 import { TabBar } from './src/components/TabBar';
@@ -91,6 +97,12 @@ export default function App() {
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Andika carries every English word, phonetic and digit in the product, so
+  // the first frame waits for it rather than flashing a system-font fallback.
+  // A failure to load is not fatal: fontError still lets the app through, and
+  // the platform font takes over.
+  const [fontsLoaded, fontError] = useFonts({ Andika_400Regular, Andika_700Bold });
+
   useEffect(() => {
     ensureChild()
       .then(() => setReady(true))
@@ -106,7 +118,7 @@ export default function App() {
           title="连接不上服务"
           body={`${error}\n\n请先启动后端：\ncd backend && ./run.sh`}
         />
-      ) : !ready ? (
+      ) : !ready || !(fontsLoaded || fontError) ? (
         <Loading />
       ) : (
         <NavProvider>

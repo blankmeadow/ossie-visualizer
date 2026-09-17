@@ -63,3 +63,46 @@ export const shadow = {
     elevation: 5,
   },
 } as const;
+
+/**
+ * Typography.
+ *
+ * Two families, split by script rather than by role:
+ *
+ * - **English, IPA and digits use Andika.** It is SIL's literacy typeface,
+ *   drawn for beginning readers, and it is the only candidate that carries the
+ *   full IPA range the dictionary needs -- Lexend, Nunito, Baloo and Atkinson
+ *   Hyperlegible are all missing more than half of it, so a phonetic like
+ *   /ˈfɒrɪst/ would fall back mid-word or render as tofu. Two of its shapes
+ *   matter directly to this product: capital I carries serifs, so `Il1` cannot
+ *   collapse into three identical bars in a spelling question, and `a` and `g`
+ *   are single-storey, matching the letterforms a Chinese primary school child
+ *   is taught to write in 四线三格.
+ *
+ * - **Chinese keeps the platform font** (PingFang SC on iOS, the vendor's
+ *   Source Han / HarmonyOS cut on Android). Both are excellent and already
+ *   installed; the smallest complete CJK webfont in this family costs ~10MB
+ *   per weight, which is not a trade an MVP should make.
+ *
+ * Because React Native cannot fall back across families the way CSS can, and
+ * because `fontWeight` is ignored for custom families on Android, English text
+ * opts in explicitly through `latin()` and never merely sets a weight.
+ */
+export const fonts = {
+  latinRegular: 'Andika_400Regular',
+  latinBold: 'Andika_700Bold',
+} as const;
+
+/**
+ * Style for text that is guaranteed to be Latin -- a lemma, a phonetic, an
+ * original sentence, a letter tile, a digit.
+ *
+ * Do not use it for Chinese: it would rely on per-platform glyph fallback and
+ * render 中文 at an inconsistent weight.
+ */
+export const latin = (weight: 'regular' | 'bold' = 'regular') => ({
+  fontFamily: weight === 'bold' ? fonts.latinBold : fonts.latinRegular,
+  // Android ignores fontWeight on a custom family and would synthesise a fake
+  // bold on top of the real one, so the weight lives in the family name only.
+  fontWeight: 'normal' as const,
+});

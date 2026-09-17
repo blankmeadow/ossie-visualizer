@@ -13,7 +13,7 @@ import type { VocabularyPage, VocabularyRow } from '../api/types';
 import { speak } from '../components/speech';
 import { Body, Card, EmptyState, Loading, Pill, Speaker } from '../components/ui';
 import { useNav } from '../nav/router';
-import { colors, font, radius, spacing } from '../theme';
+import { colors, font, latin, radius, spacing } from '../theme';
 
 type Filter = 'ALL' | 'WORD' | 'PHRASE';
 
@@ -156,8 +156,8 @@ const styles = StyleSheet.create({
     gap: spacing(3),
     paddingVertical: spacing(4),
   },
-  lemma: { fontSize: font.body + 1, fontWeight: '600', color: colors.text },
-  phonetic: { fontSize: font.tiny, color: colors.textFaint, marginTop: 2 },
+  lemma: { fontSize: font.body + 1, color: colors.text, ...latin('bold') },
+  phonetic: { fontSize: font.tiny, color: colors.textFaint, marginTop: 2, ...latin() },
   meaning: { fontSize: font.small, color: colors.textMuted, maxWidth: 110, textAlign: 'right' },
   chevron: { fontSize: 22, color: colors.textFaint },
   separator: { height: 1, backgroundColor: colors.border },

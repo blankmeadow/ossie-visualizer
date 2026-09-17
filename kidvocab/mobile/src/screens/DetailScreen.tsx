@@ -13,7 +13,7 @@ import { speak } from '../components/speech';
 import { Body, Loading, Speaker, Title } from '../components/ui';
 import { Highlighted } from './study/QuestionViews';
 import { useNav } from '../nav/router';
-import { colors, font, radius, spacing } from '../theme';
+import { colors, font, latin, radius, spacing } from '../theme';
 
 export function DetailScreen({ id }: { id: string }) {
   const { pop } = useNav();
@@ -36,7 +36,7 @@ export function DetailScreen({ id }: { id: string }) {
 
       <ScrollView contentContainerStyle={{ padding: spacing(5), paddingBottom: spacing(12) }}>
         <View style={styles.titleRow}>
-          <Title style={{ fontSize: 34 }}>{detail.lemma}</Title>
+          <Title style={{ fontSize: 34, ...latin('bold') }}>{detail.lemma}</Title>
           <Speaker onPress={() => speak(detail.lemma)} size={26} />
         </View>
         {detail.phonetic ? <Text style={styles.phonetic}>{detail.phonetic}</Text> : null}
@@ -78,7 +78,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: spacing(5) },
   back: { fontSize: 30, color: colors.text, width: 24, lineHeight: 32 },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing(3) },
-  phonetic: { fontSize: font.small, color: colors.textMuted, marginTop: spacing(2) },
+  phonetic: { fontSize: font.small, color: colors.textMuted, marginTop: spacing(2), ...latin() },
   meaning: { fontSize: font.title, color: colors.text, marginTop: spacing(4) },
   badges: { flexDirection: 'row', gap: spacing(2), marginTop: spacing(5) },
   badge: {

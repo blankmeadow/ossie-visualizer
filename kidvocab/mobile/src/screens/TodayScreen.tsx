@@ -12,7 +12,7 @@ import { api } from '../api/client';
 import type { Today } from '../api/types';
 import { Body, Button, Card, EmptyState, Loading, Title } from '../components/ui';
 import { useNav } from '../nav/router';
-import { colors, font, radius, shadow, spacing } from '../theme';
+import { colors, font, latin, radius, shadow, spacing } from '../theme';
 
 export function TodayScreen() {
   const { push, setTab, revision } = useNav();
@@ -115,7 +115,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.card,
     ...shadow.card,
   },
-  count: { fontSize: 64, fontWeight: '800', color: colors.primary, lineHeight: 74 },
+  count: { fontSize: 64, color: colors.primary, lineHeight: 74, ...latin('bold') },
   celebrate: { fontSize: 52, marginBottom: spacing(3) },
   streak: {
     flexDirection: 'row',

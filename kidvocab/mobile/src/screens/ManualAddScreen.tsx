@@ -12,7 +12,7 @@ import { api } from '../api/client';
 import { speak } from '../components/speech';
 import { Body, Button, Speaker, Title } from '../components/ui';
 import { useNav } from '../nav/router';
-import { colors, font, radius, spacing } from '../theme';
+import { colors, font, latin, radius, spacing } from '../theme';
 
 export function ManualAddScreen() {
   const { pop, dismissAll } = useNav();
@@ -87,7 +87,7 @@ export function ManualAddScreen() {
         <TextInput
           value={text}
           onChangeText={setText}
-          placeholder="例如 take care of"
+          placeholder="take care of"
           placeholderTextColor={colors.textFaint}
           style={[styles.input, styles.inputLarge]}
           autoCapitalize="none"
@@ -173,7 +173,7 @@ const styles = StyleSheet.create({
     color: colors.text,
     minHeight: 48,
   },
-  inputLarge: { fontSize: font.heading, fontWeight: '600', minHeight: 58 },
+  inputLarge: { fontSize: font.heading, minHeight: 58, ...latin() },
   inputMultiline: { minHeight: 88, textAlignVertical: 'top' },
   preview: {
     flexDirection: 'row',
@@ -185,8 +185,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primarySoft,
   },
   previewLine: { flexDirection: 'row', alignItems: 'center', gap: spacing(2) },
-  previewLemma: { fontSize: font.body + 2, fontWeight: '700', color: colors.text },
-  previewPhonetic: { fontSize: font.tiny, color: colors.textMuted, marginTop: 2 },
+  previewLemma: { fontSize: font.body + 2, color: colors.text, ...latin('bold') },
+  previewPhonetic: { fontSize: font.tiny, color: colors.textMuted, marginTop: 2, ...latin() },
   badge: {
     fontSize: font.tiny,
     color: colors.primary,

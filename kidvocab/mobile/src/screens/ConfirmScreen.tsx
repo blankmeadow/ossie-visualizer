@@ -13,7 +13,7 @@ import type { Analysis, Candidate } from '../api/types';
 import { speak } from '../components/speech';
 import { Body, Button, Speaker, Title } from '../components/ui';
 import { useNav } from '../nav/router';
-import { colors, font, radius, spacing } from '../theme';
+import { colors, font, latin, radius, spacing } from '../theme';
 
 export function ConfirmScreen({ sourceId, analysis }: { sourceId: string; analysis: Analysis }) {
   const { pop, dismissAll } = useNav();
@@ -199,10 +199,16 @@ const styles = StyleSheet.create({
   checkboxOn: { backgroundColor: colors.primary, borderColor: colors.primary },
   tick: { color: '#fff', fontSize: 14, fontWeight: '800' },
   lemmaLine: { flexDirection: 'row', alignItems: 'center', gap: spacing(2), flexWrap: 'wrap' },
-  lemma: { fontSize: font.body + 1, fontWeight: '700', color: colors.text },
+  lemma: { fontSize: font.body + 1, color: colors.text, ...latin('bold') },
   again: { fontSize: font.tiny, color: colors.streak },
   meaning: { fontSize: font.small, color: colors.textMuted, marginTop: 2 },
-  example: { fontSize: font.tiny, color: colors.textFaint, marginTop: spacing(1), lineHeight: 18 },
+  example: {
+    fontSize: font.tiny,
+    color: colors.textFaint,
+    marginTop: spacing(1),
+    lineHeight: 18,
+    ...latin(),
+  },
   extraRow: { flexDirection: 'row', gap: spacing(2), alignItems: 'center' },
   extraInput: {
     flex: 1,
