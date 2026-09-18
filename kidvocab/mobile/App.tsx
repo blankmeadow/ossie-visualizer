@@ -7,7 +7,7 @@
  * something worth keeping.
  */
 import React, { useEffect, useState } from 'react';
-import { SafeAreaView, StyleSheet, View } from 'react-native';
+import { SafeAreaView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 // Imported by exact face rather than from the package root: the root index
 // re-exports all four cuts, which makes Metro bundle the italics too (+1.3MB
@@ -32,10 +32,26 @@ import { PaywallScreen } from './src/screens/PaywallScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
 import { TodayScreen } from './src/screens/TodayScreen';
 import { StudyScreen } from './src/screens/study/StudyScreen';
-import { colors } from './src/theme';
+import { colors, maxContentWidth } from './src/theme';
 
 /** Routes that take over the whole screen, hiding the tab bar. */
 const FULLSCREEN = new Set(['capture', 'analyzing', 'confirm', 'manualAdd', 'study', 'complete', 'detail']);
+
+/** Centres the app in a phone-width column on tablets; a no-op on phones. */
+function Column({ children }: { children: React.ReactNode }) {
+  const { width } = useWindowDimensions();
+  const wide = width > maxContentWidth;
+  return (
+    <View style={styles.columnHost} pointerEvents="box-none">
+      <View
+        style={[styles.column, wide && { width: maxContentWidth }]}
+        pointerEvents="box-none"
+      >
+        {children}
+      </View>
+    </View>
+  );
+}
 
 function Shell() {
   const { tab, stack } = useNav();
@@ -45,25 +61,31 @@ function Shell() {
   return (
     <View style={styles.root}>
       {!fullscreen ? (
-        <>
+        <Column>
           <View style={styles.tabContent}>
             {tab === 'today' ? <TodayScreen /> : null}
             {tab === 'library' ? <LibraryScreen /> : null}
             {tab === 'profile' ? <ProfileScreen /> : null}
           </View>
           <TabBar />
-        </>
+        </Column>
       ) : null}
 
-      {stack.map((route, index) => (
-        <View
-          key={`${route.name}-${index}`}
-          style={FULLSCREEN.has(route.name) ? styles.fullscreen : styles.modal}
-          pointerEvents="box-none"
-        >
-          <RouteView name={route.name} params={route.params} />
-        </View>
-      ))}
+      {stack.map((route, index) => {
+        const isFullscreen = FULLSCREEN.has(route.name);
+        const view = <RouteView name={route.name} params={route.params} />;
+        return (
+          <View
+            key={`${route.name}-${index}`}
+            style={isFullscreen ? styles.fullscreen : styles.modal}
+            pointerEvents="box-none"
+          >
+            {/* A sheet keeps its backdrop full-bleed and constrains its own
+                panel, so only full-screen routes are columned here. */}
+            {isFullscreen ? <Column>{view}</Column> : view}
+          </View>
+        );
+      })}
     </View>
   );
 }
@@ -132,6 +154,8 @@ export default function App() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
   root: { flex: 1 },
+  columnHost: { flex: 1, alignItems: 'center' },
+  column: { flex: 1, width: '100%' },
   tabContent: { flex: 1 },
   fullscreen: { ...StyleSheet.absoluteFillObject, backgroundColor: colors.bg },
   modal: { ...StyleSheet.absoluteFillObject },

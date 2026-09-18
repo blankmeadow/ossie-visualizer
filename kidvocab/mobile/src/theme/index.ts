@@ -31,6 +31,16 @@ export const colors = {
 
 export const spacing = (n: number) => n * 4;
 
+/**
+ * The reading column never grows past this, however wide the screen is.
+ *
+ * On an iPad the layout would otherwise stretch a single vocabulary row across
+ * a foot of glass, and a four-option question would put its A/B/C/D labels and
+ * their answers at opposite ends of the screen. A phone-width column, centred,
+ * keeps every target within a thumb's reach in either orientation.
+ */
+export const maxContentWidth = 560;
+
 export const radius = {
   sm: 10,
   md: 16,

@@ -23,12 +23,12 @@ kidvocab/
 │   │   ├── routers/       MVP API
 │   │   └── data/          离线词典、短语表、不规则变化表
 │   └── tests/         79 个测试
-├── mobile/            React Native (Expo, TypeScript)，可跑 iOS / Android / Web
+├── mobile/            React Native (Expo, TypeScript)，可跑 iOS / iPadOS / Android / Web
 │   └── src/
 │       ├── screens/       今天 / 词库 / 我的 / 拍照 / 确认 / 学习 / 详情 / 付费墙
 │       ├── api/           接口客户端（含付费墙的类型化错误）
 │       └── theme/         颜色、间距、字号、字体（英文 Andika + 系统中文）
-└── docs/              架构说明与规格对照表
+└── docs/              架构说明、规格对照表、iOS 上机指南
 ```
 
 ---
@@ -59,11 +59,15 @@ cd mobile
 npm install
 npm run web                   # 浏览器里直接看
 # 或
-npm start                     # 用 Expo Go 扫码在手机上跑
+npm start                     # 用 Expo Go 扫码，在 iPhone / iPad / Android 上跑
 ```
 
-> 真机调试时把 `mobile/app.json` 里的 `extra.apiBaseUrl` 改成电脑的局域网 IP，
-> 例如 `http://192.168.1.10:8000`，否则手机连不上 `127.0.0.1`。
+真机不需要改任何配置：App 会从 Expo 的 manifest 里读出是哪台机器发的代码，
+自动连那台机器的 8000 端口。换 WiFi、换电脑都不用管。
+
+> **装到 iPhone / iPad 上看 [`docs/DEPLOY-IOS.md`](docs/DEPLOY-IOS.md)** ——
+> Expo Go（5 分钟）、自签真 App（7 天）、TestFlight 三条路，
+> 以及让后端脱离你电脑的做法。
 
 ### 3. 接真实的 AI 识别
 

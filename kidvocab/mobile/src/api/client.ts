@@ -8,6 +8,7 @@
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 
 import type {
   Analysis,
@@ -25,8 +26,48 @@ import type {
 
 const CHILD_KEY = 'kidvocab.childId';
 
-export const API_BASE_URL: string =
-  (Constants.expoConfig?.extra as any)?.apiBaseUrl ?? 'http://127.0.0.1:8000';
+/**
+ * Where the API lives.
+ *
+ * On a phone or an iPad, `127.0.0.1` is the device itself, so a hard-coded
+ * localhost would always fail. The dev server already knows the right answer:
+ * Expo puts the address that served the bundle into the manifest, and the API
+ * runs on the same machine. Deriving the host from there means a parent can
+ * scan the QR code and have it work without editing a file.
+ *
+ * Precedence, most explicit first:
+ *   1. EXPO_PUBLIC_API_URL            -- a real deployment
+ *   2. app.json -> extra.apiBaseUrl   -- a pinned address
+ *   3. the machine that served the bundle, on extra.apiPort
+ *   4. localhost                      -- web and simulator
+ */
+function resolveApiBaseUrl(): string {
+  const extra = (Constants.expoConfig?.extra ?? {}) as { apiBaseUrl?: string; apiPort?: number };
+  const port = extra.apiPort ?? 8000;
+
+  const fromEnv = process.env.EXPO_PUBLIC_API_URL?.trim();
+  if (fromEnv) return fromEnv.replace(/\/$/, '');
+
+  const pinned = extra.apiBaseUrl?.trim();
+  if (pinned) return pinned.replace(/\/$/, '');
+
+  // Web runs in the same browser as the dev server, so localhost is correct.
+  if (Platform.OS !== 'web') {
+    // hostUri looks like "192.168.1.10:8081"; debuggerHost is the older field
+    // still present in some Expo Go versions.
+    const hostUri =
+      Constants.expoConfig?.hostUri ??
+      (Constants as { expoGoConfig?: { debuggerHost?: string } }).expoGoConfig?.debuggerHost;
+    const host = hostUri?.split('://').pop()?.split(':')[0];
+    if (host && host !== 'localhost' && host !== '127.0.0.1') {
+      return `http://${host}:${port}`;
+    }
+  }
+
+  return `http://127.0.0.1:${port}`;
+}
+
+export const API_BASE_URL: string = resolveApiBaseUrl();
 
 export class PaywallError extends Error {
   constructor(public readonly paywall: Paywall) {

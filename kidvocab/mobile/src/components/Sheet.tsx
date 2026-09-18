@@ -1,7 +1,7 @@
 import React from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { colors, font, radius, spacing } from '../theme';
+import { colors, font, maxContentWidth, radius, spacing } from '../theme';
 
 export function Sheet({
   title,
@@ -29,8 +29,15 @@ export function Sheet({
 }
 
 const styles = StyleSheet.create({
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: colors.overlay, justifyContent: 'flex-end' },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: colors.overlay,
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+  },
   sheet: {
+    width: '100%',
+    maxWidth: maxContentWidth,
     backgroundColor: colors.card,
     borderTopLeftRadius: radius.lg,
     borderTopRightRadius: radius.lg,

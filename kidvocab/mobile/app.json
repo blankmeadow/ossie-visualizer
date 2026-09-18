@@ -3,31 +3,45 @@
     "name": "我的词库",
     "slug": "kidvocab",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
+      "image": "./assets/splash.png",
       "resizeMode": "contain",
       "backgroundColor": "#EAF2FF"
     },
     "ios": {
-      "supportsTablet": false,
+      "supportsTablet": true,
+      "bundleIdentifier": "com.kidvocab.app",
       "infoPlist": {
         "NSCameraUsageDescription": "用来拍摄教材、绘本和练习册，自动整理出值得学习的单词和短语。",
-        "NSPhotoLibraryUsageDescription": "用来选择已经拍好的学习材料图片。"
+        "NSPhotoLibraryUsageDescription": "用来选择已经拍好的学习材料图片。",
+        "NSLocalNetworkUsageDescription": "用来连接你电脑上运行的学习服务，把拍到的内容整理成词库。",
+        "NSAppTransportSecurity": {
+          "NSAllowsLocalNetworking": true
+        }
       }
     },
     "android": {
       "permissions": [
         "CAMERA",
         "READ_EXTERNAL_STORAGE"
-      ]
+      ],
+      "package": "com.kidvocab.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#2563EB"
+      }
     },
     "web": {
-      "bundler": "metro"
+      "bundler": "metro",
+      "favicon": "./assets/favicon.png"
     },
     "extra": {
-      "apiBaseUrl": "http://127.0.0.1:8000"
-    }
+      "apiBaseUrl": "",
+      "apiPort": 8000
+    },
+    "icon": "./assets/icon.png"
   }
 }

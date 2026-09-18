@@ -12,7 +12,7 @@ import { api } from '../api/client';
 import type { Paywall } from '../api/types';
 import { Body, Button, Title } from '../components/ui';
 import { useNav } from '../nav/router';
-import { colors, font, radius, spacing } from '../theme';
+import { colors, font, maxContentWidth, radius, spacing } from '../theme';
 
 export function PaywallScreen({ paywall }: { paywall: Paywall }) {
   const { pop, dismissAll, push } = useNav();
@@ -70,8 +70,11 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: colors.overlay,
     justifyContent: 'flex-end',
+    alignItems: 'center',
   },
   sheet: {
+    width: '100%',
+    maxWidth: maxContentWidth,
     backgroundColor: colors.card,
     borderTopLeftRadius: radius.lg,
     borderTopRightRadius: radius.lg,
