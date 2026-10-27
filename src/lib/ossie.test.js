@@ -1,7 +1,9 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
+  attributeDescription,
   buildSearchIndex,
+  indexKinds,
   conceptMembers,
   mappingEvidenceForDataset,
   normalizeOssie,
@@ -250,6 +252,18 @@ describe('relationship classification', () => {
     expect(relationshipKind(relationshipsOf('order').priced_on, model)).toBe('objectified')
   })
 
+  it('describes an attribute by its own text, or else by the value type it holds', () => {
+    const described = structuredClone(classified)
+    const tax = described.ontology.find((concept) => concept.concept === 'tax_number')
+    tax.description = 'A nine-digit tax number.'
+    const withTypes = normalizeOssie(described)
+    const party = withTypes.conceptByName.get('party')
+    const byName = Object.fromEntries(party.relationships.map((r) => [r.name, r]))
+    expect(attributeDescription(byName.tax_id, withTypes)).toBe('A nine-digit tax number.')
+    expect(attributeDescription({ ...byName.tax_id, description: 'Own text.' }, withTypes)).toBe('Own text.')
+    expect(attributeDescription(byName.label, withTypes)).toBe('')  // a built-in has no definition
+  })
+
   it('follows an extends chain to the built-in a value type is founded on', () => {
     expect(resolveValueBase('String', model)).toBe('String')
     expect(resolveValueBase('tax_number', model)).toBe('String')
@@ -288,6 +302,17 @@ describe('relationship classification', () => {
     const index = buildSearchIndex(model)
     expect(searchIndex(index, 'tax number', ['concept'])).toEqual([])
     expect(searchIndex(index, 'tax number', ['valueType'])[0].name).toBe('tax_number')
+  })
+
+  it('lists value types in the ontology index only while searching', () => {
+    const index = buildSearchIndex(model)
+    expect(indexKinds('ontology', '')).toEqual(['concept'])
+    expect(searchIndex(index, '', indexKinds('ontology', '')).map((item) => item.kind))
+      .not.toContain('valueType')
+    expect(searchIndex(index, 'tax number', indexKinds('ontology', 'tax number'))[0].name)
+      .toBe('tax_number')
+    expect(indexKinds('semantic', 'x')).toEqual(['dataset', 'metric', 'field'])
+    expect(indexKinds('ontology', 'x', 'metric')).toEqual(['metric'])
   })
 })
 

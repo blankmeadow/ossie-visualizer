@@ -286,6 +286,19 @@ function inheritanceChain(concept, model) {
  * again, which makes a subtype's own relationship override the parent's of the
  * same name and keeps diamond inheritance from listing a member twice.
  */
+/**
+ * What an attribute row says about itself: the relationship's own description,
+ * or else the definition of the one value type it holds -- an ontology that
+ * describes a value type once should not have to repeat it on every attribute.
+ */
+export function attributeDescription(relationship, model) {
+  if (relationship.description) return relationship.description
+  const roles = relationship.roles || []
+  if (roles.length !== 1) return ''
+  const concept = model.conceptByName.get(roles[0].concept)
+  return concept?.type === 'ValueType' ? concept.description || '' : ''
+}
+
 export function conceptMembers(concept, model) {
   if (!concept) return { attributes: [], associations: [], inbound: [] }
   const attributes = []
@@ -512,6 +525,21 @@ export function buildSearchIndex(model) {
     })
   }
   return items
+}
+
+/**
+ * The kinds the sidebar index lists for a tab. Value types are reached through
+ * the attribute table of the entity that uses them, so the ontology index lists
+ * entity types alone until the reader searches, when a value type is found by
+ * its name too -- as a semantic field is.
+ */
+export function indexKinds(tab, query, chosenKind = 'all') {
+  if (chosenKind !== 'all') return [chosenKind]
+  const searching = Boolean(query.trim())
+  if (tab === 'ontology') return searching ? ['concept', 'valueType'] : ['concept']
+  if (tab === 'semantic') return searching ? ['dataset', 'metric', 'field'] : ['dataset', 'metric']
+  if (tab === 'mapping') return ['mapping']
+  return []
 }
 
 export function searchIndex(items, query, kinds) {

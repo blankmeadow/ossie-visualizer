@@ -29,7 +29,7 @@ import {
 } from './components/ui/dropdown-menu'
 import { buildMappingGraph, buildOntologyGraph, buildSemanticGraph } from './lib/graph'
 import { useI18n, useT } from './lib/i18n'
-import { buildSearchIndex, normalizeOssie, parseOssie, relationshipKind, searchIndex } from './lib/ossie'
+import { buildSearchIndex, indexKinds, normalizeOssie, parseOssie, relationshipKind, searchIndex } from './lib/ossie'
 import { usePanelWidth } from './lib/usePanelWidth'
 
 // `count` reports how much the tab actually holds; the tabs that are not a
@@ -89,17 +89,7 @@ export default function App() {
   const [sidebarKind, setSidebarKind] = useState('all')
 
   const searchItems = useMemo(() => model ? buildSearchIndex(model) : [], [model])
-  const sidebarKinds = sidebarKind !== 'all'
-    ? [sidebarKind]
-    : activeTab === 'ontology'
-      // Value types are reached through the attribute table of the entity that
-      // uses them, so the ontology index lists entity types alone.
-      ? ['concept']
-      : activeTab === 'semantic'
-        ? query.trim() ? ['dataset', 'metric', 'field'] : ['dataset', 'metric']
-        : activeTab === 'mapping'
-          ? ['mapping']
-          : []
+  const sidebarKinds = indexKinds(activeTab, query, sidebarKind)
   const sidebarItems = useMemo(
     () => searchIndex(searchItems, query, sidebarKinds),
     [searchItems, query, sidebarKinds.join(':')],
